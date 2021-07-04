@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "TorrentAutodelete": {
+      "commandName": "Project"
+    },
+    "Jellyfin": {
+      "commandName": "Executable",
+      "executablePath": "$(JellyfinHome)\\jellyfin.exe",
+      "commandLineArgs": "-d \"$(TargetDir)data\""
+    }
+  }
+}
