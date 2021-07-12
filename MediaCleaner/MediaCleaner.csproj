@@ -13,8 +13,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Configuration\configPage.html" />
-    <EmbeddedResource Include="Configuration\configPage.html" />
+    <None Remove="Web\commons.js" />
+    <None Remove="Web\general.html" />
+    <None Remove="Web\general.js" />
+    <None Remove="Web\users.html" />
+    <None Remove="Web\users.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Web\commons.js" />
+    <EmbeddedResource Include="Web\general.html" />
+    <EmbeddedResource Include="Web\general.js" />
+    <EmbeddedResource Include="Web\users.html" />
+    <EmbeddedResource Include="Web\users.js" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="$(ConfigurationName) == Debug And $(OS) == Windows_NT">

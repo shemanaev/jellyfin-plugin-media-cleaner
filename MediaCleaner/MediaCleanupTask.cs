@@ -64,7 +64,12 @@ namespace MediaCleaner
 
         public async Task Execute(CancellationToken cancellationToken, IProgress<double> progress)
         {
-            var users = _userManager.Users.ToList();
+            var users = _userManager.Users
+                .Where(x => !Plugin.Instance.Configuration.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
+                .ToList();
+            var usersWithFavorites = _userManager.Users
+                .Where(x => !Plugin.Instance.Configuration.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
+                .ToList();
 
             if (users.Count == 0)
             {
@@ -76,19 +81,18 @@ namespace MediaCleaner
             var expired = new List<ExpiredItem>();
             if (Plugin.Instance.Configuration.KeepMoviesFor >= 0)
             {
-                var expiredMovies = _moviesCollector.Execute(users, cancellationToken);
+                var expiredMovies = _moviesCollector.Execute(users, usersWithFavorites, cancellationToken);
                 expired.AddRange(expiredMovies);
             }
             progress.Report(25);
             if (Plugin.Instance.Configuration.KeepEpisodesFor >= 0)
             {
-                var expiredSeries = _seriesCollector.Execute(users, cancellationToken);
+                var expiredSeries = _seriesCollector.Execute(users, usersWithFavorites, cancellationToken);
                 expired.AddRange(expiredSeries);
             }
             progress.Report(50);
 
             expired = expired.GroupBy(x => x.Item.Id)
-                //.Where(x => x.Count() == 1)
                 .Select(x => x.OrderByDescending(m => m.LastPlayedDate).First())
                 .OrderBy(x => x.LastPlayedDate)
                 .ToList();
@@ -98,9 +102,9 @@ namespace MediaCleaner
                 _logger.LogInformation("({Type}) '{Name}' will be deleted because expired for {Username} ({LastPlayedDate})",
                     item.Item.GetType().Name, item.Item.Name, item.User.Username, item.LastPlayedDate);
 
-                DeleteItem(item.Item);
-
                 await CreateNotification(item);
+
+                DeleteItem(item.Item);
             }
             progress.Report(100);
         }
@@ -171,7 +175,7 @@ namespace MediaCleaner
                 case Season season:
                     title = $"\"{season.SeriesName}\" S{season.IndexNumber:D2} was deleted";
                     shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
-                    overview = $"{season.Path}";
+                    overview = $"{season.Path ?? season.SeriesPath}";
                     break;
 
                 case Episode episode:

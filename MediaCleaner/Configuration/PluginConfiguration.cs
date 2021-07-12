@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MediaBrowser.Model.Plugins;
 
 namespace MediaCleaner.Configuration
@@ -24,5 +25,8 @@ namespace MediaCleaner.Configuration
         public int KeepEpisodesFor { get; set; } = -1;
         public FavoriteKeepKind KeepFavoriteEpisodes { get; set; } = FavoriteKeepKind.AnyUser;
         public SeriesDeleteKind DeleteEpisodes { get; set; } = SeriesDeleteKind.Season;
+
+        public List<string> UsersIgnorePlayed { get; set; }
+        public List<string> UsersIgnoreFavorited { get; set; }
     }
 }

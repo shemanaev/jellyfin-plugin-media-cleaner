@@ -16,7 +16,7 @@ namespace MediaCleaner.JunkCollectors
         {
         }
 
-        public override List<ExpiredItem> Execute(List<User> users, CancellationToken cancellationToken)
+        public override List<ExpiredItem> Execute(List<User> users, List<User> usersWithFavorites, CancellationToken cancellationToken)
         {
             var cutoff = Plugin.Instance.Configuration.KeepEpisodesFor;
             var scale = Plugin.Instance.Configuration.DeleteEpisodes;
@@ -25,8 +25,7 @@ namespace MediaCleaner.JunkCollectors
                 .ToList();
 
             _logger.LogDebug("{Count} episodes before filtering", expired.Count);
-            var filtered = FilterFavorites(Plugin.Instance.Configuration.KeepFavoriteEpisodes, expired, users);
-            //filtered = FilterGroup(scale, filtered);
+            var filtered = FilterFavorites(Plugin.Instance.Configuration.KeepFavoriteEpisodes, expired, usersWithFavorites);
             _logger.LogDebug("{Count} episodes after filtering", filtered.Count);
             return filtered;
         }
@@ -37,7 +36,7 @@ namespace MediaCleaner.JunkCollectors
             switch (kind)
             {
                 case SeriesDeleteKind.Season:
-                    var seasons = items.GroupBy(x => ((Episode)x.Item).SeasonId);
+                    var seasons = items.GroupBy(x => ((Episode)x.Item).Season?.Id ?? ((Episode)x.Item).Series?.Id);
                     foreach (var season in seasons)
                     {
                         var first = season.OrderByDescending(x => x.LastPlayedDate).FirstOrDefault();
@@ -57,7 +56,7 @@ namespace MediaCleaner.JunkCollectors
                     break;
 
                 case SeriesDeleteKind.Series:
-                    var series = items.GroupBy(x => ((Episode)x.Item).SeriesId);
+                    var series = items.GroupBy(x => ((Episode)x.Item).Series?.Id);
                     foreach (var show in series)
                     {
                         var first = show.OrderByDescending(x => x.LastPlayedDate).FirstOrDefault();

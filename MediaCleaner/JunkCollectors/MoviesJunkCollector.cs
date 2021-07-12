@@ -15,7 +15,7 @@ namespace MediaCleaner.JunkCollectors
         {
         }
 
-        public override List<ExpiredItem> Execute(List<User> users, CancellationToken cancellationToken)
+        public override List<ExpiredItem> Execute(List<User> users, List<User> usersWithFavorites, CancellationToken cancellationToken)
         {
             var cutoff = Plugin.Instance.Configuration.KeepMoviesFor;
             var expired = users
@@ -23,7 +23,7 @@ namespace MediaCleaner.JunkCollectors
                 .ToList();
 
             _logger.LogDebug("{Count} movies before filtering", expired.Count);
-            var filtered = FilterFavorites(Plugin.Instance.Configuration.KeepFavoriteMovies, expired, users);
+            var filtered = FilterFavorites(Plugin.Instance.Configuration.KeepFavoriteMovies, expired, usersWithFavorites);
             _logger.LogDebug("{Count} movies after filtering", filtered.Count);
             return filtered;
         }

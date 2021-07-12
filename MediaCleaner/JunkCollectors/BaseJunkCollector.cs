@@ -32,6 +32,7 @@ namespace MediaCleaner.JunkCollectors
 
         public abstract List<ExpiredItem> Execute(
             List<User> users,
+            List<User> usersWithFavorites,
             CancellationToken cancellationToken);
 
         protected List<ExpiredItem> GetExpiredItems<T>(
@@ -88,9 +89,14 @@ namespace MediaCleaner.JunkCollectors
                             || _userDataManager.GetUserData(user, episode.Series).IsFavorite
                             || (episode.Season != null && _userDataManager.GetUserData(user, episode.Season).IsFavorite),
 
+            Season season => _userDataManager.GetUserData(user, season).IsFavorite
+                          || _userDataManager.GetUserData(user, season.Series).IsFavorite,
+
+            Series series => _userDataManager.GetUserData(user, series).IsFavorite,
+
             Movie movie => _userDataManager.GetUserData(user, movie).IsFavorite,
 
-            _ => false
+            _ => _userDataManager.GetUserData(user, item).IsFavorite
         };
     }
 }

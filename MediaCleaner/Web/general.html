@@ -1,0 +1,53 @@
+<div id="MediaCleanerConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/MediaCleaner_js">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="MediaCleanerConfigForm">
+                <h2>Movies</h2>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepMoviesFor">Keep for</label>
+                    <input id="KeepMoviesFor" name="KeepMoviesFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a played movie before deleting. -1 to disable</div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="KeepFavoriteMovies">Keep favorites</label>
+                    <select is="emby-select" id="KeepFavoriteMovies" name="KeepFavoriteMovies" class="emby-select-withcolor emby-select">
+                        <option value="DontKeep">No</option>
+                        <option value="AnyUser">Any user</option>
+                        <option value="AllUsers">All users</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+
+                <h2>Series</h2>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepEpisodesFor">Keep episodes for</label>
+                    <input id="KeepEpisodesFor" name="KeepEpisodesFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a played episode before deleting. -1 to disable</div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="DeleteEpisodes">Delete after played</label>
+                    <select is="emby-select" id="DeleteEpisodes" name="DeleteEpisodes" class="emby-select-withcolor emby-select">
+                        <option value="Episode">Episode</option>
+                        <option value="Season">Entire season</option>
+                        <option value="Series">Entire series</option>
+                    </select>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="KeepFavoriteEpisodes">Keep favorites</label>
+                    <select is="emby-select" id="KeepFavoriteEpisodes" name="KeepFavoriteEpisodes" class="emby-select-withcolor emby-select">
+                        <option value="DontKeep">No</option>
+                        <option value="AnyUser">Any user</option>
+                        <option value="AllUsers">All users</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>${Save}</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

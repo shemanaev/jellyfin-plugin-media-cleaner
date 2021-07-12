@@ -28,8 +28,28 @@ namespace MediaCleaner
             {
                 new PluginPageInfo
                 {
-                    Name = this.Name,
-                    EmbeddedResourcePath = $"{GetType().Namespace}.Configuration.configPage.html"
+                    Name = "MediaCleaner",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.general.html"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_js",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.general.js"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_commons_js",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.commons.js"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_Users",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.users.html"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_Users_js",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.users.js"
                 }
             };
         }
