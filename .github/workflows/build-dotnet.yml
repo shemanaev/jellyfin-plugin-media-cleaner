@@ -16,14 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Setup .NET Core
+      - name: Setup .NET
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: 5.0.x
+          dotnet-version: "6.0.x"
 
       - name: Build Jellyfin Plugin
         uses: oddstr13/jellyfin-plugin-repository-manager@v0.4.2
         id: jprm
+        with:
+          dotnet-target: "net6.0"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2

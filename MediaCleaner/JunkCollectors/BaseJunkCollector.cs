@@ -68,7 +68,7 @@ namespace MediaCleaner.JunkCollectors
                     {
                         IncludeItemTypes = new[]
                         {
-                            typeof(T).Name
+                            typeof(T) == typeof(Movie) ? BaseItemKind.Movie : BaseItemKind.Episode
                         },
                         IsVirtualItem = false,
                         OrderBy = new[] {(ItemSortBy.DatePlayed, SortOrder.Descending)}
@@ -90,9 +90,9 @@ namespace MediaCleaner.JunkCollectors
                             || (episode.Season != null && _userDataManager.GetUserData(user, episode.Season).IsFavorite),
 
             Season season => _userDataManager.GetUserData(user, season).IsFavorite
-                          || _userDataManager.GetUserData(user, season.Series).IsFavorite,
+                          || _userDataManager.GetUserData(user, season.Series).IsFavorite, // FIXME: check if any episode favorited?
 
-            Series series => _userDataManager.GetUserData(user, series).IsFavorite,
+            Series series => _userDataManager.GetUserData(user, series).IsFavorite, // FIXME: same as season
 
             Movie movie => _userDataManager.GetUserData(user, movie).IsFavorite,
 

@@ -62,7 +62,7 @@ namespace MediaCleaner
             _seriesCollector = new SeriesJunkCollector(loggerFactory.CreateLogger<SeriesJunkCollector>(), libraryManager, userDataManager);
         }
 
-        public async Task Execute(CancellationToken cancellationToken, IProgress<double> progress)
+        public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         {
             var users = _userManager.Users
                 .Where(x => !Plugin.Instance.Configuration.UsersIgnorePlayed.Contains(x.Id.ToString("N")))

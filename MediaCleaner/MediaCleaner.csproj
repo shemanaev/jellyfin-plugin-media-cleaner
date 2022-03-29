@@ -1,15 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>MediaCleaner</RootNamespace>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.7.*-*" />
-    <PackageReference Include="Jellyfin.Model" Version="10.7.*-*" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.8.*-*" />
+    <PackageReference Include="Jellyfin.Model" Version="10.8.*-*" />
   </ItemGroup>
 
   <ItemGroup>

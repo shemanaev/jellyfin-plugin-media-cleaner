@@ -43,12 +43,16 @@ namespace MediaCleaner.JunkCollectors
                         if (first?.Item is not Episode episode) continue;
                         var episodes = episode.Season.GetEpisodes();
                         var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
-                        if (allWatched) result.Add(new ExpiredItem
+                        if (allWatched)
                         {
-                            Item = episode.Season,
-                            User = first.User,
-                            LastPlayedDate = first.LastPlayedDate
-                        });
+                            result.Add(new ExpiredItem
+                            {
+                                Item = episode.Season,
+                                User = first.User,
+                                LastPlayedDate = first.LastPlayedDate
+                            });
+                        }
+
                         _logger.LogDebug("'{User}' has watched episodes {Count} of {Total} in season {SeasonName}",
                             season.First().User.Username, episodes.Count, season.Count(), episode.Season.Name);
                     }
@@ -63,12 +67,15 @@ namespace MediaCleaner.JunkCollectors
                         if (first?.Item is not Episode episode) continue;
                         var episodes = episode.Series.GetEpisodes().ToList();
                         var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
-                        if (allWatched) result.Add(new ExpiredItem
+                        if (allWatched)
                         {
-                            Item = episode.Series,
-                            User = first.User,
-                            LastPlayedDate = first.LastPlayedDate
-                        });
+                            result.Add(new ExpiredItem
+                            {
+                                Item = episode.Series,
+                                User = first.User,
+                                LastPlayedDate = first.LastPlayedDate
+                            });
+                        }
                         _logger.LogDebug("'{User}' has watched episodes {Count} of {Total} in series {SeriesName}",
                             show.First().User.Username, episodes.Count, show.Count(), episode.Series.Name);
                     }
