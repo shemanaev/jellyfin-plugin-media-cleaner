@@ -26,7 +26,9 @@ namespace MediaCleaner.Configuration
         public FavoriteKeepKind KeepFavoriteEpisodes { get; set; } = FavoriteKeepKind.AnyUser;
         public SeriesDeleteKind DeleteEpisodes { get; set; } = SeriesDeleteKind.Season;
 
-        public List<string> UsersIgnorePlayed { get; set; }
-        public List<string> UsersIgnoreFavorited { get; set; }
+        public List<string> UsersIgnorePlayed { get; set; } = new List<string>();
+        public List<string> UsersIgnoreFavorited { get; set; } = new List<string>();
+
+        public List<string> LocationsExcluded { get; set; } = new List<string>();
     }
 }

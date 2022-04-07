@@ -4,6 +4,7 @@ using System.Threading;
 using Jellyfin.Data.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.IO;
 using MediaCleaner.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -11,8 +12,8 @@ namespace MediaCleaner.JunkCollectors
 {
     internal class SeriesJunkCollector : BaseJunkCollector
     {
-        public SeriesJunkCollector(ILogger logger, ILibraryManager libraryManager, IUserDataManager userDataManager)
-            : base(logger, libraryManager, userDataManager)
+        public SeriesJunkCollector(ILogger logger, ILibraryManager libraryManager, IUserDataManager userDataManager, IFileSystem fileSystem)
+            : base(logger, libraryManager, userDataManager, fileSystem)
         {
         }
 
@@ -26,6 +27,7 @@ namespace MediaCleaner.JunkCollectors
 
             _logger.LogDebug("{Count} episodes before filtering", expired.Count);
             var filtered = FilterFavorites(Plugin.Instance.Configuration.KeepFavoriteEpisodes, expired, usersWithFavorites);
+            filtered = FilterExcludedLocations(filtered, Plugin.Instance.Configuration.LocationsExcluded);
             _logger.LogDebug("{Count} episodes after filtering", filtered.Count);
             return filtered;
         }

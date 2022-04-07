@@ -13,6 +13,7 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Globalization;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Model.IO;
 
 namespace MediaCleaner
 {
@@ -50,7 +51,8 @@ namespace MediaCleaner
             ILibraryManager libraryManager,
             IUserDataManager userDataManager,
             IActivityManager activityManager,
-            ILocalizationManager localization)
+            ILocalizationManager localization,
+            IFileSystem fileSystem)
         {
             _logger = loggerFactory.CreateLogger<MediaCleanupTask>();
             _userManager = userManager;
@@ -58,8 +60,8 @@ namespace MediaCleaner
             _activityManager = activityManager;
             _localization = localization;
 
-            _moviesCollector = new MoviesJunkCollector(loggerFactory.CreateLogger<MoviesJunkCollector>(), libraryManager, userDataManager);
-            _seriesCollector = new SeriesJunkCollector(loggerFactory.CreateLogger<SeriesJunkCollector>(), libraryManager, userDataManager);
+            _moviesCollector = new MoviesJunkCollector(loggerFactory.CreateLogger<MoviesJunkCollector>(), libraryManager, userDataManager, fileSystem);
+            _seriesCollector = new SeriesJunkCollector(loggerFactory.CreateLogger<SeriesJunkCollector>(), libraryManager, userDataManager, fileSystem);
         }
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)

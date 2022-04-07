@@ -8,6 +8,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Querying;
 using MediaCleaner.Configuration;
 using Microsoft.Extensions.Logging;
@@ -19,15 +20,18 @@ namespace MediaCleaner.JunkCollectors
         protected readonly ILogger _logger;
         protected readonly IUserDataManager _userDataManager;
         private readonly ILibraryManager _libraryManager;
+        private readonly IFileSystem _fileSystem;
 
         protected BaseJunkCollector(
             ILogger logger,
             ILibraryManager libraryManager,
-            IUserDataManager userDataManager)
+            IUserDataManager userDataManager,
+            IFileSystem fileSystem)
         {
             _logger = logger;
             _libraryManager = libraryManager;
             _userDataManager = userDataManager;
+            _fileSystem = fileSystem;
         }
 
         public abstract List<ExpiredItem> Execute(
@@ -68,12 +72,20 @@ namespace MediaCleaner.JunkCollectors
                     {
                         IncludeItemTypes = new[]
                         {
-                            typeof(T) == typeof(Movie) ? BaseItemKind.Movie : BaseItemKind.Episode
+                            typeof(T) switch
+                            {
+                                var type when type == typeof(Movie) => BaseItemKind.Movie,
+                                var type when type == typeof(Episode) => BaseItemKind.Episode,
+                                _ => BaseItemKind.Video
+                            }
                         },
                         IsVirtualItem = false,
                         OrderBy = new[] {(ItemSortBy.DatePlayed, SortOrder.Descending)}
                     })
             .Cast<T>().ToList();
+
+        protected List<ExpiredItem> FilterExcludedLocations(List<ExpiredItem> items, List<string> locations) =>
+            items.Where(x => !locations.Any(s => _fileSystem.ContainsSubPath(s, x.Item.Path))).ToList();
 
         protected List<ExpiredItem> FilterFavorites(FavoriteKeepKind kind, List<ExpiredItem> items, List<User> users) => kind switch
         {

@@ -16,6 +16,8 @@
     <None Remove="Web\commons.js" />
     <None Remove="Web\general.html" />
     <None Remove="Web\general.js" />
+    <None Remove="Web\locations.html" />
+    <None Remove="Web\locations.js" />
     <None Remove="Web\users.html" />
     <None Remove="Web\users.js" />
   </ItemGroup>
@@ -24,6 +26,8 @@
     <EmbeddedResource Include="Web\commons.js" />
     <EmbeddedResource Include="Web\general.html" />
     <EmbeddedResource Include="Web\general.js" />
+    <EmbeddedResource Include="Web\locations.html" />
+    <EmbeddedResource Include="Web\locations.js" />
     <EmbeddedResource Include="Web\users.html" />
     <EmbeddedResource Include="Web\users.js" />
   </ItemGroup>

@@ -10,6 +10,10 @@ export function getTabs() {
             href: getConfigurationPageUrl('MediaCleaner_Users'),
             name: 'Users'
         },
+        {
+            href: getConfigurationPageUrl('MediaCleaner_Locations'),
+            name: 'Locations'
+        },
     ]
     return tabs
 }
