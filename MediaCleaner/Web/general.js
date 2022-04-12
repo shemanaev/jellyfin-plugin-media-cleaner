@@ -19,8 +19,10 @@ function onViewShow(commons) {
 
     const $KeepFavoriteMovies = page.querySelector('#KeepFavoriteMovies')
     const $KeepFavoriteEpisodes = page.querySelector('#KeepFavoriteEpisodes')
+    const $KeepFavoriteVideos = page.querySelector('#KeepFavoriteVideos')
     $KeepFavoriteMovies.addEventListener('change', keepFavoriteChanged)
     $KeepFavoriteEpisodes.addEventListener('change', keepFavoriteChanged)
+    $KeepFavoriteVideos.addEventListener('change', keepFavoriteChanged)
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
@@ -28,8 +30,10 @@ function onViewShow(commons) {
         page.querySelector('#KeepEpisodesFor').value = config.KeepEpisodesFor
         page.querySelector('#DeleteEpisodes').value = config.DeleteEpisodes
         page.querySelector('#KeepFavoriteEpisodes').value = config.KeepFavoriteEpisodes
+        page.querySelector('#KeepVideosFor').value = config.KeepVideosFor
+        page.querySelector('#KeepFavoriteVideos').value = config.KeepFavoriteVideos
 
-        fireEvent([$KeepFavoriteMovies, $KeepFavoriteEpisodes], 'change')
+        fireEvent([$KeepFavoriteMovies, $KeepFavoriteEpisodes, $KeepFavoriteVideos], 'change')
 
         Dashboard.hideLoadingMsg()
     })
@@ -45,6 +49,9 @@ function onFormSubmit(commons) {
         config.KeepEpisodesFor = form.querySelector('#KeepEpisodesFor').value
         config.DeleteEpisodes = form.querySelector('#DeleteEpisodes').value
         config.KeepFavoriteEpisodes = form.querySelector('#KeepFavoriteEpisodes').value
+        config.KeepVideosFor = form.querySelector('#KeepVideosFor').value
+        config.KeepFavoriteVideos = form.querySelector('#KeepFavoriteVideos').value
+
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
             Dashboard.processPluginConfigurationUpdateResult(result)
         })

@@ -27,6 +27,7 @@ namespace MediaCleaner
 
         private readonly IJunkCollector _moviesCollector;
         private readonly IJunkCollector _seriesCollector;
+        private readonly IJunkCollector _videosCollector;
 
         public string Name => "Played media cleanup";
 
@@ -62,6 +63,7 @@ namespace MediaCleaner
 
             _moviesCollector = new MoviesJunkCollector(loggerFactory.CreateLogger<MoviesJunkCollector>(), libraryManager, userDataManager, fileSystem);
             _seriesCollector = new SeriesJunkCollector(loggerFactory.CreateLogger<SeriesJunkCollector>(), libraryManager, userDataManager, fileSystem);
+            _videosCollector = new VideosJunkCollector(loggerFactory.CreateLogger<VideosJunkCollector>(), libraryManager, userDataManager, fileSystem);
         }
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
@@ -93,6 +95,12 @@ namespace MediaCleaner
                 expired.AddRange(expiredSeries);
             }
             progress.Report(50);
+            if (Plugin.Instance.Configuration.KeepVideosFor >= 0)
+            {
+                var expiredVideos = _videosCollector.Execute(users, usersWithFavorites, cancellationToken);
+                expired.AddRange(expiredVideos);
+            }
+            progress.Report(75);
 
             expired = expired.GroupBy(x => x.Item.Id)
                 .Select(x => x.OrderByDescending(m => m.LastPlayedDate).First())
@@ -148,6 +156,10 @@ namespace MediaCleaner
                     }
                     break;
 
+                case Video video:
+                    _libraryManager.DeleteItem(video, opts, true);
+                    break;
+
                 default:
                     _libraryManager.DeleteItem(item, opts, true);
                     break;
@@ -184,6 +196,12 @@ namespace MediaCleaner
                     title = $"\"{episode.SeriesName}\" S{episode.ParentIndexNumber:D2}E{episode.IndexNumber:D2} was deleted";
                     shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
                     overview = $"{episode.Path}";
+                    break;
+
+                case Video video:
+                    title = $"\"{video.Name}\" was deleted";
+                    shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
+                    overview = $"{video.Path}";
                     break;
 
                 default:

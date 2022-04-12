@@ -42,6 +42,22 @@
                     <div class="fieldDescription"></div>
                 </div>
 
+                <h2>Videos</h2>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepVideosFor">Keep for</label>
+                    <input id="KeepVideosFor" name="KeepVideosFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a played video before deleting. -1 to disable</div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="KeepFavoriteVideos">Keep favorites</label>
+                    <select is="emby-select" id="KeepFavoriteVideos" name="KeepFavoriteVideos" class="emby-select-withcolor emby-select">
+                        <option value="DontKeep">No</option>
+                        <option value="AnyUser">Any user</option>
+                        <option value="AllUsers">All users</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                         <span>${Save}</span>
