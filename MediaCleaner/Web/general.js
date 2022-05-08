@@ -33,7 +33,7 @@ function onViewShow(commons) {
         page.querySelector('#KeepVideosFor').value = config.KeepVideosFor
         page.querySelector('#KeepFavoriteVideos').value = config.KeepFavoriteVideos
 
-        fireEvent([$KeepFavoriteMovies, $KeepFavoriteEpisodes, $KeepFavoriteVideos], 'change')
+        commons.fireEvent([$KeepFavoriteMovies, $KeepFavoriteEpisodes, $KeepFavoriteVideos], 'change')
 
         Dashboard.hideLoadingMsg()
     })
@@ -72,9 +72,4 @@ function keepFavoriteChanged(event) {
         default:
             field.innerHTML = ''
     }
-}
-
-function fireEvent(elements, event) {
-    elements = Array.isArray(elements) ? elements : [elements]
-    elements.forEach(x => x.dispatchEvent(new Event(event)))
 }

@@ -27,7 +27,7 @@ namespace MediaCleaner.JunkCollectors
 
             _logger.LogDebug("{Count} episodes before filtering", expired.Count);
             var filtered = FilterFavorites(Plugin.Instance.Configuration.KeepFavoriteEpisodes, expired, usersWithFavorites);
-            filtered = FilterExcludedLocations(filtered, Plugin.Instance.Configuration.LocationsExcluded);
+            filtered = FilterExcludedLocations(filtered, Plugin.Instance.Configuration.LocationsExcluded, Plugin.Instance.Configuration.LocationsMode);
             _logger.LogDebug("{Count} episodes after filtering", filtered.Count);
             return filtered;
         }

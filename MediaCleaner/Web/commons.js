@@ -19,3 +19,8 @@ export function getTabs() {
 }
 
 const getConfigurationPageUrl = (name) => ApiClient.getUrl('web/ConfigurationPage', { name })
+
+export function fireEvent(elements, event) {
+    elements = Array.isArray(elements) ? elements : [elements]
+    elements.forEach(x => x.dispatchEvent(new Event(event)))
+}

@@ -2,13 +2,22 @@
     <div data-role="content">
         <div class="content-primary">
             <form id="MediaCleanerConfigForm">
+                <div class="selectContainer">
+                    <h3 class="selectLabel" for="LocationsMode">Mode</h3>
+                    <select is="emby-select" id="LocationsMode" name="LocationsMode" class="emby-select-withcolor emby-select">
+                        <option value="Exclude">Exclude</option>
+                        <option value="Include">Include</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+
                 <div>
-                    <h3 class="checkboxListLabel">Locations excluded</h3>
+                    <h3 class="checkboxListLabel">Locations</h3>
                     <div class="paperList checkboxList checkboxList-paperList" id="LocationsExcludedList">
                     </div>
                 </div>
 
-                <br/>
+                <br />
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                         <span>${Save}</span>

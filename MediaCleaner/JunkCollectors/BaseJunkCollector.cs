@@ -57,7 +57,7 @@ namespace MediaCleaner.JunkCollectors
                 var expirationTime = userData.LastPlayedDate.Value.AddDays(keepFor);
                 if (DateTime.Now.CompareTo(expirationTime) < 0) continue;
 
-                result.Add(new ExpiredItem {Item = item, User = user, LastPlayedDate = userData.LastPlayedDate.Value});
+                result.Add(new ExpiredItem { Item = item, User = user, LastPlayedDate = userData.LastPlayedDate.Value });
 
                 _logger.LogDebug("\"{Name}\" has expired for {Username} ({Value})",
                     item.Name, user.Username, userData.LastPlayedDate.Value);
@@ -80,12 +80,16 @@ namespace MediaCleaner.JunkCollectors
                             }
                         },
                         IsVirtualItem = false,
-                        OrderBy = new[] {(ItemSortBy.DatePlayed, SortOrder.Descending)}
+                        OrderBy = new[] { (ItemSortBy.DatePlayed, SortOrder.Descending) }
                     })
             .Cast<T>().ToList();
 
-        protected List<ExpiredItem> FilterExcludedLocations(List<ExpiredItem> items, List<string> locations) =>
-            items.Where(x => !locations.Any(s => _fileSystem.ContainsSubPath(s, x.Item.Path))).ToList();
+        protected List<ExpiredItem> FilterExcludedLocations(List<ExpiredItem> items, List<string> locations, LocationsListMode mode) => mode switch
+        {
+            LocationsListMode.Exclude => items.Where(x => !locations.Any(s => _fileSystem.ContainsSubPath(s, x.Item.Path))).ToList(),
+            LocationsListMode.Include => items.Where(x => locations.Any(s => _fileSystem.ContainsSubPath(s, x.Item.Path))).ToList(),
+            _ => throw new NotSupportedException()
+        };
 
         protected List<ExpiredItem> FilterFavorites(FavoriteKeepKind kind, List<ExpiredItem> items, List<User> users) => kind switch
         {

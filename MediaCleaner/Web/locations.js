@@ -17,9 +17,14 @@ function onViewShow(commons) {
     LibraryMenu.setTabs('MediaCleaner', 2, commons.getTabs)
     Dashboard.showLoadingMsg()
 
+    const $LocationsMode = page.querySelector('#LocationsMode')
     const $LocationsExcludedList = page.querySelector('#LocationsExcludedList')
 
+    $LocationsMode.addEventListener('change', listModeChanged)
+
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
+        $LocationsMode.value = config.LocationsMode
+
         ApiClient.getVirtualFolders().then(virtualFolders => {
             let locationsHtml = '<div data-role="controlgroup">'
             for (let folder of virtualFolders) {
@@ -34,6 +39,8 @@ function onViewShow(commons) {
 
             Dashboard.hideLoadingMsg()
         })
+
+        commons.fireEvent([$LocationsMode], 'change')
     })
 }
 
@@ -44,6 +51,7 @@ function onFormSubmit(commons) {
     const $LocationsExcludedList = form.querySelector('#LocationsExcludedList')
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
+        config.LocationsMode = form.querySelector('#LocationsMode').value
         config.LocationsExcluded = Array.prototype.map.call($LocationsExcludedList.querySelectorAll('input:checked'),
             elem => elem.getAttribute('data-location'))
 
@@ -59,4 +67,20 @@ function getLocationHtml(location, isChecked) {
     html += '<input is="emby-checkbox" type="checkbox" data-mini="true" data-location="' + location + '"' + checkedAttribute + ' />'
     html += '<span>' + location + '</span></label>'
     return html
+}
+
+function listModeChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    switch (this.value) {
+        case 'Exclude':
+            field.innerHTML = `Don't clean in selected locations`
+            break
+
+        case 'Include':
+            field.innerHTML = 'Clean only in selected locations'
+            break
+
+        default:
+            field.innerHTML = ''
+    }
 }

@@ -17,6 +17,12 @@ namespace MediaCleaner.Configuration
         Series
     }
 
+    public enum LocationsListMode
+    {
+        Exclude,
+        Include
+    }
+
     public class PluginConfiguration : BasePluginConfiguration
     {
         public int KeepMoviesFor { get; set; } = -1;
@@ -32,6 +38,9 @@ namespace MediaCleaner.Configuration
         public List<string> UsersIgnorePlayed { get; set; } = new List<string>();
         public List<string> UsersIgnoreFavorited { get; set; } = new List<string>();
 
+        // This should be named just "Locations", but it was list of exclusion historically
+        // and we don't want to break anyone's config.
         public List<string> LocationsExcluded { get; set; } = new List<string>();
+        public LocationsListMode LocationsMode { get; set; } = LocationsListMode.Exclude;
     }
 }
