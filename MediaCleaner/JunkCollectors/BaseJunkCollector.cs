@@ -84,12 +84,24 @@ namespace MediaCleaner.JunkCollectors
                     })
             .Cast<T>().ToList();
 
-        protected List<ExpiredItem> FilterExcludedLocations(List<ExpiredItem> items, List<string> locations, LocationsListMode mode) => mode switch
+        protected List<ExpiredItem> FilterExcludedLocations(List<ExpiredItem> items, List<string> locations, LocationsListMode mode) => items.Where(x =>
         {
-            LocationsListMode.Exclude => items.Where(x => !locations.Any(s => _fileSystem.ContainsSubPath(s, x.Item.Path))).ToList(),
-            LocationsListMode.Include => items.Where(x => locations.Any(s => _fileSystem.ContainsSubPath(s, x.Item.Path))).ToList(),
-            _ => throw new NotSupportedException()
-        };
+            var path = x.Item switch
+            {
+                Episode episode => episode.Path,
+                Season season => season.GetEpisodes().Where(x => !x.IsVirtualItem).First().Path,
+                Series series => series.GetEpisodes().Where(x => !x.IsVirtualItem).First().Path,
+                Movie movie => movie.Path,
+                _ => x.Item.Path
+            };
+            var contains = locations.Any(s => _fileSystem.ContainsSubPath(s, path));
+            return mode switch
+            {
+                LocationsListMode.Exclude => !contains,
+                LocationsListMode.Include => contains,
+                _ => throw new NotSupportedException()
+            };
+        }).ToList();
 
         protected List<ExpiredItem> FilterFavorites(FavoriteKeepKind kind, List<ExpiredItem> items, List<User> users) => kind switch
         {
