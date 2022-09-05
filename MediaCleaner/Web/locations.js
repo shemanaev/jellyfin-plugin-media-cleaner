@@ -14,7 +14,7 @@ export default function (view, params) {
 
 function onViewShow(commons) {
     const page = this
-    LibraryMenu.setTabs('MediaCleaner', 2, commons.getTabs)
+    LibraryMenu.setTabs('MediaCleaner', commons.TabLocations, commons.getTabs)
     Dashboard.showLoadingMsg()
 
     const $LocationsMode = page.querySelector('#LocationsMode')

@@ -18,7 +18,11 @@ export function getTabs() {
     return tabs
 }
 
-const getConfigurationPageUrl = (name) => ApiClient.getUrl('web/ConfigurationPage', { name })
+export const TabGeneral = 0
+export const TabUsers = 1
+export const TabLocations = 2
+
+const getConfigurationPageUrl = (name) => 'configurationpage?name=' + encodeURIComponent(name)
 
 export function fireEvent(elements, event) {
     elements = Array.isArray(elements) ? elements : [elements]

@@ -14,7 +14,7 @@ export default function (view, params) {
 
 function onViewShow(commons) {
     const page = this
-    LibraryMenu.setTabs('MediaCleaner', 1, commons.getTabs)
+    LibraryMenu.setTabs('MediaCleaner', commons.TabUsers, commons.getTabs)
     Dashboard.showLoadingMsg()
 
     const $IgnorePlayedList = page.querySelector('#IgnorePlayedList')
