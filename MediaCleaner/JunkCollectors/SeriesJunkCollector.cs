@@ -62,6 +62,7 @@ namespace MediaCleaner.JunkCollectors
                     break;
 
                 case SeriesDeleteKind.Series:
+                case SeriesDeleteKind.SeriesEnded:
                     var series = items.GroupBy(x => ((Episode)x.Item).Series?.Id);
                     foreach (var show in series)
                     {
@@ -71,6 +72,12 @@ namespace MediaCleaner.JunkCollectors
                         var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
                         if (allWatched)
                         {
+                            if (kind == SeriesDeleteKind.SeriesEnded)
+                            {
+                                if (episode.Series.Status.HasValue
+                                 && episode.Series.Status.Value != MediaBrowser.Model.Entities.SeriesStatus.Ended)
+                                    continue;
+                            }
                             result.Add(new ExpiredItem
                             {
                                 Item = episode.Series,

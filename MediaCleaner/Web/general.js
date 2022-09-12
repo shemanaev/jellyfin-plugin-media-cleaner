@@ -24,6 +24,9 @@ function onViewShow(commons) {
     $KeepFavoriteEpisodes.addEventListener('change', keepFavoriteChanged)
     $KeepFavoriteVideos.addEventListener('change', keepFavoriteChanged)
 
+    const $DeleteEpisodes = page.querySelector('#DeleteEpisodes')
+    $DeleteEpisodes.addEventListener('change', deleteEpisodesChanged)
+
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
         page.querySelector('#KeepFavoriteMovies').value = config.KeepFavoriteMovies
@@ -33,7 +36,12 @@ function onViewShow(commons) {
         page.querySelector('#KeepVideosFor').value = config.KeepVideosFor
         page.querySelector('#KeepFavoriteVideos').value = config.KeepFavoriteVideos
 
-        commons.fireEvent([$KeepFavoriteMovies, $KeepFavoriteEpisodes, $KeepFavoriteVideos], 'change')
+        commons.fireEvent([
+            $KeepFavoriteMovies,
+            $KeepFavoriteEpisodes,
+            $KeepFavoriteVideos,
+            $DeleteEpisodes,
+        ], 'change')
 
         Dashboard.hideLoadingMsg()
     })
@@ -67,6 +75,18 @@ function keepFavoriteChanged(event) {
 
         case 'AllUsers':
             field.innerHTML = 'All users have item in favorites'
+            break
+
+        default:
+            field.innerHTML = ''
+    }
+}
+
+function deleteEpisodesChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    switch (this.value) {
+        case 'SeriesEnded':
+            field.innerHTML = `Don't delete unless series status changes to "Ended" in metadata`
             break
 
         default:
