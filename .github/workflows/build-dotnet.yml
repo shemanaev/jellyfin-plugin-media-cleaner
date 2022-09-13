@@ -2,11 +2,11 @@ name: Build Plugin
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
     paths-ignore:
       - '**/*.md'
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
     paths-ignore:
       - '**/*.md'
 
@@ -14,21 +14,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+      -
+        name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      -
+        name: Setup .NET Core
+        uses: actions/setup-dotnet@v2
         with:
           dotnet-version: "6.0.x"
-
-      - name: Build Jellyfin Plugin
-        uses: oddstr13/jellyfin-plugin-repository-manager@v0.4.2
+      -
+        name: Build Jellyfin Plugin
+        uses: oddstr13/jellyfin-plugin-repository-manager@v0.5.0
         id: jprm
         with:
           dotnet-target: "net6.0"
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+      -
+        name: Upload Artifact
+        uses: actions/upload-artifact@v3
         with:
           name: build-artifact
           retention-days: 30
