@@ -11,7 +11,7 @@ internal class TroubleshootingLogger : ILogger
     public TroubleshootingLogger(
         string name,
         Func<TroubleshootingLoggerConfiguration> getCurrentConfig) =>
-        (_name, _getCurrentConfig) = (name, getCurrentConfig);
+        (_name, _getCurrentConfig) = (string.Join('.', name.Split('.')[1..]), getCurrentConfig);
 
     public IDisposable BeginScope<TState>(TState state) => default!;
 
