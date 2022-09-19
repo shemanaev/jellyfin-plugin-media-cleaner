@@ -6,20 +6,24 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
+using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;
 
 internal class FavoritesFilter : IExpiredItemFilter
 {
+    private readonly ILogger<FavoritesFilter> _logger;
     private readonly FavoriteKeepKind _kind;
     private readonly List<User> _users;
     private readonly IUserDataManager _userDataManager;
 
     public FavoritesFilter(
+        ILogger<FavoritesFilter> logger,
         FavoriteKeepKind kind,
         List<User> users,
         IUserDataManager userDataManager)
     {
+        _logger = logger;
         _kind = kind;
         _users = users;
         _userDataManager = userDataManager;
@@ -43,6 +47,11 @@ internal class FavoritesFilter : IExpiredItemFilter
                     if (!_users.Any(m => IsFavorite(m, item.Item)))
                     {
                         result.Add(item);
+                    }
+                    else
+                    {
+                        var user = _users.Find(m => IsFavorite(m, item.Item));
+                        _logger.LogTrace("'{Name}' is favorited by '{Username}'", item.Item.Name, user.Username);
                     }
                     break;
 

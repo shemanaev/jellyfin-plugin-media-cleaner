@@ -5,20 +5,24 @@ using MediaCleaner.Configuration;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.IO;
+using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;
 
 internal class LocationsFilter : IExpiredItemFilter
 {
+    private readonly ILogger<LocationsFilter> _logger;
     private readonly LocationsListMode _mode;
     private readonly List<string> _locations;
     private readonly IFileSystem _fileSystem;
 
     public LocationsFilter(
+        ILogger<LocationsFilter> logger,
         LocationsListMode mode,
         List<string> locations,
         IFileSystem fileSystem)
     {
+        _logger = logger;
         _mode = mode;
         _locations = locations;
         _fileSystem = fileSystem;
@@ -52,6 +56,11 @@ internal class LocationsFilter : IExpiredItemFilter
             if (shouldDelete)
             {
                 result.Add(item);
+            }
+            else
+            {
+                var location = _locations.Find(s => _fileSystem.ContainsSubPath(s, path));
+                _logger.LogTrace("'{Name}' is belongs to location '{Location}'", item.Item.Name, location);
             }
         }
 

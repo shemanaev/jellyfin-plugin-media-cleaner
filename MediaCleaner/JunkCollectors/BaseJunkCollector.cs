@@ -33,6 +33,7 @@ internal abstract class BaseJunkCollector : IJunkCollector
             .SelectMany(x => _itemsAdapter.GetPlayedItems(_kind, x, cancellationToken))
             .ToList();
 
+        _logger.LogDebug("Filters order: {Filters}", string.Join(", ", filters.Select(x => x.Name)));
         _logger.LogDebug("{Count} items before filtering", items.Count);
 
         foreach (var filter in filters)
