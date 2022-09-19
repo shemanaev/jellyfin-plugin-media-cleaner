@@ -61,7 +61,6 @@ public class TroubleshootingController : ControllerBase
         var pluginConfig = GetPrettyXml(Plugin.Instance.Configuration);
 
         var log = $@"
-### Troubleshooting info
 * Jellyfin version: {_applicationHost.ApplicationVersionString}
 * Plugin version: {Plugin.Instance.Version}
 <details>
