@@ -11,7 +11,7 @@ const logTextareaSelector = '#TroubleshootingLog'
 
 function onViewShow(commons) {
     const page = this
-    LibraryMenu.setTabs('MediaCleaner', commons.TabsTroubleshooting, commons.getTabs)
+    LibraryMenu.setTabs('MediaCleaner', commons.TabTroubleshooting, commons.getTabs)
     Dashboard.showLoadingMsg()
 
     const $TroubleshootingButtonCopy = page.querySelector('#TroubleshootingButtonCopy')
