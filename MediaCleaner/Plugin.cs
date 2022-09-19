@@ -60,6 +60,16 @@ namespace MediaCleaner
                 {
                     Name = "MediaCleaner_Locations_js",
                     EmbeddedResourcePath = $"{GetType().Namespace}.Web.locations.js"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_Troubleshooting",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.troubleshooting.html"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_Troubleshooting_js",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.troubleshooting.js"
                 }
             };
         }

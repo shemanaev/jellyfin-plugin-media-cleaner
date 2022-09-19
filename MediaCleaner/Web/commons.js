@@ -14,6 +14,10 @@ export function getTabs() {
             href: getConfigurationPageUrl('MediaCleaner_Locations'),
             name: 'Locations'
         },
+        {
+            href: getConfigurationPageUrl('MediaCleaner_Troubleshooting'),
+            name: 'Troubleshooting'
+        },
     ]
     return tabs
 }
@@ -21,6 +25,7 @@ export function getTabs() {
 export const TabGeneral = 0
 export const TabUsers = 1
 export const TabLocations = 2
+export const TabTroubleshooting = 3
 
 const getConfigurationPageUrl = (name) => 'configurationpage?name=' + encodeURIComponent(name)
 

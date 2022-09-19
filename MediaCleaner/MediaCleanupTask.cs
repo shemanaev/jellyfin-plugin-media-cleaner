@@ -29,6 +29,8 @@ namespace MediaCleaner
         private readonly IJunkCollector _seriesCollector;
         private readonly IJunkCollector _videosCollector;
 
+        public bool IsDryRun { get; set; } = false;
+
         public string Name => "Played media cleanup";
 
         public string Description => "Delete played media files after specified amount of time";
@@ -112,9 +114,11 @@ namespace MediaCleaner
                 _logger.LogInformation("({Type}) '{Name}' will be deleted because expired for {Username} ({LastPlayedDate})",
                     item.Item.GetType().Name, item.Item.Name, item.User.Username, item.LastPlayedDate);
 
-                await CreateNotification(item);
-
-                DeleteItem(item.Item);
+                if (!IsDryRun)
+                {
+                    await CreateNotification(item);
+                    DeleteItem(item.Item);
+                }
             }
             progress.Report(100);
         }
