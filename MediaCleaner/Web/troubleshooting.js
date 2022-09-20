@@ -6,7 +6,7 @@ export default function (view, params) {
     })
 }
 
-const pageSelector = '#MediaCleanerConfigPageTroubleshooting'
+const pageSelector = '[data-role="page"]'
 const logTextareaSelector = '#TroubleshootingLog'
 
 function onViewShow(commons) {
@@ -14,8 +14,11 @@ function onViewShow(commons) {
     LibraryMenu.setTabs('MediaCleaner', commons.TabTroubleshooting, commons.getTabs)
     Dashboard.showLoadingMsg()
 
-    const $TroubleshootingButtonCopy = page.querySelector('#TroubleshootingButtonCopy')
-    $TroubleshootingButtonCopy.addEventListener('click', troubleshootingButtonCopyClick)
+    if (window.isSecureContext) {
+        const $TroubleshootingButtonCopy = page.querySelector('#TroubleshootingButtonCopy')
+        $TroubleshootingButtonCopy.addEventListener('click', troubleshootingButtonCopyClick)
+        $TroubleshootingButtonCopy.style.display = 'inline-flex'
+    }
 
     const $TroubleshootingButtonGetLog = page.querySelector('#TroubleshootingButtonGetLog')
     $TroubleshootingButtonGetLog.addEventListener('click', troubleshootingButtonGetLogClick)
@@ -34,24 +37,26 @@ function getLog(page) {
         log.value = result
         Dashboard.hideLoadingMsg()
     }).catch(function (error) {
+        console.log(error)
         Dashboard.hideLoadingMsg()
         Dashboard.alert('Error loading log')
     })
 }
 
 function troubleshootingButtonCopyClick(event) {
-    const page = document.querySelector(pageSelector)
+    const page = this.closest(pageSelector)
     const log = page.querySelector(logTextareaSelector)
 
-    try {
-        navigator.clipboard.writeText(log.value)
-        Dashboard.alert('Log copied to clipboard')
-    } catch {
-        // todo
-    }
+    navigator.clipboard.writeText(log.value)
+        .then(() => {
+            Dashboard.alert('Log copied to clipboard')
+        })
+        .catch(error => {
+            console.log('Error copying log', error)
+        })
 }
 
 function troubleshootingButtonGetLogClick(event) {
-    const page = document.querySelector(pageSelector)
+    const page = this.closest(pageSelector)
     getLog(page)
 }

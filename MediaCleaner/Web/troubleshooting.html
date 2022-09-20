@@ -1,16 +1,26 @@
 <div id="MediaCleanerConfigPageTroubleshooting" data-role="page" class="page type-interior pluginConfigurationPage withTabs" data-controller="__plugin/MediaCleaner_Troubleshooting_js">
     <div data-role="content">
         <div class="content-primary">
-            <div>
-                <button id="TroubleshootingButtonCopy" is="emby-button" class="raised button-submit emby-button">
-                    <span>Copy to clipboard</span>
-                </button>
-                <button id="TroubleshootingButtonGetLog" is="emby-button" class="raised emby-button">
-                    <span>Recreate</span>
-                </button>
+            <div class="verticalSection verticalSection-extrabottompadding">
+                <div>
+                    <button id="TroubleshootingButtonCopy" is="emby-button" class="raised button-submit emby-button" style="display: none;">
+                        <span>Copy to clipboard</span>
+                    </button>
+                    <button id="TroubleshootingButtonGetLog" is="emby-button" class="raised emby-button">
+                        <span>Recreate</span>
+                    </button>
+                </div>
             </div>
 
-            <textarea id="TroubleshootingLog" rows="30" cols="120" readonly></textarea>
+            <div>
+                <textarea id="TroubleshootingLog" rows="30"></textarea>
+                <style>
+                    #TroubleshootingLog {
+                        width: 100%;
+                        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                    }
+                </style>
+            </div>
         </div>
     </div>
 </div>
