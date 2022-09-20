@@ -69,11 +69,24 @@ namespace MediaCleaner
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         {
+            var config = Plugin.Instance.Configuration;
+
+            _logger.LogDebug("UsersIgnorePlayed: {Users}",
+                 _userManager.Users
+                    .Where(x => config.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
+                    .Select(x => $"{x.Username}={x.Id}")
+            );
+            _logger.LogDebug("UsersIgnoreFavorited: {Users}",
+                 _userManager.Users
+                    .Where(x => config.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
+                    .Select(x => $"{x.Username}={x.Id}")
+            );
+
             var users = _userManager.Users
-                .Where(x => !Plugin.Instance.Configuration.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
+                .Where(x => !config.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
                 .ToList();
             var usersWithFavorites = _userManager.Users
-                .Where(x => !Plugin.Instance.Configuration.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
+                .Where(x => !config.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
                 .ToList();
 
             if (users.Count == 0)
@@ -87,18 +100,18 @@ namespace MediaCleaner
 
             var itemsAdapter = new ItemsAdapter(_loggerFactory.CreateLogger<ItemsAdapter>(), _libraryManager, _userDataManager);
 
-            if (Plugin.Instance.Configuration.KeepMoviesFor >= 0)
+            if (config.KeepMoviesFor >= 0)
             {
                 var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Plugin.Instance.Configuration.KeepMoviesFor),
+                    new ExpiredFilter(config.KeepMoviesFor),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
-                        Plugin.Instance.Configuration.KeepFavoriteMovies,
+                        config.KeepFavoriteMovies,
                         usersWithFavorites,
                         _userDataManager),
                     new LocationsFilter(_loggerFactory.CreateLogger<LocationsFilter>(),
-                        Plugin.Instance.Configuration.LocationsMode,
-                        Plugin.Instance.Configuration.LocationsExcluded,
+                        config.LocationsMode,
+                        config.LocationsExcluded,
                         _fileSystem)
                 };
                 var moviesCollector = new MoviesJunkCollector(_loggerFactory.CreateLogger<MoviesJunkCollector>(), itemsAdapter);
@@ -107,20 +120,20 @@ namespace MediaCleaner
             }
             progress.Report(25);
 
-            if (Plugin.Instance.Configuration.KeepEpisodesFor >= 0)
+            if (config.KeepEpisodesFor >= 0)
             {
                 var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Plugin.Instance.Configuration.KeepEpisodesFor),
+                    new ExpiredFilter(config.KeepEpisodesFor),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
-                        Plugin.Instance.Configuration.KeepFavoriteEpisodes,
+                        config.KeepFavoriteEpisodes,
                         usersWithFavorites,
                         _userDataManager),
                     new LocationsFilter(_loggerFactory.CreateLogger<LocationsFilter>(),
-                        Plugin.Instance.Configuration.LocationsMode,
-                        Plugin.Instance.Configuration.LocationsExcluded,
+                        config.LocationsMode,
+                        config.LocationsExcluded,
                         _fileSystem),
-                    new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Plugin.Instance.Configuration.DeleteEpisodes)
+                    new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), config.DeleteEpisodes)
                 };
                 var seriesCollector = new SeriesJunkCollector(_loggerFactory.CreateLogger<SeriesJunkCollector>(), itemsAdapter);
                 var expiredSeries = seriesCollector.Execute(users, filters, cancellationToken);
@@ -128,18 +141,18 @@ namespace MediaCleaner
             }
             progress.Report(50);
 
-            if (Plugin.Instance.Configuration.KeepVideosFor >= 0)
+            if (config.KeepVideosFor >= 0)
             {
                 var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Plugin.Instance.Configuration.KeepVideosFor),
+                    new ExpiredFilter(config.KeepVideosFor),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
-                        Plugin.Instance.Configuration.KeepFavoriteVideos,
+                        config.KeepFavoriteVideos,
                         usersWithFavorites,
                         _userDataManager),
                     new LocationsFilter(_loggerFactory.CreateLogger<LocationsFilter>(),
-                        Plugin.Instance.Configuration.LocationsMode,
-                        Plugin.Instance.Configuration.LocationsExcluded,
+                        config.LocationsMode,
+                        config.LocationsExcluded,
                         _fileSystem)
                 };
                 var videosCollector = new VideosJunkCollector(_loggerFactory.CreateLogger<VideosJunkCollector>(), itemsAdapter);

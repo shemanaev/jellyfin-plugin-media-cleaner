@@ -37,7 +37,7 @@ internal class SeriesFilter : IExpiredItemFilter
                         var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                         var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
 
-                        _logger.LogDebug("\"{User}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
+                        _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
                             season.First().User.Username, season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
 
                         if (allWatched)
@@ -65,7 +65,7 @@ internal class SeriesFilter : IExpiredItemFilter
                         var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                         var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
 
-                        _logger.LogDebug("\"{User}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
+                        _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
                             show.First().User.Username, show.Count(), episodes.Count, episode.Series.Name);
 
                         if (allWatched)
