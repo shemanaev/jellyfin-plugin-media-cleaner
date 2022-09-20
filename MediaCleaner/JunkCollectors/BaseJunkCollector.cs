@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -29,6 +30,7 @@ internal abstract class BaseJunkCollector : IJunkCollector
         IEnumerable<IExpiredItemFilter> filters,
         CancellationToken cancellationToken)
     {
+        _logger.LogTrace("Collecting played items for {UsersCount} users started at {StartTime}", users.Count, DateTime.Now);
         var items = users
             .SelectMany(x => _itemsAdapter.GetPlayedItems(_kind, x, cancellationToken))
             .ToList();
@@ -43,13 +45,14 @@ internal abstract class BaseJunkCollector : IJunkCollector
 
             foreach (var item in before.Except(after))
             {
-                _logger.LogTrace("'{Name}' has been filtered by {FilterName}", item.Item.Name, filter.Name);
+                _logger.LogTrace("\"{Name}\" filtered by {FilterName}", item.Item.Name, filter.Name);
             }
 
             items = after;
         }
 
         _logger.LogDebug("{Count} items after filtering", items.Count);
+        _logger.LogTrace("Collecting finished at {StartTime}", DateTime.Now);
         return items;
     }
 }

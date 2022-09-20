@@ -37,7 +37,7 @@ internal class SeriesFilter : IExpiredItemFilter
                         var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                         var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
 
-                        _logger.LogDebug("'{User}' has watched episodes {Count} of {Total} in season '{SeriesName}': '{SeasonName}'",
+                        _logger.LogDebug("\"{User}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
                             season.First().User.Username, season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
 
                         if (allWatched)
@@ -49,7 +49,7 @@ internal class SeriesFilter : IExpiredItemFilter
                                 LastPlayedDate = first.LastPlayedDate
                             });
 
-                            _logger.LogTrace("Season '{SeriesName}': '{SeasonName}' was added to expired items", episode.SeriesName, episode.Season.Name);
+                            _logger.LogTrace("Season \"{SeriesName}\": \"{SeasonName}\" was added to expired items", episode.SeriesName, episode.Season.Name);
                         }
                     }
 
@@ -65,7 +65,7 @@ internal class SeriesFilter : IExpiredItemFilter
                         var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                         var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
 
-                        _logger.LogDebug("'{User}' has watched episodes {Count} of {Total} in series '{SeriesName}'",
+                        _logger.LogDebug("\"{User}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
                             show.First().User.Username, show.Count(), episodes.Count, episode.Series.Name);
 
                         if (allWatched)
@@ -75,7 +75,7 @@ internal class SeriesFilter : IExpiredItemFilter
                                 if (episode.Series.Status.HasValue
                                  && episode.Series.Status.Value != MediaBrowser.Model.Entities.SeriesStatus.Ended)
                                 {
-                                    _logger.LogTrace("Series '{SeriesName}' was NOT added to expired items because metadata indicates that it's not yet finished",
+                                    _logger.LogTrace("Series \"{SeriesName}\" was NOT added to expired items because metadata indicates that it's not yet finished",
                                         episode.SeriesName);
                                     continue;
                                 }
@@ -88,7 +88,7 @@ internal class SeriesFilter : IExpiredItemFilter
                                 LastPlayedDate = first.LastPlayedDate
                             });
 
-                            _logger.LogTrace("Series '{SeriesName}' was added to expired items", episode.SeriesName);
+                            _logger.LogTrace("Series \"{SeriesName}\" was added to expired items", episode.SeriesName);
                         }
                     }
 

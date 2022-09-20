@@ -47,7 +47,7 @@ internal class ItemsAdapter
                 LastPlayedDate = userData.LastPlayedDate.Value
             });
 
-            _logger.LogDebug("'{Name}' has been played by {Username} ({Value})",
+            _logger.LogDebug("\"{Name}\" played by \"{Username}\" ({Value})",
                 item.Name, user.Username, userData.LastPlayedDate.Value);
         }
 

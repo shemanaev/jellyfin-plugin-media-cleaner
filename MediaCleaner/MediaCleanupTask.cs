@@ -155,7 +155,7 @@ namespace MediaCleaner
 
             foreach (var item in expired)
             {
-                _logger.LogInformation("({Type}) '{Name}' will be deleted because expired for {Username} ({LastPlayedDate})",
+                _logger.LogInformation("({Type}) \"{Name}\" will be deleted because expired for \"{Username}\" ({LastPlayedDate})",
                     item.Item.GetType().Name, item.Item.Name, item.User.Username, item.LastPlayedDate);
 
                 if (!IsDryRun)
