@@ -199,7 +199,7 @@ namespace MediaCleaner
                         _libraryManager.DeleteItem(eps, opts, true);
                     }
                     _libraryManager.DeleteItem(season, opts, true);
-                    if (!season.Series.GetEpisodes().Any())
+                    if (!season.Series?.GetEpisodes().Any() ?? false)
                     {
                         _libraryManager.DeleteItem(season.Series, opts, true);
                     }
@@ -207,11 +207,11 @@ namespace MediaCleaner
 
                 case Episode episode:
                     _libraryManager.DeleteItem(episode, opts, true);
-                    if (!episode.Season.GetEpisodes().Any())
+                    if (!episode.Season?.GetEpisodes().Any() ?? false)
                     {
                         _libraryManager.DeleteItem(episode.Season, opts, true);
                     }
-                    if (!episode.Series.GetEpisodes().Any())
+                    if (!episode.Series?.GetEpisodes().Any() ?? false)
                     {
                         _libraryManager.DeleteItem(episode.Series, opts, true);
                     }
