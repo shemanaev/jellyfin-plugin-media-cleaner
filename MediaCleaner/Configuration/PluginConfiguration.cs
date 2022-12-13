@@ -43,5 +43,7 @@ namespace MediaCleaner.Configuration
         // and we don't want to break anyone's config.
         public List<string> LocationsExcluded { get; set; } = new List<string>();
         public LocationsListMode LocationsMode { get; set; } = LocationsListMode.Exclude;
+
+        public bool MarkAsUnplayed { get; set; } = false;
     }
 }

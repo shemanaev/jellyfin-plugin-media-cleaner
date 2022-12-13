@@ -27,6 +27,9 @@ function onViewShow(commons) {
     const $DeleteEpisodes = page.querySelector('#DeleteEpisodes')
     $DeleteEpisodes.addEventListener('change', deleteEpisodesChanged)
 
+    const $MarkAsUnplayed = page.querySelector('#MarkAsUnplayed')
+    $MarkAsUnplayed.addEventListener('change', markAsUnplayedChanged)
+
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
         page.querySelector('#KeepFavoriteMovies').value = config.KeepFavoriteMovies
@@ -35,12 +38,14 @@ function onViewShow(commons) {
         page.querySelector('#KeepFavoriteEpisodes').value = config.KeepFavoriteEpisodes
         page.querySelector('#KeepVideosFor').value = config.KeepVideosFor
         page.querySelector('#KeepFavoriteVideos').value = config.KeepFavoriteVideos
+        page.querySelector('#MarkAsUnplayed').checked = config.MarkAsUnplayed
 
         commons.fireEvent([
             $KeepFavoriteMovies,
             $KeepFavoriteEpisodes,
             $KeepFavoriteVideos,
             $DeleteEpisodes,
+            $MarkAsUnplayed,
         ], 'change')
 
         Dashboard.hideLoadingMsg()
@@ -59,6 +64,7 @@ function onFormSubmit(commons) {
         config.KeepFavoriteEpisodes = form.querySelector('#KeepFavoriteEpisodes').value
         config.KeepVideosFor = form.querySelector('#KeepVideosFor').value
         config.KeepFavoriteVideos = form.querySelector('#KeepFavoriteVideos').value
+        config.MarkAsUnplayed = form.querySelector('#MarkAsUnplayed').checked
 
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
             Dashboard.processPluginConfigurationUpdateResult(result)
@@ -91,5 +97,14 @@ function deleteEpisodesChanged(event) {
 
         default:
             field.innerHTML = ''
+    }
+}
+
+function markAsUnplayedChanged(event) {
+    const field = this.parentNode.parentNode.querySelector('.fieldDescription')
+    if (this.checked) {
+        field.innerHTML = `Items will be marked as unplayed when deleted and will not be removed when re-added`
+    } else {
+        field.innerHTML = `Re-added items that have already been removed by cleaner will be deleted again the first time the scheduled task is run`
     }
 }

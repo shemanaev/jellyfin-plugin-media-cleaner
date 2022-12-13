@@ -171,11 +171,16 @@ namespace MediaCleaner
                 _logger.LogInformation("({Type}) \"{Name}\" will be deleted because expired for \"{Username}\" ({LastPlayedDate})",
                     item.Item.GetType().Name, item.Item.Name, item.User.Username, item.LastPlayedDate);
 
-                if (!IsDryRun)
+                if (IsDryRun) continue;
+
+                await CreateNotification(item);
+
+                if (config.MarkAsUnplayed)
                 {
-                    await CreateNotification(item);
-                    DeleteItem(item.Item);
+                    item.Item.MarkUnplayed(item.User);
                 }
+
+                DeleteItem(item.Item);
             }
             progress.Report(100);
         }
