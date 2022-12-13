@@ -9,11 +9,15 @@
                     <button id="TroubleshootingButtonGetLog" is="emby-button" class="raised emby-button">
                         <span>Recreate</span>
                     </button>
+                    <button id="TroubleshootingButtonToggleViewer" is="emby-button" class="raised emby-button">
+                        <span>Toggle viewer</span>
+                    </button>
                 </div>
             </div>
 
             <div>
                 <textarea id="TroubleshootingLog" rows="30"></textarea>
+                <div id="TroubleshootingLogViewer" style="display: none;"></div>
                 <style>
                     #TroubleshootingLog {
                         width: 100%;

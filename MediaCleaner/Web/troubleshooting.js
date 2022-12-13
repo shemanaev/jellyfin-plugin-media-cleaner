@@ -8,6 +8,7 @@ export default function (view, params) {
 
 const pageSelector = '[data-role="page"]'
 const logTextareaSelector = '#TroubleshootingLog'
+const logViewerSelector = '#TroubleshootingLogViewer'
 
 function onViewShow(commons) {
     const page = this
@@ -23,6 +24,9 @@ function onViewShow(commons) {
     const $TroubleshootingButtonGetLog = page.querySelector('#TroubleshootingButtonGetLog')
     $TroubleshootingButtonGetLog.addEventListener('click', troubleshootingButtonGetLogClick)
 
+    const $TroubleshootingButtonToggleViewer = page.querySelector('#TroubleshootingButtonToggleViewer')
+    $TroubleshootingButtonToggleViewer.addEventListener('click', troubleshootingButtonToggleViewerClick)
+
     getLog(page)
 }
 
@@ -34,7 +38,15 @@ function getLog(page) {
     Dashboard.showLoadingMsg()
     ApiClient.fetch(request).then(function (result) {
         const log = page.querySelector(logTextareaSelector)
+        const viewer = page.querySelector(logViewerSelector)
         log.value = result
+
+        const el = document.createElement('html')
+        el.innerHTML = result
+        const details = el.querySelector('details:last-of-type > pre')
+        viewer.innerHTML = ''
+        viewer.appendChild(details)
+
         Dashboard.hideLoadingMsg()
     }).catch(function (error) {
         console.log(error)
@@ -59,4 +71,18 @@ function troubleshootingButtonCopyClick(event) {
 function troubleshootingButtonGetLogClick(event) {
     const page = this.closest(pageSelector)
     getLog(page)
+}
+
+function troubleshootingButtonToggleViewerClick(event) {
+    const page = this.closest(pageSelector)
+    const log = page.querySelector(logTextareaSelector)
+    const viewer = page.querySelector(logViewerSelector)
+
+    if (log.style.display === 'none') {
+        log.style.display = 'inline'
+        viewer.style.display = 'none'
+    } else {
+        log.style.display = 'none'
+        viewer.style.display = 'inline'
+    }
 }
