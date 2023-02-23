@@ -38,7 +38,13 @@ internal class ItemsAdapter
             cancellationToken.ThrowIfCancellationRequested();
             var userData = _userDataManager.GetUserData(user, item);
 
-            if (!userData.Played || !userData.LastPlayedDate.HasValue) continue;
+            if (!userData.Played) continue;
+
+            if (!userData.LastPlayedDate.HasValue)
+            {
+                _logger.LogWarning("\"{Name}\" ({Id}) marked as played but has not date", item.Name, item.Id);
+                continue;
+            }
 
             result.Add(new ExpiredItem
             {
