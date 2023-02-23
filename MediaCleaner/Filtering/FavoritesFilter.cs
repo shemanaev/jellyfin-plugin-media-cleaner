@@ -50,7 +50,7 @@ internal class FavoritesFilter : IExpiredItemFilter
                     }
                     else
                     {
-                        var user = _users.Find(m => IsFavorite(m, item.Item));
+                        var user = _users.First(m => IsFavorite(m, item.Item));
                         _logger.LogTrace("\"{Name}\" is favorited by \"{Username}\"", item.Item.Name, user.Username);
                     }
                     break;
@@ -70,11 +70,11 @@ internal class FavoritesFilter : IExpiredItemFilter
     private bool IsFavorite(User user, BaseItem item) => item switch
     {
         Episode episode => _userDataManager.GetUserData(user, episode).IsFavorite
-                        || _userDataManager.GetUserData(user, episode.Series).IsFavorite
-                        || (episode.Season != null && _userDataManager.GetUserData(user, episode.Season).IsFavorite),
+                        || (_userDataManager.GetUserData(user, episode.Series)?.IsFavorite ?? false)
+                        || (episode.Season != null && (_userDataManager.GetUserData(user, episode.Season)?.IsFavorite ?? false)),
 
         Season season => _userDataManager.GetUserData(user, season).IsFavorite
-                      || _userDataManager.GetUserData(user, season.Series).IsFavorite, // FIXME: check if any episode favorited?
+                      || (_userDataManager.GetUserData(user, season.Series)?.IsFavorite ?? false), // FIXME: check if any episode favorited?
 
         Series series => _userDataManager.GetUserData(user, series).IsFavorite, // FIXME: same as season
 
