@@ -70,11 +70,11 @@ internal class FavoritesFilter : IExpiredItemFilter
     private bool IsFavorite(User user, BaseItem item) => item switch
     {
         Episode episode => (_userDataManager.GetUserData(user, episode)?.IsFavorite ?? false)
-                        || (_userDataManager.GetUserData(user, episode.Series)?.IsFavorite ?? false)
+                        || (episode.Series != null && (_userDataManager.GetUserData(user, episode.Series)?.IsFavorite ?? false))
                         || (episode.Season != null && (_userDataManager.GetUserData(user, episode.Season)?.IsFavorite ?? false)),
 
         Season season => (_userDataManager.GetUserData(user, season)?.IsFavorite ?? false)
-                      || (_userDataManager.GetUserData(user, season.Series)?.IsFavorite ?? false), // FIXME: check if any episode favorited?
+                      || (season.Series != null && (_userDataManager.GetUserData(user, season.Series)?.IsFavorite ?? false)), // FIXME: check if any episode favorited?
 
         Series series => _userDataManager.GetUserData(user, series)?.IsFavorite ?? false, // FIXME: same as season
 
