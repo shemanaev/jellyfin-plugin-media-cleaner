@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
@@ -26,7 +25,7 @@ internal class ItemsAdapter
         _userDataManager = userDataManager;
     }
 
-    public List<ExpiredItem> GetPlayedItems(
+    public IEnumerable<ExpiredItem> GetPlayedItems(
         BaseItemKind kind,
         User user,
         CancellationToken cancellationToken)
@@ -60,7 +59,7 @@ internal class ItemsAdapter
         return result;
     }
 
-    private List<BaseItem> GetUserItems(BaseItemKind kind, User user) =>
+    private IEnumerable<BaseItem> GetUserItems(BaseItemKind kind, User user) =>
         _libraryManager.GetItemList(
                 new InternalItemsQuery(user)
                 {
@@ -70,6 +69,5 @@ internal class ItemsAdapter
                     },
                     IsVirtualItem = false,
                     OrderBy = new[] { (ItemSortBy.DatePlayed, SortOrder.Descending) }
-                })
-        .ToList();
+                });
 }

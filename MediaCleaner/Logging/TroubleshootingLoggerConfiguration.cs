@@ -4,5 +4,5 @@ namespace MediaCleaner.Logging;
 
 internal class TroubleshootingLoggerConfiguration
 {
-    public List<string> Output { get; set; }
+    public List<string>? Output { get; set; }
 }

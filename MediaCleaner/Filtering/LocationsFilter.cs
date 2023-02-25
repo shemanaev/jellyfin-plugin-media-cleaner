@@ -39,8 +39,8 @@ internal class LocationsFilter : IExpiredItemFilter
             var path = item.Item switch
             {
                 Episode episode => episode.Path,
-                Season season => season.GetEpisodes().Where(x => !x.IsVirtualItem).First().Path,
-                Series series => series.GetEpisodes().Where(x => !x.IsVirtualItem).First().Path,
+                Season season => season.GetEpisodes().First(x => !x.IsVirtualItem).Path,
+                Series series => series.GetEpisodes().First(x => !x.IsVirtualItem).Path,
                 Movie movie => movie.Path,
                 _ => item.Item.Path
             };

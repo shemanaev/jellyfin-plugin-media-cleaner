@@ -21,10 +21,10 @@ internal class TroubleshootingLogger : ILogger
         LogLevel logLevel,
         EventId eventId,
         TState state,
-        Exception exception,
-        Func<TState, Exception, string> formatter)
+        Exception? exception,
+        Func<TState, Exception?, string> formatter)
     {
         var s = $"[{logLevel.ToString()[..3]}] {_name}: {formatter(state, exception)}";
-        _getCurrentConfig().Output.Add(s);
+        _getCurrentConfig().Output?.Add(s);
     }
 }

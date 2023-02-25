@@ -58,7 +58,7 @@ public class TroubleshootingController : ControllerBase
         };
         await task.ExecuteAsync(progress, default!);
 
-        var pluginConfig = GetPrettyXml(Plugin.Instance.Configuration);
+        var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
 
         var log = $@"* Jellyfin version: {_applicationHost.ApplicationVersionString}
 * Plugin version: {Plugin.Instance.Version}

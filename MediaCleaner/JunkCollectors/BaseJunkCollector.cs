@@ -40,6 +40,7 @@ internal abstract class BaseJunkCollector : IJunkCollector
 
         foreach (var filter in filters)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var before = items;
             var after = filter.Apply(before);
 
