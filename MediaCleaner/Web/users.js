@@ -17,8 +17,13 @@ function onViewShow(commons) {
     LibraryMenu.setTabs('MediaCleaner', commons.TabUsers, commons.getTabs)
     Dashboard.showLoadingMsg()
 
+    const $UsersPlayedMode = page.querySelector('#UsersPlayedMode')
+    const $UsersFavoritedMode = page.querySelector('#UsersFavoritedMode')
     const $IgnorePlayedList = page.querySelector('#IgnorePlayedList')
     const $IgnoreFavoritedList = page.querySelector('#IgnoreFavoritedList')
+
+    $UsersPlayedMode.addEventListener('change', usersPlayedModeChanged)
+    $UsersFavoritedMode.addEventListener('change', usersFavoritedModeChanged)
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         ApiClient.getUsers().then(users => {
@@ -35,6 +40,14 @@ function onViewShow(commons) {
 
             $IgnorePlayedList.innerHTML = playedHtml
             $IgnoreFavoritedList.innerHTML = favoritedHtml
+
+            $UsersPlayedMode.value = config.UsersPlayedMode
+            $UsersFavoritedMode.value = config.UsersFavoritedMode
+
+            commons.fireEvent([
+                $UsersPlayedMode,
+                $UsersFavoritedMode,
+            ], 'change')
 
             Dashboard.hideLoadingMsg()
         })
@@ -55,6 +68,9 @@ function onFormSubmit(commons) {
         config.UsersIgnoreFavorited = Array.prototype.map.call($IgnoreFavoritedList.querySelectorAll('input:checked'),
             elem => elem.getAttribute('data-userid'))
 
+        config.UsersPlayedMode = form.querySelector('#UsersPlayedMode').value
+        config.UsersFavoritedMode = form.querySelector('#UsersFavoritedMode').value
+
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
             Dashboard.processPluginConfigurationUpdateResult(result)
         })
@@ -67,4 +83,36 @@ function getUserHtml(user, isChecked) {
     html += '<input is="emby-checkbox" type="checkbox" data-mini="true" data-userid="' + user.Id + '"' + checkedAttribute + ' />'
     html += '<span>' + user.Name + '</span></label>'
     return html
+}
+
+function usersPlayedModeChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    switch (this.value) {
+        case 'Ignore':
+            field.innerHTML = 'Ignore played state of following users'
+            break
+
+        case 'Acknowledge':
+            field.innerHTML = 'Use played state only of following users'
+            break
+
+        default:
+            field.innerHTML = ''
+    }
+}
+
+function usersFavoritedModeChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    switch (this.value) {
+        case 'Ignore':
+            field.innerHTML = 'Ignore favorites of following users'
+            break
+
+        case 'Acknowledge':
+            field.innerHTML = 'Use favorites only of following users'
+            break
+
+        default:
+            field.innerHTML = ''
+    }
 }

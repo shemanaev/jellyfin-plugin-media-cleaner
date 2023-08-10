@@ -10,6 +10,12 @@ namespace MediaCleaner.Configuration
         AllUsers
     }
 
+    public enum PlayedKeepKind
+    {
+        AnyUser,
+        AllUsers
+    }
+
     public enum SeriesDeleteKind
     {
         Episode,
@@ -24,20 +30,32 @@ namespace MediaCleaner.Configuration
         Include
     }
 
+    public enum UsersListMode
+    {
+        Ignore,
+        Acknowledge
+    }
+
     public class PluginConfiguration : BasePluginConfiguration
     {
         public int KeepMoviesFor { get; set; } = -1;
+        public PlayedKeepKind KeepPlayedMovies { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteMovies { get; set; } = FavoriteKeepKind.AnyUser;
 
         public int KeepEpisodesFor { get; set; } = -1;
+        public PlayedKeepKind KeepPlayedEpisodes { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteEpisodes { get; set; } = FavoriteKeepKind.AnyUser;
         public SeriesDeleteKind DeleteEpisodes { get; set; } = SeriesDeleteKind.Season;
 
         public int KeepVideosFor { get; set; } = -1;
+        public PlayedKeepKind KeepPlayedVideos { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteVideos { get; set; } = FavoriteKeepKind.AnyUser;
 
         public List<string> UsersIgnorePlayed { get; set; } = new List<string>();
+        public UsersListMode UsersPlayedMode { get; set; } = UsersListMode.Ignore;
+
         public List<string> UsersIgnoreFavorited { get; set; } = new List<string>();
+        public UsersListMode UsersFavoritedMode { get; set; } = UsersListMode.Ignore;
 
         // This should be named just "Locations", but it was list of exclusion historically
         // and we don't want to break anyone's config.

@@ -33,6 +33,14 @@ internal abstract class BaseJunkCollector : IJunkCollector
         _logger.LogTrace("Collecting played items for {UsersCount} users started at {StartTime}", users.Count, DateTime.Now);
         var items = users
             .SelectMany(x => _itemsAdapter.GetPlayedItems(_kind, x, cancellationToken))
+            .GroupBy(x => x.Item)
+            .Select(x => new ExpiredItem
+            {
+                Item = x.Key,
+                Data = x.SelectMany(a => a.Data.Select(z => z))
+                        .OrderByDescending(a => a.LastPlayedDate)
+                        .ToList()
+            })
             .ToList();
 
         _logger.LogDebug("Filters order: {Filters}", string.Join(", ", filters.Select(x => x.Name)));

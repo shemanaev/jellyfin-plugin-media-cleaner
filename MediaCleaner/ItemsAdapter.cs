@@ -48,8 +48,11 @@ internal class ItemsAdapter
             result.Add(new ExpiredItem
             {
                 Item = item,
-                User = user,
-                LastPlayedDate = userData.LastPlayedDate.Value
+                Data = new List<ExpiredItemData> {
+                    new ExpiredItemData {
+                        User = user, LastPlayedDate = userData.LastPlayedDate.Value
+                    }
+                },
             });
 
             _logger.LogDebug("\"{Name}\" played by \"{Username}\" ({LastPlayedDate})",

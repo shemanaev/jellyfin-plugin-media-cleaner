@@ -73,11 +73,13 @@ namespace MediaCleaner
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         {
+            _logger.LogDebug("UsersPlayedMode: {Mode}", Configuration.UsersPlayedMode);
             _logger.LogDebug("UsersIgnorePlayed: {Users}",
                  _userManager.Users
                     .Where(x => Configuration.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
                     .Select(x => $"{x.Username}={x.Id}")
             );
+            _logger.LogDebug("UsersFavoritedMode: {Mode}", Configuration.UsersFavoritedMode);
             _logger.LogDebug("UsersIgnoreFavorited: {Users}",
                  _userManager.Users
                     .Where(x => Configuration.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
@@ -85,10 +87,10 @@ namespace MediaCleaner
             );
 
             var users = _userManager.Users
-                .Where(x => !Configuration.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
+                .Where(x => FilterUsersList(Configuration.UsersIgnorePlayed, Configuration.UsersPlayedMode, x))
                 .ToList();
             var usersWithFavorites = _userManager.Users
-                .Where(x => !Configuration.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
+                .Where(x => FilterUsersList(Configuration.UsersIgnoreFavorited, Configuration.UsersFavoritedMode, x))
                 .ToList();
 
             if (users.Count == 0)
@@ -123,15 +125,13 @@ namespace MediaCleaner
             }
             progress.Report(75);
 
-            expired = expired.GroupBy(x => x.Item.Id)
-                .Select(x => x.OrderByDescending(m => m.LastPlayedDate).First())
-                .OrderBy(x => x.LastPlayedDate)
-                .ToList();
+            expired = expired.OrderBy(x => x.Data.First().LastPlayedDate).ToList();
 
             foreach (var item in expired)
             {
-                _logger.LogInformation("({Type}) \"{Name}\" will be deleted because expired for \"{Username}\" ({LastPlayedDate})",
-                    item.Item.GetType().Name, item.Item.Name, item.User.Username, item.LastPlayedDate);
+                var expiredForUsers = string.Join(", ", item.Data.Select(x => $"{x.User.Username} ({x.LastPlayedDate})"));
+                _logger.LogInformation("({Type}) \"{Name}\" will be deleted because expired for: {Users}",
+                    item.Item.GetType().Name, item.Item.Name, expiredForUsers);
 
                 if (IsDryRun) continue;
 
@@ -139,7 +139,10 @@ namespace MediaCleaner
 
                 if (Configuration.MarkAsUnplayed)
                 {
-                    item.Item.MarkUnplayed(item.User);
+                    foreach (var data in item.Data)
+                    {
+                        item.Item.MarkUnplayed(data.User);
+                    }
                 }
 
                 DeleteItem(item.Item);
@@ -147,11 +150,23 @@ namespace MediaCleaner
             progress.Report(100);
         }
 
+        private static bool FilterUsersList(List<string> users, UsersListMode mode, User x)
+        {
+            return users.Contains(x.Id.ToString("N")) switch
+            {
+                true when mode == UsersListMode.Ignore => false,
+                true when mode == UsersListMode.Acknowledge => true,
+                false when mode == UsersListMode.Ignore => true,
+                false when mode == UsersListMode.Acknowledge => false,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
         private List<ExpiredItem> CollectMovies(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepMoviesFor),
+                    new ExpiredFilter(Configuration.KeepMoviesFor, users.Count, Configuration.KeepPlayedMovies),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteMovies,
                         usersWithFavorites,
@@ -170,7 +185,7 @@ namespace MediaCleaner
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepEpisodesFor),
+                    new ExpiredFilter(Configuration.KeepEpisodesFor, users.Count, Configuration.KeepPlayedEpisodes),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteEpisodes,
                         usersWithFavorites,
@@ -190,7 +205,7 @@ namespace MediaCleaner
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepVideosFor),
+                    new ExpiredFilter(Configuration.KeepVideosFor, users.Count, Configuration.KeepPlayedVideos),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteVideos,
                         usersWithFavorites,
@@ -262,37 +277,37 @@ namespace MediaCleaner
             {
                 case Movie movie:
                     title = $"\"{movie.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
+                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
                     overview = $"{movie.Path}";
                     break;
 
                 case Series series:
                     title = $"\"{series.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
+                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
                     overview = $"{series.Path}";
                     break;
 
                 case Season season:
                     title = $"\"{season.SeriesName}\" S{season.IndexNumber:D2} was deleted";
-                    shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
+                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
                     overview = $"{season.Path ?? season.SeriesPath}";
                     break;
 
                 case Episode episode:
                     title = $"\"{episode.SeriesName}\" S{episode.ParentIndexNumber:D2}E{episode.IndexNumber:D2} was deleted";
-                    shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
+                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
                     overview = $"{episode.Path}";
                     break;
 
                 case Video video:
                     title = $"\"{video.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
+                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
                     overview = $"{video.Path}";
                     break;
 
                 default:
                     title = $"\"{item.Item.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.User.Username} at {item.LastPlayedDate}";
+                    shortOverview = $"Last played by {item.Data.First().User.Username}  at  {item.Data.First().LastPlayedDate}";
                     overview = $"{item.Item.Path}";
                     break;
             };

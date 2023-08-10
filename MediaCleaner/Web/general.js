@@ -17,6 +17,13 @@ function onViewShow(commons) {
     LibraryMenu.setTabs('MediaCleaner', commons.TabsGeneral, commons.getTabs)
     Dashboard.showLoadingMsg()
 
+    const $KeepPlayedMovies = page.querySelector('#KeepPlayedMovies')
+    const $KeepPlayedEpisodes = page.querySelector('#KeepPlayedEpisodes')
+    const $KeepPlayedVideos = page.querySelector('#KeepPlayedVideos')
+    $KeepPlayedMovies.addEventListener('change', keepPlayedChanged)
+    $KeepPlayedEpisodes.addEventListener('change', keepPlayedChanged)
+    $KeepPlayedVideos.addEventListener('change', keepPlayedChanged)
+
     const $KeepFavoriteMovies = page.querySelector('#KeepFavoriteMovies')
     const $KeepFavoriteEpisodes = page.querySelector('#KeepFavoriteEpisodes')
     const $KeepFavoriteVideos = page.querySelector('#KeepFavoriteVideos')
@@ -32,15 +39,21 @@ function onViewShow(commons) {
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
-        page.querySelector('#KeepFavoriteMovies').value = config.KeepFavoriteMovies
+        $KeepPlayedMovies.value = config.KeepPlayedMovies
+        $KeepFavoriteMovies.value = config.KeepFavoriteMovies
         page.querySelector('#KeepEpisodesFor').value = config.KeepEpisodesFor
         page.querySelector('#DeleteEpisodes').value = config.DeleteEpisodes
-        page.querySelector('#KeepFavoriteEpisodes').value = config.KeepFavoriteEpisodes
+        $KeepPlayedEpisodes.value = config.KeepPlayedEpisodes
+        $KeepFavoriteEpisodes.value = config.KeepFavoriteEpisodes
         page.querySelector('#KeepVideosFor').value = config.KeepVideosFor
-        page.querySelector('#KeepFavoriteVideos').value = config.KeepFavoriteVideos
+        $KeepPlayedVideos.value = config.KeepPlayedVideos
+        $KeepFavoriteVideos.value = config.KeepFavoriteVideos
         page.querySelector('#MarkAsUnplayed').checked = config.MarkAsUnplayed
 
         commons.fireEvent([
+            $KeepPlayedMovies,
+            $KeepPlayedEpisodes,
+            $KeepPlayedVideos,
             $KeepFavoriteMovies,
             $KeepFavoriteEpisodes,
             $KeepFavoriteVideos,
@@ -50,6 +63,17 @@ function onViewShow(commons) {
 
         Dashboard.hideLoadingMsg()
     })
+
+    const request = {
+        url: ApiClient.getUrl('MediaCleaner/Test'),
+    }
+
+
+    ApiClient.fetch(request).then(function (result) {
+        console.log(result)
+    }).catch(function (error) {
+        console.log(error)
+    })
 }
 
 function onFormSubmit(commons) {
@@ -58,11 +82,14 @@ function onFormSubmit(commons) {
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         config.KeepMoviesFor = form.querySelector('#KeepMoviesFor').value
+        config.KeepPlayedMovies = form.querySelector('#KeepPlayedMovies').value
         config.KeepFavoriteMovies = form.querySelector('#KeepFavoriteMovies').value
         config.KeepEpisodesFor = form.querySelector('#KeepEpisodesFor').value
         config.DeleteEpisodes = form.querySelector('#DeleteEpisodes').value
+        config.KeepPlayedEpisodes = form.querySelector('#KeepPlayedEpisodes').value
         config.KeepFavoriteEpisodes = form.querySelector('#KeepFavoriteEpisodes').value
         config.KeepVideosFor = form.querySelector('#KeepVideosFor').value
+        config.KeepPlayedVideos = form.querySelector('#KeepPlayedVideos').value
         config.KeepFavoriteVideos = form.querySelector('#KeepFavoriteVideos').value
         config.MarkAsUnplayed = form.querySelector('#MarkAsUnplayed').checked
 
@@ -81,6 +108,22 @@ function keepFavoriteChanged(event) {
 
         case 'AllUsers':
             field.innerHTML = 'All users have item in favorites'
+            break
+
+        default:
+            field.innerHTML = ''
+    }
+}
+
+function keepPlayedChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    switch (this.value) {
+        case 'AnyUser':
+            field.innerHTML = 'At least one user have fully played item'
+            break
+
+        case 'AllUsers':
+            field.innerHTML = 'All users have fully played item'
             break
 
         default:

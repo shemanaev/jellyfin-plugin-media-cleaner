@@ -3,13 +3,29 @@
         <div class="content-primary">
             <form id="MediaCleanerConfigForm">
                 <div>
-                    <h3 class="checkboxListLabel">Ignore played state</h3>
+                    <h2 class="checkboxListLabel">Played state</h2>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="UsersPlayedMode">List mode</label>
+                        <select is="emby-select" id="UsersPlayedMode" name="UsersPlayedMode" class="emby-select-withcolor emby-select">
+                            <option value="Ignore">Ignore</option>
+                            <option value="Acknowledge">Acknowledge</option>
+                        </select>
+                        <div class="fieldDescription"></div>
+                    </div>
                     <div class="paperList checkboxList checkboxList-paperList" id="IgnorePlayedList">
                     </div>
                 </div>
 
                 <div>
-                    <h3 class="checkboxListLabel">Ignore favorites</h3>
+                    <h2 class="checkboxListLabel">Favorites</h2>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="UsersFavoritedMode">List mode</label>
+                        <select is="emby-select" id="UsersFavoritedMode" name="UsersFavoritedMode" class="emby-select-withcolor emby-select">
+                            <option value="Ignore">Ignore</option>
+                            <option value="Acknowledge">Acknowledge</option>
+                        </select>
+                        <div class="fieldDescription"></div>
+                    </div>
                     <div class="paperList checkboxList checkboxList-paperList" id="IgnoreFavoritedList">
                     </div>
                 </div>

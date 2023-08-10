@@ -19,85 +19,79 @@ internal class SeriesFilter : IExpiredItemFilter
 
     public string Name => "Series";
 
-    public List<ExpiredItem> Apply(List<ExpiredItem> itemsAll)
+    public List<ExpiredItem> Apply(List<ExpiredItem> items)
     {
         var result = new List<ExpiredItem>();
 
-        // group by user to ensure at least one user fully watched series/season
-        foreach (var items in itemsAll.GroupBy(x => x.User))
+        switch (_kind)
         {
-            switch (_kind)
-            {
-                case SeriesDeleteKind.Season:
-                    var seasons = items.GroupBy(x => ((Episode)x.Item).Season?.Id ?? ((Episode)x.Item).Series?.Id);
-                    foreach (var season in seasons)
+            case SeriesDeleteKind.Season:
+                var seasons = items.GroupBy(x => ((Episode)x.Item).Season?.Id ?? ((Episode)x.Item).Series?.Id);
+                foreach (var season in seasons)
+                {
+                    var first = season.MaxBy(x => x.Data.First().LastPlayedDate);
+                    if (first?.Item is not Episode episode) continue;
+                    var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
+                    var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
+
+                    _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
+                        season.First().Data.First().User.Username, season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
+
+                    if (allWatched)
                     {
-                        var first = season.MaxBy(x => x.LastPlayedDate);
-                        if (first?.Item is not Episode episode) continue;
-                        var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
-                        var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
-
-                        _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
-                            season.First().User.Username, season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
-
-                        if (allWatched)
+                        result.Add(new ExpiredItem
                         {
-                            result.Add(new ExpiredItem
-                            {
-                                Item = episode.Season,
-                                User = first.User,
-                                LastPlayedDate = first.LastPlayedDate
-                            });
+                            Item = episode.Season,
+                            Data = first.Data,
+                        });
 
-                            _logger.LogTrace("Season \"{SeriesName}\": \"{SeasonName}\" was added to expired items", episode.SeriesName, episode.Season.Name);
-                        }
+                        _logger.LogTrace("Season \"{SeriesName}\": \"{SeasonName}\" was added to expired items", episode.SeriesName, episode.Season.Name);
                     }
+                }
 
-                    break;
+                break;
 
-                case SeriesDeleteKind.Series:
-                case SeriesDeleteKind.SeriesEnded:
-                    var series = items.GroupBy(x => ((Episode)x.Item).Series?.Id);
-                    foreach (var show in series)
+            case SeriesDeleteKind.Series:
+            case SeriesDeleteKind.SeriesEnded:
+                var series = items.GroupBy(x => ((Episode)x.Item).Series?.Id);
+                foreach (var show in series)
+                {
+                    var first = show.MaxBy(x => x.Data.First().LastPlayedDate);
+                    if (first?.Item is not Episode episode) continue;
+                    var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
+                    var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
+
+                    _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
+                        show.First().Data.First().User.Username, show.Count(), episodes.Count, episode.Series.Name);
+
+                    if (allWatched)
                     {
-                        var first = show.MaxBy(x => x.LastPlayedDate);
-                        if (first?.Item is not Episode episode) continue;
-                        var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
-                        var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
-
-                        _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
-                            show.First().User.Username, show.Count(), episodes.Count, episode.Series.Name);
-
-                        if (allWatched)
+                        if (_kind == SeriesDeleteKind.SeriesEnded)
                         {
-                            if (_kind == SeriesDeleteKind.SeriesEnded)
+                            if (episode.Series.Status.HasValue
+                                && episode.Series.Status.Value != MediaBrowser.Model.Entities.SeriesStatus.Ended)
                             {
-                                if (episode.Series.Status.HasValue
-                                 && episode.Series.Status.Value != MediaBrowser.Model.Entities.SeriesStatus.Ended)
-                                {
-                                    _logger.LogTrace("Series \"{SeriesName}\" was NOT added to expired items because metadata indicates that it's not yet finished",
-                                        episode.SeriesName);
-                                    continue;
-                                }
+                                _logger.LogTrace("Series \"{SeriesName}\" was NOT added to expired items because metadata indicates that it's not yet finished",
+                                    episode.SeriesName);
+                                continue;
                             }
-
-                            result.Add(new ExpiredItem
-                            {
-                                Item = episode.Series,
-                                User = first.User,
-                                LastPlayedDate = first.LastPlayedDate
-                            });
-
-                            _logger.LogTrace("Series \"{SeriesName}\" was added to expired items", episode.SeriesName);
                         }
+
+                        result.Add(new ExpiredItem
+                        {
+                            Item = episode.Series,
+                            Data = first.Data,
+                        });
+
+                        _logger.LogTrace("Series \"{SeriesName}\" was added to expired items", episode.SeriesName);
                     }
+                }
 
-                    break;
+                break;
 
-                default:
-                    result = itemsAll;
-                    break;
-            }
+            default:
+                result = items;
+                break;
         }
 
         return result;
