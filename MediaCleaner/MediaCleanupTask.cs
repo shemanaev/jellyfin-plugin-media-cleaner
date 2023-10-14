@@ -123,6 +123,18 @@ namespace MediaCleaner
                 var expiredVideos = CollectVideos(users, usersWithFavorites, itemsAdapter, cancellationToken);
                 expired.AddRange(expiredVideos);
             }
+
+            if (Configuration.KeepAudioFor >= 0)
+            {
+                var expiredAudio = CollectAudio(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                expired.AddRange(expiredAudio);
+            }
+
+            if (Configuration.KeepAudioBooksFor >= 0)
+            {
+                var expiredAudioBooks = CollectAudioBook(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                expired.AddRange(expiredAudioBooks);
+            }
             progress.Report(75);
 
             expired = expired.OrderBy(x => x.Data.First().LastPlayedDate).ToList();
@@ -218,6 +230,44 @@ namespace MediaCleaner
             var videosCollector = new VideosJunkCollector(_loggerFactory.CreateLogger<VideosJunkCollector>(), itemsAdapter);
             var expiredVideos = videosCollector.Execute(users, filters, cancellationToken);
             return expiredVideos;
+        }
+
+        private List<ExpiredItem> CollectAudio(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        {
+            var filters = new List<IExpiredItemFilter>
+                {
+                    new ExpiredFilter(Configuration.KeepAudioFor, users.Count, Configuration.KeepPlayedAudio),
+                    new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
+                        Configuration.KeepFavoriteAudio,
+                        usersWithFavorites,
+                        _userDataManager),
+                    new LocationsFilter(_loggerFactory.CreateLogger<LocationsFilter>(),
+                        Configuration.LocationsMode,
+                        Configuration.LocationsExcluded,
+                        _fileSystem)
+                };
+            var collector = new AudioJunkCollector(_loggerFactory.CreateLogger<AudioJunkCollector>(), itemsAdapter);
+            var expiredItems = collector.Execute(users, filters, cancellationToken);
+            return expiredItems;
+        }
+
+        private List<ExpiredItem> CollectAudioBook(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        {
+            var filters = new List<IExpiredItemFilter>
+                {
+                    new ExpiredFilter(Configuration.KeepAudioBooksFor, users.Count, Configuration.KeepPlayedAudioBooks),
+                    new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
+                        Configuration.KeepFavoriteAudioBooks,
+                        usersWithFavorites,
+                        _userDataManager),
+                    new LocationsFilter(_loggerFactory.CreateLogger<LocationsFilter>(),
+                        Configuration.LocationsMode,
+                        Configuration.LocationsExcluded,
+                        _fileSystem)
+                };
+            var collector = new AudioBookJunkCollector(_loggerFactory.CreateLogger<AudioBookJunkCollector>(), itemsAdapter);
+            var expiredItems = collector.Execute(users, filters, cancellationToken);
+            return expiredItems;
         }
 
         private void DeleteItem(BaseItem item)

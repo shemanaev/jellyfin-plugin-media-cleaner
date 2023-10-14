@@ -20,16 +20,24 @@ function onViewShow(commons) {
     const $KeepPlayedMovies = page.querySelector('#KeepPlayedMovies')
     const $KeepPlayedEpisodes = page.querySelector('#KeepPlayedEpisodes')
     const $KeepPlayedVideos = page.querySelector('#KeepPlayedVideos')
+    const $KeepPlayedAudio = page.querySelector('#KeepPlayedAudio')
+    const $KeepPlayedAudioBooks = page.querySelector('#KeepPlayedAudioBooks')
     $KeepPlayedMovies.addEventListener('change', keepPlayedChanged)
     $KeepPlayedEpisodes.addEventListener('change', keepPlayedChanged)
     $KeepPlayedVideos.addEventListener('change', keepPlayedChanged)
+    $KeepPlayedAudio.addEventListener('change', keepPlayedChanged)
+    $KeepPlayedAudioBooks.addEventListener('change', keepPlayedChanged)
 
     const $KeepFavoriteMovies = page.querySelector('#KeepFavoriteMovies')
     const $KeepFavoriteEpisodes = page.querySelector('#KeepFavoriteEpisodes')
     const $KeepFavoriteVideos = page.querySelector('#KeepFavoriteVideos')
+    const $KeepFavoriteAudio = page.querySelector('#KeepFavoriteAudio')
+    const $KeepFavoriteAudioBooks = page.querySelector('#KeepFavoriteAudioBooks')
     $KeepFavoriteMovies.addEventListener('change', keepFavoriteChanged)
     $KeepFavoriteEpisodes.addEventListener('change', keepFavoriteChanged)
     $KeepFavoriteVideos.addEventListener('change', keepFavoriteChanged)
+    $KeepFavoriteAudio.addEventListener('change', keepFavoriteChanged)
+    $KeepFavoriteAudioBooks.addEventListener('change', keepFavoriteChanged)
 
     const $DeleteEpisodes = page.querySelector('#DeleteEpisodes')
     $DeleteEpisodes.addEventListener('change', deleteEpisodesChanged)
@@ -41,22 +49,37 @@ function onViewShow(commons) {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
         $KeepPlayedMovies.value = config.KeepPlayedMovies
         $KeepFavoriteMovies.value = config.KeepFavoriteMovies
+
         page.querySelector('#KeepEpisodesFor').value = config.KeepEpisodesFor
         page.querySelector('#DeleteEpisodes').value = config.DeleteEpisodes
         $KeepPlayedEpisodes.value = config.KeepPlayedEpisodes
         $KeepFavoriteEpisodes.value = config.KeepFavoriteEpisodes
+
         page.querySelector('#KeepVideosFor').value = config.KeepVideosFor
         $KeepPlayedVideos.value = config.KeepPlayedVideos
         $KeepFavoriteVideos.value = config.KeepFavoriteVideos
+
+        page.querySelector('#KeepAudioFor').value = config.KeepAudioFor
+        $KeepPlayedAudio.value = config.KeepPlayedAudio
+        $KeepFavoriteAudio.value = config.KeepFavoriteAudio
+
+        page.querySelector('#KeepAudioBooksFor').value = config.KeepAudioBooksFor
+        $KeepPlayedAudioBooks.value = config.KeepPlayedAudioBooks
+        $KeepFavoriteAudioBooks.value = config.KeepFavoriteAudioBooks
+
         page.querySelector('#MarkAsUnplayed').checked = config.MarkAsUnplayed
 
         commons.fireEvent([
             $KeepPlayedMovies,
             $KeepPlayedEpisodes,
             $KeepPlayedVideos,
+            $KeepPlayedAudio,
+            $KeepPlayedAudioBooks,
             $KeepFavoriteMovies,
             $KeepFavoriteEpisodes,
             $KeepFavoriteVideos,
+            $KeepFavoriteAudio,
+            $KeepFavoriteAudioBooks,
             $DeleteEpisodes,
             $MarkAsUnplayed,
         ], 'change')
@@ -84,13 +107,24 @@ function onFormSubmit(commons) {
         config.KeepMoviesFor = form.querySelector('#KeepMoviesFor').value
         config.KeepPlayedMovies = form.querySelector('#KeepPlayedMovies').value
         config.KeepFavoriteMovies = form.querySelector('#KeepFavoriteMovies').value
+
         config.KeepEpisodesFor = form.querySelector('#KeepEpisodesFor').value
         config.DeleteEpisodes = form.querySelector('#DeleteEpisodes').value
         config.KeepPlayedEpisodes = form.querySelector('#KeepPlayedEpisodes').value
         config.KeepFavoriteEpisodes = form.querySelector('#KeepFavoriteEpisodes').value
+
         config.KeepVideosFor = form.querySelector('#KeepVideosFor').value
         config.KeepPlayedVideos = form.querySelector('#KeepPlayedVideos').value
         config.KeepFavoriteVideos = form.querySelector('#KeepFavoriteVideos').value
+
+        config.KeepAudioFor = form.querySelector('#KeepAudioFor').value
+        config.KeepPlayedAudio = form.querySelector('#KeepPlayedAudio').value
+        config.KeepFavoriteAudio = form.querySelector('#KeepFavoriteAudio').value
+
+        config.KeepAudioBooksFor = form.querySelector('#KeepAudioBooksFor').value
+        config.KeepPlayedAudioBooks = form.querySelector('#KeepPlayedAudioBooks').value
+        config.KeepFavoriteAudioBooks = form.querySelector('#KeepFavoriteAudioBooks').value
+
         config.MarkAsUnplayed = form.querySelector('#MarkAsUnplayed').checked
 
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {

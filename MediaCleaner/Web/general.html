@@ -84,6 +84,54 @@
                     <div class="fieldDescription"></div>
                 </div>
 
+                <h2>Audio</h2>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioFor">Keep for</label>
+                    <input id="KeepAudioFor" name="KeepAudioFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a played audio before deleting. -1 to disable</div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="KeepPlayedAudio">Keep while not played by</label>
+                    <select is="emby-select" id="KeepPlayedAudio" name="KeepPlayedAudio" class="emby-select-withcolor emby-select">
+                        <option value="AnyUser">Any user</option>
+                        <option value="AllUsers">All users</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="KeepFavoriteAudio">Keep favorites</label>
+                    <select is="emby-select" id="KeepFavoriteAudio" name="KeepFavoriteAudio" class="emby-select-withcolor emby-select">
+                        <option value="DontKeep">No</option>
+                        <option value="AnyUser">Any user</option>
+                        <option value="AllUsers">All users</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+
+                <h2>Audio books</h2>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioBooksFor">Keep for</label>
+                    <input id="KeepAudioBooksFor" name="KeepAudioBooksFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a played audio book before deleting. -1 to disable</div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="KeepPlayedAudioBooks">Keep while not played by</label>
+                    <select is="emby-select" id="KeepPlayedAudioBooks" name="KeepPlayedAudioBooks" class="emby-select-withcolor emby-select">
+                        <option value="AnyUser">Any user</option>
+                        <option value="AllUsers">All users</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="KeepFavoriteAudioBooks">Keep favorites</label>
+                    <select is="emby-select" id="KeepFavoriteAudioBooks" name="KeepFavoriteAudioBooks" class="emby-select-withcolor emby-select">
+                        <option value="DontKeep">No</option>
+                        <option value="AnyUser">Any user</option>
+                        <option value="AllUsers">All users</option>
+                    </select>
+                    <div class="fieldDescription"></div>
+                </div>
+
                 <h2>Misc</h2>
                 <div class="checkboxContainer checkboxContainer-withDescription">
                     <label>

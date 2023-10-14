@@ -51,6 +51,14 @@ namespace MediaCleaner.Configuration
         public PlayedKeepKind KeepPlayedVideos { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteVideos { get; set; } = FavoriteKeepKind.AnyUser;
 
+        public int KeepAudioFor { get; set; } = -1;
+        public PlayedKeepKind KeepPlayedAudio { get; set; } = PlayedKeepKind.AnyUser;
+        public FavoriteKeepKind KeepFavoriteAudio { get; set; } = FavoriteKeepKind.AnyUser;
+
+        public int KeepAudioBooksFor { get; set; } = -1;
+        public PlayedKeepKind KeepPlayedAudioBooks { get; set; } = PlayedKeepKind.AnyUser;
+        public FavoriteKeepKind KeepFavoriteAudioBooks { get; set; } = FavoriteKeepKind.AnyUser;
+
         public List<string> UsersIgnorePlayed { get; set; } = new List<string>();
         public UsersListMode UsersPlayedMode { get; set; } = UsersListMode.Ignore;
 
