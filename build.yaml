@@ -1,8 +1,8 @@
 ---
 name: "Media Cleaner"
 guid: "607fee77-97eb-41fe-bf22-26844d99ffb0"
-version: "2.8.0.0"
-targetAbi: "10.8.0.0"
+version: "2.9.0.0"
+targetAbi: "10.8.11.0"
 framework: "net6.0"
 overview: "Delete played media after specified time"
 description: >
@@ -13,4 +13,4 @@ owner: "shemanaev"
 artifacts:
 - "MediaCleaner.dll"
 changelog: >
-  Add support for audio and audio books
+  Add new "keep while" option: Any user (latest playback)

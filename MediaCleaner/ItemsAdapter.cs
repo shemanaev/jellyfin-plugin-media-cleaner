@@ -37,7 +37,8 @@ internal class ItemsAdapter
             cancellationToken.ThrowIfCancellationRequested();
             var userData = _userDataManager.GetUserData(user, item);
 
-            if (!userData.Played) continue;
+            var isWatching = userData.PlaybackPositionTicks != 0;
+            if (!userData.Played && !isWatching) continue;
 
             if (!userData.LastPlayedDate.HasValue)
             {
@@ -50,7 +51,10 @@ internal class ItemsAdapter
                 Item = item,
                 Data = new List<ExpiredItemData> {
                     new ExpiredItemData {
-                        User = user, LastPlayedDate = userData.LastPlayedDate.Value
+                        User = user,
+                        LastPlayedDate = userData.LastPlayedDate.Value,
+                        IsPlayed = userData.Played,
+                        IsWatching = isWatching,
                     }
                 },
             });

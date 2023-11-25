@@ -13,6 +13,7 @@ namespace MediaCleaner.Configuration
     public enum PlayedKeepKind
     {
         AnyUser,
+        AnyUserRolling,
         AllUsers
     }
 

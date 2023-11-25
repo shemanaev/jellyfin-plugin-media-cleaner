@@ -15,5 +15,7 @@ namespace MediaCleaner
     {
         public User User { get; set; } = default!;
         public DateTime LastPlayedDate { get; set; }
+        public bool IsPlayed { get; set; }
+        public bool IsWatching { get; set; }
     }
 }

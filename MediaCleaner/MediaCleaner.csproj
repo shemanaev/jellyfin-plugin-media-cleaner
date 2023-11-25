@@ -4,15 +4,13 @@
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>MediaCleaner</RootNamespace>
-    <AssemblyVersion>2.7.0.0</AssemblyVersion>
-    <FileVersion>2.7.0.0</FileVersion>
-    <AssemblyVersion>2.8.0.0</AssemblyVersion>
-    <FileVersion>2.8.0.0</FileVersion>
+    <AssemblyVersion>2.9.0.0</AssemblyVersion>
+    <FileVersion>2.9.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.8.*-*" />
-    <PackageReference Include="Jellyfin.Model" Version="10.8.*-*" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.8.11" />
+    <PackageReference Include="Jellyfin.Model" Version="10.8.11" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,7 +37,7 @@
     <EmbeddedResource Include="Web\users.js" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="$(ConfigurationName) == Debug And $(OS) == Windows_NT">
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="$(ConfigurationName) == Debug">
     <Exec Command="xcopy /I /Y $(TargetDir) &quot;$(TargetDir)/data/plugins/MediaCleaner/&quot;" />
   </Target>
 

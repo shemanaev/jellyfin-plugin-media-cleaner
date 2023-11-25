@@ -153,7 +153,11 @@ function keepPlayedChanged(event) {
     const field = this.parentNode.querySelector('.fieldDescription')
     switch (this.value) {
         case 'AnyUser':
-            field.innerHTML = 'At least one user have fully played item'
+            field.innerHTML = 'At least one user have fully played item (countdown from first playback)'
+            break
+
+        case 'AnyUserRolling':
+            field.innerHTML = 'At least one user have fully played item (countdown from latest playback, extends period on any in-progress playback)'
             break
 
         case 'AllUsers':

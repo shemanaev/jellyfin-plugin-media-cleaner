@@ -178,7 +178,10 @@ namespace MediaCleaner
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepMoviesFor, users.Count, Configuration.KeepPlayedMovies),
+                    new ExpiredFilter(_loggerFactory.CreateLogger<ExpiredFilter>(),
+                        Configuration.KeepMoviesFor,
+                        users.Count,
+                        Configuration.KeepPlayedMovies),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteMovies,
                         usersWithFavorites,
@@ -197,7 +200,10 @@ namespace MediaCleaner
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepEpisodesFor, users.Count, Configuration.KeepPlayedEpisodes),
+                    new ExpiredFilter(_loggerFactory.CreateLogger<ExpiredFilter>(),
+                        Configuration.KeepEpisodesFor,
+                        users.Count,
+                        Configuration.KeepPlayedEpisodes),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteEpisodes,
                         usersWithFavorites,
@@ -217,7 +223,10 @@ namespace MediaCleaner
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepVideosFor, users.Count, Configuration.KeepPlayedVideos),
+                    new ExpiredFilter(_loggerFactory.CreateLogger<ExpiredFilter>(),
+                        Configuration.KeepVideosFor,
+                        users.Count,
+                        Configuration.KeepPlayedVideos),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteVideos,
                         usersWithFavorites,
@@ -236,7 +245,10 @@ namespace MediaCleaner
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepAudioFor, users.Count, Configuration.KeepPlayedAudio),
+                    new ExpiredFilter(_loggerFactory.CreateLogger<ExpiredFilter>(),
+                        Configuration.KeepAudioFor,
+                        users.Count,
+                        Configuration.KeepPlayedAudio),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteAudio,
                         usersWithFavorites,
@@ -255,7 +267,10 @@ namespace MediaCleaner
         {
             var filters = new List<IExpiredItemFilter>
                 {
-                    new ExpiredFilter(Configuration.KeepAudioBooksFor, users.Count, Configuration.KeepPlayedAudioBooks),
+                    new ExpiredFilter(_loggerFactory.CreateLogger<ExpiredFilter>(),
+                        Configuration.KeepAudioBooksFor,
+                        users.Count,
+                        Configuration.KeepPlayedAudioBooks),
                     new FavoritesFilter(_loggerFactory.CreateLogger<FavoritesFilter>(),
                         Configuration.KeepFavoriteAudioBooks,
                         usersWithFavorites,
