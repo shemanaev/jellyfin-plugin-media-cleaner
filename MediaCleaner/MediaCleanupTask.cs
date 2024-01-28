@@ -16,6 +16,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Model.IO;
 using MediaCleaner.Filtering;
 using MediaCleaner.Configuration;
+using System.IO;
 
 namespace MediaCleaner
 {
@@ -304,7 +305,7 @@ namespace MediaCleaner
                         _libraryManager.DeleteItem(eps, opts, true);
                     }
                     _libraryManager.DeleteItem(season, opts, true);
-                    if (!season.Series?.GetEpisodes().Any() ?? false)
+                    if (!(season.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(season.Series))
                     {
                         _libraryManager.DeleteItem(season.Series, opts, true);
                     }
@@ -316,7 +317,7 @@ namespace MediaCleaner
                     {
                         _libraryManager.DeleteItem(episode.Season, opts, true);
                     }
-                    if (!episode.Series?.GetEpisodes().Any() ?? false)
+                    if (!(episode.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(episode.Series))
                     {
                         _libraryManager.DeleteItem(episode.Series, opts, true);
                     }
@@ -382,6 +383,20 @@ namespace MediaCleaner
                 ShortOverview = shortOverview,
                 Overview = overview,
             });
+        }
+
+        /// <summary>
+        /// Check if item has extra files and shouldn't be deleted.
+        /// </summary>
+        private bool HasExtraFiles(BaseItem? item)
+        {
+            if (item == null) return false;
+            if (!Directory.Exists(item.Path)) return false;
+
+            // https://github.com/jmbannon/ytdl-sub
+            var hasYtdlSubMeta = Directory.EnumerateFiles(item.Path, ".ytdl-sub-*-download-archive.json").Any();
+
+            return hasYtdlSubMeta;
         }
     }
 }
