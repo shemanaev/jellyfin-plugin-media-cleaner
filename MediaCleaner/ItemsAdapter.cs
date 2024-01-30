@@ -46,6 +46,13 @@ internal class ItemsAdapter
                 continue;
             }
 
+            if (userData.LastPlayedDate < item.DateCreated)
+            {
+                _logger.LogWarning("Ignoring \"{Name}\" ({Id}): played by \"{Username}\" at {LastPlayedDate}, but added at {DateCreated}",
+                    item.Name, item.Id, user.Username, userData.LastPlayedDate, item.DateCreated);
+                continue;
+            }
+
             result.Add(new ExpiredItem
             {
                 Item = item,
