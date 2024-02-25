@@ -199,7 +199,14 @@ namespace MediaCleaner
                     }
                 }
 
-                DeleteItem(item.Item);
+                try
+                {
+                    DeleteItem(item.Item);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting item: {name}", item.FullName);
+                }
             }
 
             expiredNotPlayed = expiredNotPlayed.OrderBy(x => x.Item.DateCreated).ToList();
@@ -213,7 +220,14 @@ namespace MediaCleaner
 
                 await CreateNotification(item);
 
-                DeleteItem(item.Item);
+                try
+                {
+                    DeleteItem(item.Item);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deleting item: {name}", item.FullName);
+                }
             }
 
             progress.Report(100);
@@ -500,37 +514,67 @@ namespace MediaCleaner
             {
                 case Movie movie:
                     title = $"\"{movie.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
+                    shortOverview = item.Kind switch
+                    {
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        _ => throw new NotImplementedException(),
+                    };
                     overview = $"{movie.Path}";
                     break;
 
                 case Series series:
                     title = $"\"{series.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
+                    shortOverview = item.Kind switch
+                    {
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        _ => throw new NotImplementedException(),
+                    };
                     overview = $"{series.Path}";
                     break;
 
                 case Season season:
                     title = $"\"{season.SeriesName}\" S{season.IndexNumber:D2} was deleted";
-                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
+                    shortOverview = item.Kind switch
+                    {
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        _ => throw new NotImplementedException(),
+                    };
                     overview = $"{season.Path ?? season.SeriesPath}";
                     break;
 
                 case Episode episode:
                     title = $"\"{episode.SeriesName}\" S{episode.ParentIndexNumber:D2}E{episode.IndexNumber:D2} was deleted";
-                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
+                    shortOverview = item.Kind switch
+                    {
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        _ => throw new NotImplementedException(),
+                    };
                     overview = $"{episode.Path}";
                     break;
 
                 case Video video:
                     title = $"\"{video.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}";
+                    shortOverview = item.Kind switch
+                    {
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        _ => throw new NotImplementedException(),
+                    };
                     overview = $"{video.Path}";
                     break;
 
                 default:
                     title = $"\"{item.Item.Name}\" was deleted";
-                    shortOverview = $"Last played by {item.Data.First().User.Username}  at  {item.Data.First().LastPlayedDate}";
+                    shortOverview = item.Kind switch
+                    {
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        _ => throw new NotImplementedException(),
+                    };
                     overview = $"{item.Item.Path}";
                     break;
             };
