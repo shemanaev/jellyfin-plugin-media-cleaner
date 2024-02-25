@@ -44,8 +44,19 @@ function getLog(page) {
         const el = document.createElement('html')
         el.innerHTML = result
         const details = el.querySelector('details:last-of-type > pre')
+
+        const colorizedDetails = document.createElement('div')
+        colorizedDetails.innerHTML = colorizeLog(details.innerHTML, {
+            'Tra': 'color: #8e8e94',
+            'Deb': 'color: #007dff',
+            'Inf': 'color: #00ca48',
+            'War': 'color: #ff7600',
+            'Err': 'color: #ff0c1b',
+            'Cri': 'background-color: #ff0c1b',
+        })
+
         viewer.innerHTML = ''
-        viewer.appendChild(details)
+        viewer.appendChild(colorizedDetails)
 
         Dashboard.hideLoadingMsg()
     }).catch(function (error) {
@@ -85,4 +96,22 @@ function troubleshootingButtonToggleViewerClick(event) {
         log.style.display = 'none'
         viewer.style.display = 'inline'
     }
+}
+
+function colorizeLog(s, colors) {
+    let level = Object.keys(colors)
+    let style = Object.values(colors)
+
+    let replacements = {}
+    level.forEach((tag, i) => replacements['\\[(' + tag + ')\\]'] = '[<span style="' + style[i] + '">$1</span>]')
+    let result = replaceBulk(s, replacements)
+    return result.replace(new RegExp('\n', 'g'), '<br>\n')
+}
+
+function replaceBulk(s, replacements) {
+    let find = Object.keys(replacements)
+    let replace = Object.values(replacements)
+    let modifiedString = s
+    find.forEach((tag, i) => modifiedString = modifiedString.replace(new RegExp(tag, 'g'), replace[i]))
+    return modifiedString
 }
