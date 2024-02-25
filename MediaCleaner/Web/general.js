@@ -47,23 +47,28 @@ function onViewShow(commons) {
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
+        page.querySelector('#KeepMoviesNotPlayedFor').value = config.KeepMoviesNotPlayedFor
         $KeepPlayedMovies.value = config.KeepPlayedMovies
         $KeepFavoriteMovies.value = config.KeepFavoriteMovies
 
         page.querySelector('#KeepEpisodesFor').value = config.KeepEpisodesFor
+        page.querySelector('#KeepEpisodesNotPlayedFor').value = config.KeepEpisodesNotPlayedFor
         page.querySelector('#DeleteEpisodes').value = config.DeleteEpisodes
         $KeepPlayedEpisodes.value = config.KeepPlayedEpisodes
         $KeepFavoriteEpisodes.value = config.KeepFavoriteEpisodes
 
         page.querySelector('#KeepVideosFor').value = config.KeepVideosFor
+        page.querySelector('#KeepVideosNotPlayedFor').value = config.KeepVideosNotPlayedFor
         $KeepPlayedVideos.value = config.KeepPlayedVideos
         $KeepFavoriteVideos.value = config.KeepFavoriteVideos
 
         page.querySelector('#KeepAudioFor').value = config.KeepAudioFor
+        page.querySelector('#KeepAudioNotPlayedFor').value = config.KeepAudioNotPlayedFor
         $KeepPlayedAudio.value = config.KeepPlayedAudio
         $KeepFavoriteAudio.value = config.KeepFavoriteAudio
 
         page.querySelector('#KeepAudioBooksFor').value = config.KeepAudioBooksFor
+        page.querySelector('#KeepAudioBooksNotPlayedFor').value = config.KeepAudioBooksNotPlayedFor
         $KeepPlayedAudioBooks.value = config.KeepPlayedAudioBooks
         $KeepFavoriteAudioBooks.value = config.KeepFavoriteAudioBooks
 
@@ -105,23 +110,28 @@ function onFormSubmit(commons) {
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         config.KeepMoviesFor = form.querySelector('#KeepMoviesFor').value
+        config.KeepMoviesNotPlayedFor = form.querySelector('#KeepMoviesNotPlayedFor').value
         config.KeepPlayedMovies = form.querySelector('#KeepPlayedMovies').value
         config.KeepFavoriteMovies = form.querySelector('#KeepFavoriteMovies').value
 
         config.KeepEpisodesFor = form.querySelector('#KeepEpisodesFor').value
+        config.KeepEpisodesNotPlayedFor = form.querySelector('#KeepEpisodesNotPlayedFor').value
         config.DeleteEpisodes = form.querySelector('#DeleteEpisodes').value
         config.KeepPlayedEpisodes = form.querySelector('#KeepPlayedEpisodes').value
         config.KeepFavoriteEpisodes = form.querySelector('#KeepFavoriteEpisodes').value
 
         config.KeepVideosFor = form.querySelector('#KeepVideosFor').value
+        config.KeepVideosNotPlayedFor = form.querySelector('#KeepVideosNotPlayedFor').value
         config.KeepPlayedVideos = form.querySelector('#KeepPlayedVideos').value
         config.KeepFavoriteVideos = form.querySelector('#KeepFavoriteVideos').value
 
         config.KeepAudioFor = form.querySelector('#KeepAudioFor').value
+        config.KeepAudioNotPlayedFor = form.querySelector('#KeepAudioNotPlayedFor').value
         config.KeepPlayedAudio = form.querySelector('#KeepPlayedAudio').value
         config.KeepFavoriteAudio = form.querySelector('#KeepFavoriteAudio').value
 
         config.KeepAudioBooksFor = form.querySelector('#KeepAudioBooksFor').value
+        config.KeepAudioBooksNotPlayedFor = form.querySelector('#KeepAudioBooksNotPlayedFor').value
         config.KeepPlayedAudioBooks = form.querySelector('#KeepPlayedAudioBooks').value
         config.KeepFavoriteAudioBooks = form.querySelector('#KeepFavoriteAudioBooks').value
 

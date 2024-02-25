@@ -4,7 +4,7 @@
             <form id="MediaCleanerConfigForm">
                 <h2>Movies</h2>
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="KeepMoviesFor">Keep for</label>
+                    <label class="inputLabel inputLabelUnfocused" for="KeepMoviesFor">Keep played for <i>X</i> days</label>
                     <input id="KeepMoviesFor" name="KeepMoviesFor" type="number" is="emby-input" min="-1" />
                     <div class="fieldDescription">How many days to keep a played movie before deleting. -1 to disable</div>
                 </div>
@@ -16,6 +16,11 @@
                         <option value="AllUsers">All users</option>
                     </select>
                     <div class="fieldDescription"></div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepMoviesNotPlayedFor">Keep not played for <i>X</i> days</label>
+                    <input id="KeepMoviesNotPlayedFor" name="KeepMoviesNotPlayedFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a not played movie before deleting. -1 to disable</div>
                 </div>
                 <div class="selectContainer">
                     <label class="selectLabel" for="KeepFavoriteMovies">Keep favorites</label>
@@ -29,7 +34,7 @@
 
                 <h2>Series</h2>
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="KeepEpisodesFor">Keep episodes for</label>
+                    <label class="inputLabel inputLabelUnfocused" for="KeepEpisodesFor">Keep played episodes for <i>X</i> days</label>
                     <input id="KeepEpisodesFor" name="KeepEpisodesFor" type="number" is="emby-input" min="-1" />
                     <div class="fieldDescription">How many days to keep a played episode before deleting. -1 to disable</div>
                 </div>
@@ -52,6 +57,11 @@
                     </select>
                     <div class="fieldDescription"></div>
                 </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepEpisodesNotPlayedFor">Keep not played episodes for <i>X</i> days</label>
+                    <input id="KeepEpisodesNotPlayedFor" name="KeepEpisodesNotPlayedFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a not played episode before deleting. -1 to disable</div>
+                </div>
                 <div class="selectContainer">
                     <label class="selectLabel" for="KeepFavoriteEpisodes">Keep favorites</label>
                     <select is="emby-select" id="KeepFavoriteEpisodes" name="KeepFavoriteEpisodes" class="emby-select-withcolor emby-select">
@@ -64,7 +74,7 @@
 
                 <h2>Videos</h2>
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="KeepVideosFor">Keep for</label>
+                    <label class="inputLabel inputLabelUnfocused" for="KeepVideosFor">Keep played for <i>X</i> days</label>
                     <input id="KeepVideosFor" name="KeepVideosFor" type="number" is="emby-input" min="-1" />
                     <div class="fieldDescription">How many days to keep a played video before deleting. -1 to disable</div>
                 </div>
@@ -76,6 +86,11 @@
                         <option value="AllUsers">All users</option>
                     </select>
                     <div class="fieldDescription"></div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepVideosNotPlayedFor">Keep not played for <i>X</i> days</label>
+                    <input id="KeepVideosNotPlayedFor" name="KeepVideosNotPlayedFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a not played video before deleting. -1 to disable</div>
                 </div>
                 <div class="selectContainer">
                     <label class="selectLabel" for="KeepFavoriteVideos">Keep favorites</label>
@@ -89,7 +104,7 @@
 
                 <h2>Audio</h2>
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioFor">Keep for</label>
+                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioFor">Keep played for <i>X</i> days</label>
                     <input id="KeepAudioFor" name="KeepAudioFor" type="number" is="emby-input" min="-1" />
                     <div class="fieldDescription">How many days to keep a played audio before deleting. -1 to disable</div>
                 </div>
@@ -101,6 +116,11 @@
                         <option value="AllUsers">All users</option>
                     </select>
                     <div class="fieldDescription"></div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioNotPlayedFor">Keep not played for <i>X</i> days</label>
+                    <input id="KeepAudioNotPlayedFor" name="KeepAudioNotPlayedFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a not played audio before deleting. -1 to disable</div>
                 </div>
                 <div class="selectContainer">
                     <label class="selectLabel" for="KeepFavoriteAudio">Keep favorites</label>
@@ -114,7 +134,7 @@
 
                 <h2>Audio books</h2>
                 <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioBooksFor">Keep for</label>
+                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioBooksFor">Keep played for <i>X</i> days</label>
                     <input id="KeepAudioBooksFor" name="KeepAudioBooksFor" type="number" is="emby-input" min="-1" />
                     <div class="fieldDescription">How many days to keep a played audio book before deleting. -1 to disable</div>
                 </div>
@@ -126,6 +146,11 @@
                         <option value="AllUsers">All users</option>
                     </select>
                     <div class="fieldDescription"></div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="KeepAudioBooksNotPlayedFor">Keep not played for <i>X</i> days</label>
+                    <input id="KeepAudioBooksNotPlayedFor" name="KeepAudioBooksNotPlayedFor" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">How many days to keep a not played audio book before deleting. -1 to disable</div>
                 </div>
                 <div class="selectContainer">
                     <label class="selectLabel" for="KeepFavoriteAudioBooks">Keep favorites</label>

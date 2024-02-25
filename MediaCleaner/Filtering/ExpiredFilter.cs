@@ -81,7 +81,7 @@ internal class ExpiredFilter : IExpiredItemFilter
 
     private bool IsAnyUserRollingWatched(List<ExpiredItemData> users)
     {
-        if (!users.Any(x => x.IsPlayed))
+        if (!users.Any(x => x.IsPlayed || x.IsWatching))
         {
             _logger.LogTrace("Not played by any user");
             return false;

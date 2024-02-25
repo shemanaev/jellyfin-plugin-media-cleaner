@@ -64,4 +64,37 @@ internal abstract class BaseJunkCollector : IJunkCollector
         _logger.LogTrace("Collecting finished at {StartTime}", DateTime.Now);
         return items;
     }
+
+    public virtual List<ExpiredItem> ExecuteNotPlayed(
+        List<ExpiredItem> expiredPlayedItems,
+        IEnumerable<IExpiredItemFilter> filters,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogTrace("Collecting not played items started at {StartTime}", DateTime.Now);
+        var playedIds = expiredPlayedItems.Select(x => x.Item.Id).ToList();
+        var items = _itemsAdapter
+            .GetNotPlayedItems(_kind, playedIds, cancellationToken)
+            .ToList();
+
+        _logger.LogDebug("Filters order: {Filters}", string.Join(", ", filters.Select(x => x.Name)));
+        _logger.LogDebug("{Count} items before filtering", items.Count);
+
+        foreach (var filter in filters)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var before = items;
+            var after = filter.Apply(before);
+
+            foreach (var item in before.Except(after))
+            {
+                _logger.LogTrace("\"{Name}\" filtered by {FilterName}", item.Item.Name, filter.Name);
+            }
+
+            items = after;
+        }
+
+        _logger.LogDebug("{Count} items after filtering", items.Count);
+        _logger.LogTrace("Collecting finished at {StartTime}", DateTime.Now);
+        return items;
+    }
 }

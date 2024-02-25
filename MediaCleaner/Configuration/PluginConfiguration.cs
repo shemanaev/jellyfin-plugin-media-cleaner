@@ -40,23 +40,28 @@ namespace MediaCleaner.Configuration
     public class PluginConfiguration : BasePluginConfiguration
     {
         public int KeepMoviesFor { get; set; } = -1;
+        public int KeepMoviesNotPlayedFor { get; set; } = -1;
         public PlayedKeepKind KeepPlayedMovies { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteMovies { get; set; } = FavoriteKeepKind.AnyUser;
 
         public int KeepEpisodesFor { get; set; } = -1;
+        public int KeepEpisodesNotPlayedFor { get; set; } = -1;
         public PlayedKeepKind KeepPlayedEpisodes { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteEpisodes { get; set; } = FavoriteKeepKind.AnyUser;
         public SeriesDeleteKind DeleteEpisodes { get; set; } = SeriesDeleteKind.Season;
 
         public int KeepVideosFor { get; set; } = -1;
+        public int KeepVideosNotPlayedFor { get; set; } = -1;
         public PlayedKeepKind KeepPlayedVideos { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteVideos { get; set; } = FavoriteKeepKind.AnyUser;
 
         public int KeepAudioFor { get; set; } = -1;
+        public int KeepAudioNotPlayedFor { get; set; } = -1;
         public PlayedKeepKind KeepPlayedAudio { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteAudio { get; set; } = FavoriteKeepKind.AnyUser;
 
         public int KeepAudioBooksFor { get; set; } = -1;
+        public int KeepAudioBooksNotPlayedFor { get; set; } = -1;
         public PlayedKeepKind KeepPlayedAudioBooks { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteAudioBooks { get; set; } = FavoriteKeepKind.AnyUser;
 

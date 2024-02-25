@@ -7,6 +7,12 @@ using MediaBrowser.Controller.Entities.TV;
 
 namespace MediaCleaner
 {
+    internal enum ExpiredKind
+    {
+        Played,
+        NotPlayed,
+    }
+
     internal class ExpiredItem
     {
         public BaseItem Item { get; set; } = default!;

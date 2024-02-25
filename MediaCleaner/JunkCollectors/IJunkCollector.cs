@@ -8,5 +8,6 @@ namespace MediaCleaner.JunkCollectors
     internal interface IJunkCollector
     {
         List<ExpiredItem> Execute(List<User> users, IEnumerable<IExpiredItemFilter> filters, CancellationToken cancellationToken);
+        List<ExpiredItem> ExecuteNotPlayed(List<ExpiredItem> expiredPlayedItems, IEnumerable<IExpiredItemFilter> filters, CancellationToken cancellationToken);
     }
 }

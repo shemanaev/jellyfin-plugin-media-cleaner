@@ -29,13 +29,13 @@ internal class SeriesFilter : IExpiredItemFilter
                 var seasons = items.GroupBy(x => ((Episode)x.Item).Season?.Id ?? ((Episode)x.Item).Series?.Id);
                 foreach (var season in seasons)
                 {
-                    var first = season.MaxBy(x => x.Data.First().LastPlayedDate);
+                    var first = season.MaxBy(x => x.Data?.First().LastPlayedDate ?? x.Item.DateCreated);
                     if (first?.Item is not Episode episode) continue;
                     var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
 
                     _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
-                        season.First().Data.First().User.Username, season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
+                        season.First().Data?.First().User.Username ?? "[None]", season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
 
                     if (allWatched)
                     {
@@ -43,6 +43,7 @@ internal class SeriesFilter : IExpiredItemFilter
                         {
                             Item = episode.Season,
                             Data = first.Data,
+                            Kind = first.Kind,
                         });
 
                         _logger.LogTrace("Season \"{SeriesName}\": \"{SeasonName}\" was added to expired items", episode.SeriesName, episode.Season.Name);
@@ -56,13 +57,13 @@ internal class SeriesFilter : IExpiredItemFilter
                 var series = items.GroupBy(x => ((Episode)x.Item).Series?.Id);
                 foreach (var show in series)
                 {
-                    var first = show.MaxBy(x => x.Data.First().LastPlayedDate);
+                    var first = show.MaxBy(x => x.Data?.First().LastPlayedDate ?? x.Item.DateCreated);
                     if (first?.Item is not Episode episode) continue;
                     var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
 
                     _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
-                        show.First().Data.First().User.Username, show.Count(), episodes.Count, episode.Series.Name);
+                        show.First().Data?.First().User.Username ?? "[None]", show.Count(), episodes.Count, episode.Series.Name);
 
                     if (allWatched)
                     {
@@ -81,6 +82,7 @@ internal class SeriesFilter : IExpiredItemFilter
                         {
                             Item = episode.Series,
                             Data = first.Data,
+                            Kind = first.Kind,
                         });
 
                         _logger.LogTrace("Series \"{SeriesName}\" was added to expired items", episode.SeriesName);
