@@ -33,7 +33,7 @@ internal class ExpiredFilter : IExpiredItemFilter
 
         foreach (var item in items)
         {
-            _logger.LogTrace("Filtering item \"{Name}\"", item.Item.Name);
+            _logger.LogTrace("Filtering item \"{Name}\"", item.FullName);
 
             switch (_keepKind)
             {

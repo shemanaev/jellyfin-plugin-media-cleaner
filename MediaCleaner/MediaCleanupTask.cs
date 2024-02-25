@@ -144,7 +144,7 @@ namespace MediaCleaner
             {
                 var expiredForUsers = string.Join(", ", item.Data.Select(x => $"{x.User.Username} ({x.LastPlayedDate})"));
                 _logger.LogInformation("({Type}) \"{Name}\" will be deleted because expired for: {Users}",
-                    item.Item.GetType().Name, item.Item.Name, expiredForUsers);
+                    item.Item.GetType().Name, item.FullName, expiredForUsers);
 
                 if (IsDryRun) continue;
 
@@ -388,7 +388,7 @@ namespace MediaCleaner
         /// <summary>
         /// Check if item has extra files and shouldn't be deleted.
         /// </summary>
-        private bool HasExtraFiles(BaseItem? item)
+        private static bool HasExtraFiles(BaseItem? item)
         {
             if (item == null) return false;
             if (!Directory.Exists(item.Path)) return false;

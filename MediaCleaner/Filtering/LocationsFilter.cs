@@ -60,7 +60,7 @@ internal class LocationsFilter : IExpiredItemFilter
             else
             {
                 var location = _locations.Find(s => _fileSystem.ContainsSubPath(s, path));
-                _logger.LogTrace("\"{Name}\" is belongs to \"{Location}\"", item.Item.Name, location);
+                _logger.LogTrace("\"{Name}\" is belongs to \"{Location}\"", item.FullName, location);
             }
         }
 

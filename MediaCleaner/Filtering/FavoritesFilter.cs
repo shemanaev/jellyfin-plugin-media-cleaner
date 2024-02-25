@@ -51,7 +51,7 @@ internal class FavoritesFilter : IExpiredItemFilter
                     else
                     {
                         var user = _users.First(m => IsFavorite(m, item.Item));
-                        _logger.LogTrace("\"{Name}\" is favorited by \"{Username}\"", item.Item.Name, user.Username);
+                        _logger.LogTrace("\"{Name}\" is favorited by \"{Username}\"", item.FullName, user.Username);
                     }
                     break;
 
