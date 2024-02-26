@@ -28,7 +28,7 @@ internal class ExpiredNotPlayedFilter : IExpiredItemFilter
             _logger.LogTrace("Filtering item \"{Name}\"", item.FullName);
 
             var expirationTime = item.Item.DateCreated.AddDays(_keepFor);
-            if (DateTime.Now.CompareTo(expirationTime) < 0) continue;
+            if (DateTime.UtcNow.CompareTo(expirationTime) < 0) continue;
 
             _logger.LogTrace("Not played by anyone since {DateAdded}", item.Item.DateCreated);
             result.Add(item);

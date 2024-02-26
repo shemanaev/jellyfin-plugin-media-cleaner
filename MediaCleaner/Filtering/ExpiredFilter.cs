@@ -70,7 +70,7 @@ internal class ExpiredFilter : IExpiredItemFilter
             if (!user.IsPlayed) continue;
 
             var expirationTime = user.LastPlayedDate.AddDays(_keepFor);
-            if (DateTime.Now.CompareTo(expirationTime) < 0) continue;
+            if (DateTime.UtcNow.CompareTo(expirationTime) < 0) continue;
 
             _logger.LogTrace("Played by \"{Username}\"", user.User.Username);
             return true;
@@ -91,7 +91,7 @@ internal class ExpiredFilter : IExpiredItemFilter
         var expirationTime = user.LastPlayedDate.AddDays(_keepFor);
 
         _logger.LogTrace("Latest played by \"{Username}\"", user.User.Username);
-        return DateTime.Now.CompareTo(expirationTime) >= 0;
+        return DateTime.UtcNow.CompareTo(expirationTime) >= 0;
     }
 
     private bool IsAllUsersWatched(List<ExpiredItemData> users)
@@ -102,7 +102,7 @@ internal class ExpiredFilter : IExpiredItemFilter
             if (!user.IsPlayed) continue;
 
             var expirationTime = user.LastPlayedDate.AddDays(_keepFor);
-            if (DateTime.Now.CompareTo(expirationTime) < 0) continue;
+            if (DateTime.UtcNow.CompareTo(expirationTime) < 0) continue;
 
             expiredCount++;
         }
