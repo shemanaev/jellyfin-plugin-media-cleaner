@@ -37,6 +37,7 @@ internal abstract class BaseJunkCollector : IJunkCollector
             .Select(x => new ExpiredItem
             {
                 Item = x.Key,
+                Kind = x.Select(a => a.Kind).FirstOrDefault(),
                 Data = x.SelectMany(a => a.Data.Select(z => z))
                         .OrderByDescending(a => a.LastPlayedDate)
                         .ToList()
@@ -66,14 +67,20 @@ internal abstract class BaseJunkCollector : IJunkCollector
     }
 
     public virtual List<ExpiredItem> ExecuteNotPlayed(
-        List<ExpiredItem> expiredPlayedItems,
+        List<User> users,
         IEnumerable<IExpiredItemFilter> filters,
         CancellationToken cancellationToken)
     {
         _logger.LogTrace("Collecting not played items started at {StartTime}", DateTime.Now);
-        var playedIds = expiredPlayedItems.Select(x => x.Item.Id).ToList();
-        var items = _itemsAdapter
-            .GetNotPlayedItems(_kind, playedIds, cancellationToken)
+        var items = users
+            .SelectMany(x => _itemsAdapter.GetNotPlayedItems(_kind, x, cancellationToken))
+            .GroupBy(x => x.Item)
+            .Where(x => x.Count() == users.Count)
+            .Select(x => new ExpiredItem
+            {
+                Item = x.Key,
+                Kind = x.Select(a => a.Kind).FirstOrDefault(),
+            })
             .ToList();
 
         _logger.LogDebug("Filters order: {Filters}", string.Join(", ", filters.Select(x => x.Name)));
