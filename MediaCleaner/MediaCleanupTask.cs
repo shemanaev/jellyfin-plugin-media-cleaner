@@ -183,7 +183,7 @@ namespace MediaCleaner
 
             foreach (var item in expired)
             {
-                var expiredForUsers = string.Join(", ", item.Data.Select(x => $"{x.User.Username} ({x.LastPlayedDate})"));
+                var expiredForUsers = string.Join(", ", item.Data.Select(x => $"{x.User.Username} ({x.LastPlayedDate.ToLocalTime()})"));
                 _logger.LogInformation("({Type}) \"{Name}\" will be deleted because expired for: {Users}",
                     item.Item.GetType().Name, item.FullName, expiredForUsers);
 
@@ -214,7 +214,7 @@ namespace MediaCleaner
             foreach (var item in expiredNotPlayed)
             {
                 _logger.LogInformation("({Type}) \"{Name}\" will be deleted because no one played it since {DateCreated}",
-                    item.Item.GetType().Name, item.FullName, item.Item.DateCreated);
+                    item.Item.GetType().Name, item.FullName, item.Item.DateCreated.ToLocalTime());
 
                 if (IsDryRun) continue;
 
@@ -516,8 +516,8 @@ namespace MediaCleaner
                     title = $"\"{movie.Name}\" was deleted";
                     shortOverview = item.Kind switch
                     {
-                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
-                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate.ToLocalTime()}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated.ToLocalTime()}",
                         _ => throw new NotImplementedException(),
                     };
                     overview = $"{movie.Path}";
@@ -527,8 +527,8 @@ namespace MediaCleaner
                     title = $"\"{series.Name}\" was deleted";
                     shortOverview = item.Kind switch
                     {
-                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
-                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate.ToLocalTime()}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated.ToLocalTime()}",
                         _ => throw new NotImplementedException(),
                     };
                     overview = $"{series.Path}";
@@ -538,8 +538,8 @@ namespace MediaCleaner
                     title = $"\"{season.SeriesName}\" S{season.IndexNumber:D2} was deleted";
                     shortOverview = item.Kind switch
                     {
-                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
-                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate.ToLocalTime()}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated.ToLocalTime()}",
                         _ => throw new NotImplementedException(),
                     };
                     overview = $"{season.Path ?? season.SeriesPath}";
@@ -549,8 +549,8 @@ namespace MediaCleaner
                     title = $"\"{episode.SeriesName}\" S{episode.ParentIndexNumber:D2}E{episode.IndexNumber:D2} was deleted";
                     shortOverview = item.Kind switch
                     {
-                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
-                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate.ToLocalTime()}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated.ToLocalTime()}",
                         _ => throw new NotImplementedException(),
                     };
                     overview = $"{episode.Path}";
@@ -560,8 +560,8 @@ namespace MediaCleaner
                     title = $"\"{video.Name}\" was deleted";
                     shortOverview = item.Kind switch
                     {
-                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
-                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate.ToLocalTime()}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated.ToLocalTime()}",
                         _ => throw new NotImplementedException(),
                     };
                     overview = $"{video.Path}";
@@ -571,8 +571,8 @@ namespace MediaCleaner
                     title = $"\"{item.Item.Name}\" was deleted";
                     shortOverview = item.Kind switch
                     {
-                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate}",
-                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated}",
+                        ExpiredKind.Played => $"Last played by {item.Data.First().User.Username} at {item.Data.First().LastPlayedDate.ToLocalTime()}",
+                        ExpiredKind.NotPlayed => $"Not played by anyone since {item.Item.DateCreated.ToLocalTime()}",
                         _ => throw new NotImplementedException(),
                     };
                     overview = $"{item.Item.Path}";
