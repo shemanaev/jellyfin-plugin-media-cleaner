@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
@@ -33,7 +31,7 @@ internal class ItemsAdapter
         CancellationToken cancellationToken)
     {
         var result = new List<ExpiredItem>();
-        var items = GetUserItems(kind, user);
+        var items = GetUserItems(kind, user, ItemSortBy.DatePlayed);
         foreach (var item in items)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -80,15 +78,24 @@ internal class ItemsAdapter
 
     public IEnumerable<ExpiredItem> GetNotPlayedItems(
         BaseItemKind kind,
-        IEnumerable<Guid> excludeIds,
+        User user,
         CancellationToken cancellationToken)
     {
         var result = new List<ExpiredItem>();
-        var items = GetItems(kind, excludeIds);
-        foreach ( var item in items )
+        var items = GetUserItems(kind, user, ItemSortBy.DateCreated);
+        foreach (var item in items)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var userData = _userDataManager.GetUserData(user, item);
 
+            var isWatching = userData.PlaybackPositionTicks != 0;
+            if (userData.Played || isWatching)
+            {
+                _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username}", item.Name, item.Id, user.Username);
+                continue;
+            }
+
+            _logger.LogTrace("\"{Name}\" ({Id}) added because not played by {Username}", item.Name, item.Id, user.Username);
             result.Add(new ExpiredItem
             {
                 Item = item,
@@ -99,20 +106,7 @@ internal class ItemsAdapter
         return result;
     }
 
-    private IEnumerable<BaseItem> GetItems(BaseItemKind kind, IEnumerable<Guid> excludeIds) =>
-        _libraryManager.GetItemList(
-                new InternalItemsQuery()
-                {
-                    ExcludeItemIds = excludeIds.ToArray(),
-                    IncludeItemTypes = new[]
-                    {
-                        kind,
-                    },
-                    IsVirtualItem = false,
-                    OrderBy = new[] { (ItemSortBy.DateCreated, SortOrder.Descending) }
-                });
-
-    private IEnumerable<BaseItem> GetUserItems(BaseItemKind kind, User user) =>
+    private IEnumerable<BaseItem> GetUserItems(BaseItemKind kind, User user, string sortBy) =>
         _libraryManager.GetItemList(
                 new InternalItemsQuery(user)
                 {
@@ -121,6 +115,6 @@ internal class ItemsAdapter
                         kind,
                     },
                     IsVirtualItem = false,
-                    OrderBy = new[] { (ItemSortBy.DatePlayed, SortOrder.Descending) }
+                    OrderBy = new[] { (sortBy, SortOrder.Descending) }
                 });
 }
