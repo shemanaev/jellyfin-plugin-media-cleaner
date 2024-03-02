@@ -28,7 +28,9 @@ namespace MediaCleaner.Configuration
         Episode,
         Season,
         Series,
-        SeriesEnded
+        SeriesEnded,
+        EpisodeKeepLast,
+        SeasonKeepLast,
     }
 
     public enum LocationsListMode
