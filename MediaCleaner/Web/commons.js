@@ -22,6 +22,24 @@ export function getTabs() {
     return tabs
 }
 
+// compatibility layer with pre 10.9
+export function setTabs(unused, selectedIndex, itemsFn) {
+    const $tabs = document.querySelector('.pluginConfigurationPage:not(.hide) #navigationTabs')
+    $tabs.innerHTML = ''
+
+    let i = 0
+    for (const tab of itemsFn()) {
+        const elem = document.createElement("a")
+        elem.innerHTML = tab.name
+        elem.addEventListener('click', (e) => Dashboard.navigate('/' + tab.href, false))
+        elem.className = 'emby-button' + (i === selectedIndex ? ' ui-btn-active' : '')
+        elem.dataset.role = 'button'
+
+        i++
+        $tabs.appendChild(elem)
+    }
+}
+
 export const TabGeneral = 0
 export const TabUsers = 1
 export const TabLocations = 2

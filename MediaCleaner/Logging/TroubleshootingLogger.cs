@@ -13,7 +13,7 @@ internal class TroubleshootingLogger : ILogger
         Func<TroubleshootingLoggerConfiguration> getCurrentConfig) =>
         (_name, _getCurrentConfig) = (string.Join('.', name.Split('.')[1..]), getCurrentConfig);
 
-    public IDisposable BeginScope<TState>(TState state) => default!;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => default!;
 
     public bool IsEnabled(LogLevel logLevel) => true;
 

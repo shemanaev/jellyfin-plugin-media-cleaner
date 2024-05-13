@@ -14,7 +14,7 @@ export default function (view, params) {
 
 function onViewShow(commons) {
     const page = this
-    LibraryMenu.setTabs('MediaCleaner', commons.TabUsers, commons.getTabs)
+    commons.setTabs('MediaCleaner', commons.TabUsers, commons.getTabs)
     Dashboard.showLoadingMsg()
 
     const $UsersPlayedMode = page.querySelector('#UsersPlayedMode')

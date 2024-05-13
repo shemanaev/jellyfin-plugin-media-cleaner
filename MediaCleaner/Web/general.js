@@ -14,7 +14,7 @@ export default function (view, params) {
 
 function onViewShow(commons) {
     const page = this
-    LibraryMenu.setTabs('MediaCleaner', commons.TabsGeneral, commons.getTabs)
+    commons.setTabs('MediaCleaner', commons.TabGeneral, commons.getTabs)
     Dashboard.showLoadingMsg()
 
     const $KeepPlayedMovies = page.querySelector('#KeepPlayedMovies')

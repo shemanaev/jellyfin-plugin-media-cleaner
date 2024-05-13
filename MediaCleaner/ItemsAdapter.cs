@@ -4,7 +4,6 @@ using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Model.Querying;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner;
@@ -106,15 +105,18 @@ internal class ItemsAdapter
         return result;
     }
 
-    private IEnumerable<BaseItem> GetUserItems(BaseItemKind kind, User user, string sortBy) =>
+    private List<BaseItem> GetUserItems(BaseItemKind kind, User user, ItemSortBy sortBy) =>
         _libraryManager.GetItemList(
                 new InternalItemsQuery(user)
                 {
-                    IncludeItemTypes = new[]
-                    {
+                    IncludeItemTypes =
+                    [
                         kind,
-                    },
+                    ],
                     IsVirtualItem = false,
-                    OrderBy = new[] { (sortBy, SortOrder.Descending) }
+                    OrderBy = new (ItemSortBy, SortOrder)[]
+                    {
+                        (sortBy, SortOrder.Descending),
+                    }
                 });
 }

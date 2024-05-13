@@ -12,7 +12,7 @@ const logViewerSelector = '#TroubleshootingLogViewer'
 
 function onViewShow(commons) {
     const page = this
-    LibraryMenu.setTabs('MediaCleaner', commons.TabTroubleshooting, commons.getTabs)
+    commons.setTabs('MediaCleaner', commons.TabTroubleshooting, commons.getTabs)
     Dashboard.showLoadingMsg()
 
     if (window.isSecureContext) {
