@@ -8,6 +8,7 @@ using System.Web;
 using System.Xml;
 using System.Xml.Serialization;
 using MediaBrowser.Common;
+using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Globalization;
@@ -20,27 +21,19 @@ using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Controllers;
 
-[Authorize(Policy = "RequiresElevation")]
+[Authorize(Policy = Policies.RequiresElevation)]
 [ApiController]
 [Route("MediaCleaner")]
-public class TroubleshootingController : ControllerBase
+public class TroubleshootingController(
+    IServiceScopeFactory scopeFactory,
+    IApplicationHost applicationHost
+) : ControllerBase
 {
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IApplicationHost _applicationHost;
-
-    public TroubleshootingController(
-        IServiceScopeFactory scopeFactory,
-        IApplicationHost applicationHost)
-    {
-        _scopeFactory = scopeFactory;
-        _applicationHost = applicationHost;
-    }
-
     [HttpGet("Log")]
     [Produces(MediaTypeNames.Text.Plain)]
     public async Task<string> GetLog()
     {
-        using var scope = _scopeFactory.CreateScope();
+        using var scope = scopeFactory.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<IUserManager>();
         var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
         var userDataManager = scope.ServiceProvider.GetRequiredService<IUserDataManager>();
@@ -50,7 +43,7 @@ public class TroubleshootingController : ControllerBase
         var progress = new Progress<double>();
 
         var logOutput = new List<string>();
-        var loggerFactory = new LoggerFactory(new[] { new TroubleshootingLoggerProvider(new TroubleshootingLoggerConfiguration { Output = logOutput }) });
+        var loggerFactory = new LoggerFactory([new TroubleshootingLoggerProvider(new TroubleshootingLoggerConfiguration { Output = logOutput })]);
 
         var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem)
         {
@@ -60,7 +53,7 @@ public class TroubleshootingController : ControllerBase
 
         var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
 
-        var log = $@"* Jellyfin version: {_applicationHost.ApplicationVersionString}
+        var log = $@"* Jellyfin version: {applicationHost.ApplicationVersionString}
 * Plugin version: {Plugin.Instance.Version}
 <details>
 <summary>Configuration</summary>

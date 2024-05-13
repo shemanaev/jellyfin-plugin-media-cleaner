@@ -478,7 +478,7 @@ namespace MediaCleaner
                     _libraryManager.DeleteItem(season, opts, true);
                     if (!(season.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(season.Series))
                     {
-                        _libraryManager.DeleteItem(season.Series, opts, true);
+                        _libraryManager.DeleteItem(season.Series!, opts, true);
                     }
                     break;
 
@@ -486,11 +486,11 @@ namespace MediaCleaner
                     _libraryManager.DeleteItem(episode, opts, true);
                     if (!episode.Season?.GetEpisodes().Any() ?? false)
                     {
-                        _libraryManager.DeleteItem(episode.Season, opts, true);
+                        _libraryManager.DeleteItem(episode.Season!, opts, true);
                     }
                     if (!(episode.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(episode.Series))
                     {
-                        _libraryManager.DeleteItem(episode.Series, opts, true);
+                        _libraryManager.DeleteItem(episode.Series!, opts, true);
                     }
                     break;
 

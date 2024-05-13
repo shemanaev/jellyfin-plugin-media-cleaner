@@ -23,13 +23,13 @@ jobs:
         name: Setup .NET Core
         uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: "6.0.x"
+          dotnet-version: "8.0.x"
       -
         name: Build Jellyfin Plugin
         uses: oddstr13/jellyfin-plugin-repository-manager@v0.5.0
         id: jprm
         with:
-          dotnet-target: "net6.0"
+          dotnet-target: "net8.0"
       -
         name: Upload Artifact
         uses: actions/upload-artifact@v3
