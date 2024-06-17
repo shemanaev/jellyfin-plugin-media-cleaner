@@ -88,7 +88,7 @@ internal class ItemsAdapter
             var userData = _userDataManager.GetUserData(user, item);
 
             var isWatching = userData.PlaybackPositionTicks != 0;
-            if (userData.Played || isWatching)
+            if ((userData.Played && userData.LastPlayedDate >= item.DateCreated) || isWatching)
             {
                 _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username}", item.Name, item.Id, user.Username);
                 continue;
