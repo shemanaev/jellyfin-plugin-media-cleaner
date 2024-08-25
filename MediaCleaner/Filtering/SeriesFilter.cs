@@ -26,11 +26,12 @@ internal class SeriesFilter : IExpiredItemFilter
         switch (_kind)
         {
             case SeriesDeleteKind.Season:
-                var seasons = items.GroupBy(x => ((Episode)x.Item).Season?.Id ?? ((Episode)x.Item).Series?.Id);
+            var seasons = items.GroupBy(x => x.Item is Episode episode ? episode.Season?.Id ?? episode.Series?.Id : null);
                 foreach (var season in seasons)
                 {
                     var first = season.MaxBy(x => x.Data?.First()?.LastPlayedDate ?? x.Item.DateCreated);
                     if (first?.Item is not Episode episode) continue;
+                    if (episode.Season == null) continue;
                     var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
 
@@ -59,6 +60,7 @@ internal class SeriesFilter : IExpiredItemFilter
                 {
                     var first = show.MaxBy(x => x.Data?.First()?.LastPlayedDate ?? x.Item.DateCreated);
                     if (first?.Item is not Episode episode) continue;
+                    if (episode.Series == null) continue;
                     var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
 
