@@ -173,6 +173,12 @@
                     <div class="fieldDescription checkboxFieldDescription"></div>
                 </div>
 
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="CountAsNotPlayedAfter">Consider items "not played" if the play was more than <i>X</i> days ago</label>
+                    <input id="CountAsNotPlayedAfter" name="CountAsNotPlayedAfter" type="number" is="emby-input" min="-1" />
+                    <div class="fieldDescription">-1 to disable</div>
+                </div>
+
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                         <span>${Save}</span>

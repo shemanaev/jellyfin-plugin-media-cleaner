@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using Jellyfin.Data.Entities;
@@ -27,6 +28,7 @@ internal class ItemsAdapter
     public IEnumerable<ExpiredItem> GetPlayedItems(
         BaseItemKind kind,
         User user,
+        DateTime? startDate,
         CancellationToken cancellationToken)
     {
         var result = new List<ExpiredItem>();
@@ -49,6 +51,12 @@ internal class ItemsAdapter
             {
                 _logger.LogWarning("Ignoring \"{Name}\" ({Id}): played by \"{Username}\" at {LastPlayedDate}, but added at {DateCreated}",
                     item.Name, item.Id, user.Username, userData.LastPlayedDate.Value.ToLocalTime(), item.DateCreated.ToLocalTime());
+                continue;
+            }
+
+            if (startDate != null && userData.LastPlayedDate < startDate)
+            {
+                _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username} before {StartDate}", item.Name, item.Id, user.Username, startDate);
                 continue;
             }
 
@@ -78,6 +86,7 @@ internal class ItemsAdapter
     public IEnumerable<ExpiredItem> GetNotPlayedItems(
         BaseItemKind kind,
         User user,
+        DateTime? startDate,
         CancellationToken cancellationToken)
     {
         var result = new List<ExpiredItem>();
@@ -88,10 +97,24 @@ internal class ItemsAdapter
             var userData = _userDataManager.GetUserData(user, item);
 
             var isWatching = userData.PlaybackPositionTicks != 0;
-            if ((userData.Played && userData.LastPlayedDate >= item.DateCreated) || isWatching)
+            var isPlayedAfterItemCreated = userData.LastPlayedDate >= item.DateCreated;
+            var shouldSkip = (userData.Played && isPlayedAfterItemCreated) || isWatching;
+
+            if (startDate != null)
             {
-                _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username}", item.Name, item.Id, user.Username);
-                continue;
+                if (shouldSkip && userData.LastPlayedDate >= startDate)
+                {
+                    _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username} after {StartDate}", item.Name, item.Id, user.Username, startDate);
+                    continue;
+                }
+            }
+            else
+            {
+                if (shouldSkip)
+                {
+                    _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username}", item.Name, item.Id, user.Username);
+                    continue;
+                }
             }
 
             _logger.LogTrace("\"{Name}\" ({Id}) added because not played by {Username}", item.Name, item.Id, user.Username);

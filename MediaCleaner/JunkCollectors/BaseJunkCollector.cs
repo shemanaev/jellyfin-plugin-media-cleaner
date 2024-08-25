@@ -28,11 +28,12 @@ internal abstract class BaseJunkCollector : IJunkCollector
     public virtual List<ExpiredItem> Execute(
         List<User> users,
         IEnumerable<IExpiredItemFilter> filters,
+        DateTime? startDate,
         CancellationToken cancellationToken)
     {
         _logger.LogTrace("Collecting played items for {UsersCount} users started at {StartTime}", users.Count, DateTime.Now);
         var items = users
-            .SelectMany(x => _itemsAdapter.GetPlayedItems(_kind, x, cancellationToken))
+            .SelectMany(x => _itemsAdapter.GetPlayedItems(_kind, x, startDate, cancellationToken))
             .GroupBy(x => x.Item)
             .Select(x => new ExpiredItem
             {
@@ -69,11 +70,12 @@ internal abstract class BaseJunkCollector : IJunkCollector
     public virtual List<ExpiredItem> ExecuteNotPlayed(
         List<User> users,
         IEnumerable<IExpiredItemFilter> filters,
+        DateTime? startDate,
         CancellationToken cancellationToken)
     {
         _logger.LogTrace("Collecting not played items started at {StartTime}", DateTime.Now);
         var items = users
-            .SelectMany(x => _itemsAdapter.GetNotPlayedItems(_kind, x, cancellationToken))
+            .SelectMany(x => _itemsAdapter.GetNotPlayedItems(_kind, x, startDate, cancellationToken))
             .GroupBy(x => x.Item)
             .Where(x => x.Count() == users.Count)
             .Select(x => new ExpiredItem

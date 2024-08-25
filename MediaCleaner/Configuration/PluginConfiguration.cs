@@ -77,5 +77,6 @@ namespace MediaCleaner.Configuration
         public LocationsListMode LocationsMode { get; set; } = LocationsListMode.Exclude;
 
         public bool MarkAsUnplayed { get; set; } = false;
+        public int CountAsNotPlayedAfter { get; set; } = -1;
     }
 }

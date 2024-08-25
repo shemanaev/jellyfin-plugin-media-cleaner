@@ -101,6 +101,12 @@ namespace MediaCleaner
                 return;
             }
 
+            DateTime? startDate = null;
+            if (Configuration.CountAsNotPlayedAfter >= 0)
+            {
+                startDate = DateTime.Now.AddDays(-Configuration.CountAsNotPlayedAfter);
+            }
+
             var expired = new List<ExpiredItem>();
             var expiredNotPlayed = new List<ExpiredItem>();
 
@@ -110,12 +116,12 @@ namespace MediaCleaner
             {
                 if (Configuration.KeepMoviesFor >= 0)
                 {
-                    var expiredMovies = CollectMovies(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredMovies = CollectMovies(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expired.AddRange(expiredMovies);
                 }
                 if (Configuration.KeepMoviesNotPlayedFor >= 0)
                 {
-                    var expiredNotPlayedMovies = CollectNotPlayedMovies(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredNotPlayedMovies = CollectNotPlayedMovies(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expiredNotPlayed.AddRange(expiredNotPlayedMovies);
                 }
             }
@@ -125,12 +131,12 @@ namespace MediaCleaner
             {
                 if (Configuration.KeepEpisodesFor >= 0)
                 {
-                    var expiredSeries = CollectSeries(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredSeries = CollectSeries(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expired.AddRange(expiredSeries);
                 }
                 if (Configuration.KeepEpisodesNotPlayedFor >= 0)
                 {
-                    var expiredNotPlayedEpisodes = CollectNotPlayedSeries(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredNotPlayedEpisodes = CollectNotPlayedSeries(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expiredNotPlayed.AddRange(expiredNotPlayedEpisodes);
                 }
             }
@@ -140,12 +146,12 @@ namespace MediaCleaner
             {
                 if (Configuration.KeepVideosFor >= 0)
                 {
-                    var expiredVideos = CollectVideos(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredVideos = CollectVideos(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expired.AddRange(expiredVideos);
                 }
                 if (Configuration.KeepVideosNotPlayedFor >= 0)
                 {
-                    var expiredNotPlayedVideos = CollectNotPlayedVideos(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredNotPlayedVideos = CollectNotPlayedVideos(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expiredNotPlayed.AddRange(expiredNotPlayedVideos);
                 }
             }
@@ -154,12 +160,12 @@ namespace MediaCleaner
             {
                 if (Configuration.KeepAudioFor >= 0)
                 {
-                    var expiredAudio = CollectAudio(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredAudio = CollectAudio(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expired.AddRange(expiredAudio);
                 }
                 if (Configuration.KeepAudioNotPlayedFor >= 0)
                 {
-                    var expiredNotPlayedAudio = CollectNotPlayedAudio(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredNotPlayedAudio = CollectNotPlayedAudio(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expiredNotPlayed.AddRange(expiredNotPlayedAudio);
                 }
             }
@@ -168,12 +174,12 @@ namespace MediaCleaner
             {
                 if (Configuration.KeepAudioBooksFor >= 0)
                 {
-                    var expiredAudioBooks = CollectAudioBook(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredAudioBooks = CollectAudioBook(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expired.AddRange(expiredAudioBooks);
                 }
                 if (Configuration.KeepAudioBooksNotPlayedFor >= 0)
                 {
-                    var expiredNotPlayedAudioBooks = CollectNotPlayedAudioBook(users, usersWithFavorites, itemsAdapter, cancellationToken);
+                    var expiredNotPlayedAudioBooks = CollectNotPlayedAudioBook(users, usersWithFavorites, itemsAdapter, startDate, cancellationToken);
                     expiredNotPlayed.AddRange(expiredNotPlayedAudioBooks);
                 }
             }
@@ -245,7 +251,7 @@ namespace MediaCleaner
             };
         }
 
-        private List<ExpiredItem> CollectMovies(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectMovies(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -263,11 +269,11 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var moviesCollector = new MoviesJunkCollector(_loggerFactory.CreateLogger<MoviesJunkCollector>(), itemsAdapter);
-            var expiredMovies = moviesCollector.Execute(users, filters, cancellationToken);
+            var expiredMovies = moviesCollector.Execute(users, filters, startDate, cancellationToken);
             return expiredMovies;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedMovies(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedMovies(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -283,11 +289,11 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var moviesCollector = new MoviesJunkCollector(_loggerFactory.CreateLogger<MoviesJunkCollector>(), itemsAdapter);
-            var movies = moviesCollector.ExecuteNotPlayed(users, filters, cancellationToken);
+            var movies = moviesCollector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return movies;
         }
 
-        private List<ExpiredItem> CollectSeries(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectSeries(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -306,11 +312,11 @@ namespace MediaCleaner
                     new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes)
                 };
             var seriesCollector = new SeriesJunkCollector(_loggerFactory.CreateLogger<SeriesJunkCollector>(), itemsAdapter);
-            var expiredSeries = seriesCollector.Execute(users, filters, cancellationToken);
+            var expiredSeries = seriesCollector.Execute(users, filters, startDate, cancellationToken);
             return expiredSeries;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedSeries(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedSeries(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -327,11 +333,11 @@ namespace MediaCleaner
                     new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes)
                 };
             var seriesCollector = new SeriesJunkCollector(_loggerFactory.CreateLogger<SeriesJunkCollector>(), itemsAdapter);
-            var expiredSeries = seriesCollector.ExecuteNotPlayed(users, filters, cancellationToken);
+            var expiredSeries = seriesCollector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredSeries;
         }
 
-        private List<ExpiredItem> CollectVideos(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectVideos(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -349,11 +355,11 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var videosCollector = new VideosJunkCollector(_loggerFactory.CreateLogger<VideosJunkCollector>(), itemsAdapter);
-            var expiredVideos = videosCollector.Execute(users, filters, cancellationToken);
+            var expiredVideos = videosCollector.Execute(users, filters, startDate, cancellationToken);
             return expiredVideos;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedVideos(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedVideos(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -369,11 +375,11 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var videosCollector = new VideosJunkCollector(_loggerFactory.CreateLogger<VideosJunkCollector>(), itemsAdapter);
-            var expiredVideos = videosCollector.ExecuteNotPlayed(users, filters, cancellationToken);
+            var expiredVideos = videosCollector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredVideos;
         }
 
-        private List<ExpiredItem> CollectAudio(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectAudio(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -391,11 +397,11 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var collector = new AudioJunkCollector(_loggerFactory.CreateLogger<AudioJunkCollector>(), itemsAdapter);
-            var expiredItems = collector.Execute(users, filters, cancellationToken);
+            var expiredItems = collector.Execute(users, filters, startDate, cancellationToken);
             return expiredItems;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedAudio(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedAudio(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -411,11 +417,11 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var collector = new AudioJunkCollector(_loggerFactory.CreateLogger<AudioJunkCollector>(), itemsAdapter);
-            var expiredItems = collector.ExecuteNotPlayed(users, filters, cancellationToken);
+            var expiredItems = collector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredItems;
         }
 
-        private List<ExpiredItem> CollectAudioBook(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectAudioBook(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -433,11 +439,11 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var collector = new AudioBookJunkCollector(_loggerFactory.CreateLogger<AudioBookJunkCollector>(), itemsAdapter);
-            var expiredItems = collector.Execute(users, filters, cancellationToken);
+            var expiredItems = collector.Execute(users, filters, startDate, cancellationToken);
             return expiredItems;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedAudioBook(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedAudioBook(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -453,7 +459,7 @@ namespace MediaCleaner
                         _fileSystem)
                 };
             var collector = new AudioBookJunkCollector(_loggerFactory.CreateLogger<AudioBookJunkCollector>(), itemsAdapter);
-            var expiredItems = collector.ExecuteNotPlayed(users, filters, cancellationToken);
+            var expiredItems = collector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredItems;
         }
 
