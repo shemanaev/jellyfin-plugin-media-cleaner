@@ -23,23 +23,32 @@ internal class SeriesFilter : IExpiredItemFilter
     {
         var result = new List<ExpiredItem>();
 
+        _logger.LogInformation("SeriesFilter start: {Items}", items.Select(x => x.Item.Id));
+
         switch (_kind)
         {
             case SeriesDeleteKind.Season:
-            var seasons = items.GroupBy(x => x.Item is Episode episode ? episode.Season?.Id ?? episode.Series?.Id : null);
+                var seasons = items.GroupBy(x => x.Item is Episode episode ? episode.Season?.Id ?? episode.Series?.Id : null);
+                _logger.LogInformation("SeriesFilter seasons: {Count}, {Items}", seasons.Count(), seasons.Select(x => x.Key));
                 foreach (var season in seasons)
                 {
+                    _logger.LogInformation("SeriesFilter season: {Id}", season.Key);
                     var first = season.MaxBy(x => x.Data?.First()?.LastPlayedDate ?? x.Item.DateCreated);
                     if (first?.Item is not Episode episode) continue;
                     if (episode.Season == null) continue;
+                    _logger.LogInformation("SeriesFilter first episode: {episode}", episode.Id);
                     var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
+
+                    _logger.LogInformation("SeriesFilter allWatched: {allWatched}", allWatched);
 
                     _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
                         season.First().Data?.First()?.User.Username ?? "[None]", season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
 
                     if (allWatched)
                     {
+                        _logger.LogInformation("SeriesFilter allWatched true: {OriginalTitle}", episode.Season);
+
                         result.Add(new ExpiredItem
                         {
                             Item = episode.Season,
