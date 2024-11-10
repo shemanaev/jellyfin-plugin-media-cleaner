@@ -4,8 +4,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>MediaCleaner</RootNamespace>
-    <AssemblyVersion>2.18.0.0</AssemblyVersion>
-    <FileVersion>2.18.0.0</FileVersion>
+    <AssemblyVersion>2.19.0.0</AssemblyVersion>
+    <FileVersion>2.19.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
