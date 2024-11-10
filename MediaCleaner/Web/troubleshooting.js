@@ -27,12 +27,17 @@ function onViewShow(commons) {
     const $TroubleshootingButtonToggleViewer = page.querySelector('#TroubleshootingButtonToggleViewer')
     $TroubleshootingButtonToggleViewer.addEventListener('click', troubleshootingButtonToggleViewerClick)
 
+    const $LogLevel = page.querySelector('#LogLevel')
+    $LogLevel.addEventListener('change', troubleshootingButtonGetLogClick)
+
     getLog(page)
 }
 
 function getLog(page) {
+    const $LogLevel = page.querySelector('#LogLevel')
+
     const request = {
-        url: ApiClient.getUrl('MediaCleaner/Log'),
+        url: ApiClient.getUrl('MediaCleaner/Log') + "?level=" + $LogLevel.value,
     }
 
     Dashboard.showLoadingMsg()

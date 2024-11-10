@@ -24,6 +24,11 @@ internal class TroubleshootingLogger : ILogger
         Exception? exception,
         Func<TState, Exception?, string> formatter)
     {
+        if (_getCurrentConfig().LogLevel > logLevel)
+        {
+            return;
+        }
+
         var s = $"[{logLevel.ToString()[..3]}] {_name}: {formatter(state, exception)}";
         _getCurrentConfig().Output?.Add(s);
     }

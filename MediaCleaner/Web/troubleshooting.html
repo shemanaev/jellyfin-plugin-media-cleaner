@@ -4,7 +4,7 @@
             <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
 
             <div class="verticalSection verticalSection-extrabottompadding">
-                <div>
+                <div style="margin: -2em auto;">
                     <button id="TroubleshootingButtonCopy" is="emby-button" class="raised button-submit emby-button" style="display: none;">
                         <span>Copy to clipboard</span>
                     </button>
@@ -14,6 +14,18 @@
                     <button id="TroubleshootingButtonToggleViewer" is="emby-button" class="raised emby-button">
                         <span>Toggle viewer</span>
                     </button>
+                    <div style="display: inline-flex; position: relative; vertical-align: middle; margin-top: .65em; margin-left: .3em;">
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="LogLevel">Log level</label>
+                            <select is="emby-select" id="LogLevel" name="LogLevel" class="emby-select-withcolor emby-select">
+                                <option value="Trace" selected>Trace</option>
+                                <option value="Debug">Debug</option>
+                                <option value="Information">Information</option>
+                                <option value="Warning">Warning</option>
+                            </select>
+                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

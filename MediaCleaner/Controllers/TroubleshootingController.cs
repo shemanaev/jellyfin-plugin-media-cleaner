@@ -31,7 +31,7 @@ public class TroubleshootingController(
 {
     [HttpGet("Log")]
     [Produces(MediaTypeNames.Text.Plain)]
-    public async Task<string> GetLog()
+    public async Task<string> GetLog(string? level)
     {
         using var scope = scopeFactory.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<IUserManager>();
@@ -42,8 +42,9 @@ public class TroubleshootingController(
         var fileSystem = scope.ServiceProvider.GetRequiredService<IFileSystem>();
         var progress = new Progress<double>();
 
+        Enum.TryParse<LogLevel>(level ?? "Trace", out var logLevel);
         var logOutput = new List<string>();
-        var loggerFactory = new LoggerFactory([new TroubleshootingLoggerProvider(new TroubleshootingLoggerConfiguration { Output = logOutput })]);
+        var loggerFactory = new LoggerFactory([new TroubleshootingLoggerProvider(new TroubleshootingLoggerConfiguration { Output = logOutput, LogLevel = logLevel })]);
 
         var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem)
         {
