@@ -47,16 +47,16 @@ internal class ItemsAdapter
                 continue;
             }
 
+            if (startDate != null && userData.LastPlayedDate < startDate)
+            {
+                _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username} before {StartDate}", item.Name, item.Id, user.Username, startDate);
+                continue;
+            }
+
             if (userData.LastPlayedDate < item.DateCreated)
             {
                 _logger.LogWarning("Ignoring \"{Name}\" ({Id}): played by \"{Username}\" at {LastPlayedDate}, but added at {DateCreated}",
                     item.Name, item.Id, user.Username, userData.LastPlayedDate.Value.ToLocalTime(), item.DateCreated.ToLocalTime());
-                continue;
-            }
-
-            if (startDate != null && userData.LastPlayedDate < startDate)
-            {
-                _logger.LogTrace("\"{Name}\" ({Id}) was played by {Username} before {StartDate}", item.Name, item.Id, user.Username, startDate);
                 continue;
             }
 
