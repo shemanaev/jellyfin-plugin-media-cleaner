@@ -1,0 +1,28 @@
+<div id="MediaCleanerPreviewPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs" data-controller="__plugin/MediaCleaner_Preview_js">
+    <div data-role="content">
+        <div class="content-primary">
+            <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
+
+            <h2>Preview Mode <span id="previewModeStatus"></span></h2>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+                <p>This page shows items that would be deleted if preview mode is active. No files will be deleted in preview mode.</p>
+                <div class="fieldDescription">To enable preview mode, go to the General tab and check "Preview mode" under Misc section.</div>
+                <div class="fieldDescription">To delete the items, disable preview mode and run the Media Cleaner task again.</div>
+            </div>
+            <div id="previewEmptyMessage" style="display: none">
+                <p>No items in preview. Enable preview mode and run the Media Cleaner task to see what would be deleted.</p>
+            </div>
+
+            <div id="previewList">
+                <!-- Preview items will be listed here -->
+            </div>
+
+            <div id="clearPreviewBtnContainer" style="display: none">
+                <br />
+                <button is="emby-button" type="button" class="raised button-submit block emby-button" id="clearPreviewBtn">
+                    <span>Clear Preview List</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using MediaBrowser.Model.Plugins;
 
@@ -79,5 +80,19 @@ namespace MediaCleaner.Configuration
         public bool MarkAsUnplayed { get; set; } = false;
         public int CountAsNotPlayedAfter { get; set; } = -1;
         public bool AllowDeleteIfPlayedBeforeAdded { get; set; } = false;
+
+        public bool PreviewMode { get; set; } = false;
+        public List<PreviewItem> PreviewItems { get; set; } = new List<PreviewItem>();
+    }
+
+    public class PreviewItem
+    {
+        public string Id { get; set; } = default!;
+        public string Name { get; set; } = default!;
+        public string Type { get; set; } = default!;
+        public string Path { get; set; } = default!;
+        public string Kind { get; set; } = default!;
+        public string Reason { get; set; } = default!;
+        public DateTime PreviewDate { get; set; } = DateTime.Now;
     }
 }

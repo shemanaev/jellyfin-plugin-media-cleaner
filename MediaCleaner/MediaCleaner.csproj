@@ -32,6 +32,8 @@
     <EmbeddedResource Include="Web\general.js" />
     <EmbeddedResource Include="Web\locations.html" />
     <EmbeddedResource Include="Web\locations.js" />
+    <EmbeddedResource Include="Web\preview.html" />
+    <EmbeddedResource Include="Web\preview.js" />
     <EmbeddedResource Include="Web\troubleshooting.html" />
     <EmbeddedResource Include="Web\troubleshooting.js" />
     <EmbeddedResource Include="Web\users.html" />

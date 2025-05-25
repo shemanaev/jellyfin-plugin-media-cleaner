@@ -185,6 +185,9 @@ namespace MediaCleaner
             }
             progress.Report(75);
 
+            Configuration.PreviewItems.Clear();
+
+
             expired = expired.OrderBy(x => x.Data.First().LastPlayedDate).ToList();
 
             foreach (var item in expired)
@@ -194,6 +197,12 @@ namespace MediaCleaner
                     item.Item.GetType().Name, item.FullName, expiredForUsers);
 
                 if (IsDryRun) continue;
+
+                if (Configuration.PreviewMode)
+                {
+                    AddToPreview(item, $"Last played by {string.Join(", ", item.Data.Select(x => x.User.Username))} at {item.Data.First().LastPlayedDate.ToLocalTime()}");
+                    continue;
+                }
 
                 await CreateNotification(item);
 
@@ -223,6 +232,12 @@ namespace MediaCleaner
                     item.Item.GetType().Name, item.FullName, item.Item.DateCreated.ToLocalTime());
 
                 if (IsDryRun) continue;
+
+                if (Configuration.PreviewMode)
+                {
+                    AddToPreview(item, $"Not played by anyone since {item.Item.DateCreated.ToLocalTime()}");
+                    continue;
+                }
 
                 await CreateNotification(item);
 
@@ -604,6 +619,33 @@ namespace MediaCleaner
             var hasYtdlSubMeta = Directory.EnumerateFiles(item.Path, ".ytdl-sub-*-download-archive.json").Any();
 
             return hasYtdlSubMeta;
+        }
+
+        /// <summary>
+        /// Add an item to the preview list
+        /// </summary>
+        private void AddToPreview(ExpiredItem item, string reason)
+        {
+            var path = item.Item.Path;
+            if (string.IsNullOrEmpty(path))
+            {
+                path = item.Item switch
+                {
+                    Season season => season.SeriesPath,
+                    Episode episode => episode.Path,
+                    _ => string.Empty
+                };
+            }
+            Configuration.PreviewItems.Add(new PreviewItem
+            {
+                Id = item.Item.Id.ToString(),
+                Name = item.FullName,
+                Type = item.Item.GetType().Name,
+                Path = path ?? string.Empty,
+                Kind = item.Kind.ToString(),
+                Reason = reason,
+                PreviewDate = DateTime.Now
+            });
         }
     }
 }

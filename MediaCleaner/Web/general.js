@@ -48,6 +48,9 @@ function onViewShow(commons) {
     const $AllowDeleteIfPlayedBeforeAdded = page.querySelector('#AllowDeleteIfPlayedBeforeAdded')
     $AllowDeleteIfPlayedBeforeAdded.addEventListener('change', allowDeleteIfPlayedBeforeAddedChanged)
 
+    const $PreviewMode = page.querySelector('#PreviewMode')
+    $PreviewMode.addEventListener('change', previewModeChanged)
+
     const $CountAsNotPlayedAfter = page.querySelector('#CountAsNotPlayedAfter')
     $CountAsNotPlayedAfter.addEventListener('change', countAsNotPlayedAfterChanged)
 
@@ -80,6 +83,7 @@ function onViewShow(commons) {
 
         page.querySelector('#MarkAsUnplayed').checked = config.MarkAsUnplayed
         page.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked = config.AllowDeleteIfPlayedBeforeAdded
+        page.querySelector('#PreviewMode').checked = config.PreviewMode
         page.querySelector('#CountAsNotPlayedAfter').value = config.CountAsNotPlayedAfter
 
         commons.fireEvent([
@@ -96,6 +100,7 @@ function onViewShow(commons) {
             $DeleteEpisodes,
             $MarkAsUnplayed,
             $AllowDeleteIfPlayedBeforeAdded,
+            $PreviewMode,
             $CountAsNotPlayedAfter,
         ], 'change')
 
@@ -147,6 +152,7 @@ function onFormSubmit(commons) {
 
         config.MarkAsUnplayed = form.querySelector('#MarkAsUnplayed').checked
         config.AllowDeleteIfPlayedBeforeAdded = form.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked
+        config.PreviewMode = form.querySelector('#PreviewMode').checked
         config.CountAsNotPlayedAfter = form.querySelector('#CountAsNotPlayedAfter').value
 
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
@@ -232,6 +238,15 @@ function allowDeleteIfPlayedBeforeAddedChanged(event) {
         field.innerHTML = `Files will be deleted even if they were played before being added to the library`
     } else {
         field.innerHTML = `Files will not be deleted if they were played before being added to the library`
+    }
+}
+
+function previewModeChanged(event) {
+    const field = this.parentNode.parentNode.querySelector('.fieldDescription')
+    if (this.checked) {
+        field.innerHTML = `Files won't be deleted but added to preview list instead. Check the Preview tab to see what would be deleted.`
+    } else {
+        field.innerHTML = `Files will be deleted according to the configured rules.`
     }
 }
 
