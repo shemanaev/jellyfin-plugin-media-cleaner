@@ -5,6 +5,7 @@ using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using MediaCleaner.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner;
@@ -14,15 +15,18 @@ internal class ItemsAdapter
     private readonly ILogger<ItemsAdapter> _logger;
     private readonly IUserDataManager _userDataManager;
     private readonly ILibraryManager _libraryManager;
+    private readonly PluginConfiguration _config;
 
     public ItemsAdapter(
         ILogger<ItemsAdapter> logger,
         ILibraryManager libraryManager,
-        IUserDataManager userDataManager)
+        IUserDataManager userDataManager,
+        PluginConfiguration config)
     {
         _logger = logger;
         _libraryManager = libraryManager;
         _userDataManager = userDataManager;
+        _config = config;
     }
 
     public IEnumerable<ExpiredItem> GetPlayedItems(
@@ -47,7 +51,7 @@ internal class ItemsAdapter
                 continue;
             }
 
-            if (userData.LastPlayedDate < item.DateCreated)
+            if (userData.LastPlayedDate < item.DateCreated && !_config.AllowDeleteIfPlayedBeforeAdded)
             {
                 _logger.LogWarning("Ignoring \"{Name}\" ({Id}): played by \"{Username}\" at {LastPlayedDate}, but added at {DateCreated}",
                     item.Name, item.Id, user.Username, userData.LastPlayedDate.Value.ToLocalTime(), item.DateCreated.ToLocalTime());
@@ -97,7 +101,7 @@ internal class ItemsAdapter
             var userData = _userDataManager.GetUserData(user, item);
 
             var isWatching = userData.PlaybackPositionTicks != 0;
-            var isPlayedAfterItemCreated = userData.LastPlayedDate >= item.DateCreated;
+            var isPlayedAfterItemCreated = _config.AllowDeleteIfPlayedBeforeAdded || userData.LastPlayedDate >= item.DateCreated;
             var shouldSkip = (userData.Played && isPlayedAfterItemCreated) || isWatching;
 
             if (startDate != null)

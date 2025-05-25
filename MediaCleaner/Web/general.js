@@ -45,6 +45,9 @@ function onViewShow(commons) {
     const $MarkAsUnplayed = page.querySelector('#MarkAsUnplayed')
     $MarkAsUnplayed.addEventListener('change', markAsUnplayedChanged)
 
+    const $AllowDeleteIfPlayedBeforeAdded = page.querySelector('#AllowDeleteIfPlayedBeforeAdded')
+    $AllowDeleteIfPlayedBeforeAdded.addEventListener('change', allowDeleteIfPlayedBeforeAddedChanged)
+
     const $CountAsNotPlayedAfter = page.querySelector('#CountAsNotPlayedAfter')
     $CountAsNotPlayedAfter.addEventListener('change', countAsNotPlayedAfterChanged)
 
@@ -76,6 +79,7 @@ function onViewShow(commons) {
         $KeepFavoriteAudioBooks.value = config.KeepFavoriteAudioBooks
 
         page.querySelector('#MarkAsUnplayed').checked = config.MarkAsUnplayed
+        page.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked = config.AllowDeleteIfPlayedBeforeAdded
         page.querySelector('#CountAsNotPlayedAfter').value = config.CountAsNotPlayedAfter
 
         commons.fireEvent([
@@ -91,6 +95,7 @@ function onViewShow(commons) {
             $KeepFavoriteAudioBooks,
             $DeleteEpisodes,
             $MarkAsUnplayed,
+            $AllowDeleteIfPlayedBeforeAdded,
             $CountAsNotPlayedAfter,
         ], 'change')
 
@@ -141,6 +146,7 @@ function onFormSubmit(commons) {
         config.KeepFavoriteAudioBooks = form.querySelector('#KeepFavoriteAudioBooks').value
 
         config.MarkAsUnplayed = form.querySelector('#MarkAsUnplayed').checked
+        config.AllowDeleteIfPlayedBeforeAdded = form.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked
         config.CountAsNotPlayedAfter = form.querySelector('#CountAsNotPlayedAfter').value
 
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
@@ -217,6 +223,15 @@ function countAsNotPlayedAfterChanged(event) {
     } else {
         const playDate = addDays(-this.value)
         field.innerHTML = `All plays before <b>${playDate.toLocaleDateString()}</b> will not be counted. Set to <i>-1</i> to disable this behavior`
+    }
+}
+
+function allowDeleteIfPlayedBeforeAddedChanged(event) {
+    const field = this.parentNode.parentNode.querySelector('.fieldDescription')
+    if (this.checked) {
+        field.innerHTML = `Files will be deleted even if they were played before being added to the library`
+    } else {
+        field.innerHTML = `Files will not be deleted if they were played before being added to the library`
     }
 }
 

@@ -110,7 +110,7 @@ namespace MediaCleaner
             var expired = new List<ExpiredItem>();
             var expiredNotPlayed = new List<ExpiredItem>();
 
-            var itemsAdapter = new ItemsAdapter(_loggerFactory.CreateLogger<ItemsAdapter>(), _libraryManager, _userDataManager);
+            var itemsAdapter = new ItemsAdapter(_loggerFactory.CreateLogger<ItemsAdapter>(), _libraryManager, _userDataManager, Configuration);
 
             if (Configuration.KeepMoviesFor >= 0 || Configuration.KeepMoviesNotPlayedFor >= 0)
             {

@@ -78,5 +78,6 @@ namespace MediaCleaner.Configuration
 
         public bool MarkAsUnplayed { get; set; } = false;
         public int CountAsNotPlayedAfter { get; set; } = -1;
+        public bool AllowDeleteIfPlayedBeforeAdded { get; set; } = false;
     }
 }
