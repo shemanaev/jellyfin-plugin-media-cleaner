@@ -192,6 +192,14 @@
                     <div class="fieldDescription checkboxFieldDescription">If checked, files will be deleted even if they were played before they were added to the library.</div>
                 </div>
 
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="PreviewMode" />
+                        <span>Preview mode</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">If checked, files won't be deleted but added to preview list instead. Check the Preview tab to see what would be deleted.</div>
+                </div>
+
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="CountAsNotPlayedAfter">Consider items "not played" if the play was more than <i>X</i> days ago</label>
                     <input id="CountAsNotPlayedAfter" name="CountAsNotPlayedAfter" type="number" is="emby-input" min="-1" />
