@@ -32,7 +32,7 @@ jobs:
           dotnet-target: "net8.0"
       -
         name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-artifact
           retention-days: 30
