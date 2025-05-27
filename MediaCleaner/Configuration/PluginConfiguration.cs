@@ -79,5 +79,9 @@ namespace MediaCleaner.Configuration
         public bool MarkAsUnplayed { get; set; } = false;
         public int CountAsNotPlayedAfter { get; set; } = -1;
         public bool AllowDeleteIfPlayedBeforeAdded { get; set; } = false;
+
+        public bool EnableTagExclusion { get; set; } = true;
+        public string ExclusionTag { get; set; } = "mediacleaner_keep";
+        public bool ReplaceExclusionTag { get; set; } = false;
     }
 }

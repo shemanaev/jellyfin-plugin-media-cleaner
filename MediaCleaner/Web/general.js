@@ -51,6 +51,13 @@ function onViewShow(commons) {
     const $CountAsNotPlayedAfter = page.querySelector('#CountAsNotPlayedAfter')
     $CountAsNotPlayedAfter.addEventListener('change', countAsNotPlayedAfterChanged)
 
+    const $EnableTagExclusion = page.querySelector('#EnableTagExclusion')
+    $EnableTagExclusion.addEventListener('change', enableTagExclusionChanged)
+
+    const $ReplaceExclusionTag = page.querySelector('#ReplaceExclusionTag')
+    $ReplaceExclusionTag.addEventListener('change', replaceExclusionTagChanged)
+
+
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
         page.querySelector('#KeepMoviesNotPlayedFor').value = config.KeepMoviesNotPlayedFor
@@ -82,6 +89,13 @@ function onViewShow(commons) {
         page.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked = config.AllowDeleteIfPlayedBeforeAdded
         page.querySelector('#CountAsNotPlayedAfter').value = config.CountAsNotPlayedAfter
 
+        page.querySelector('#EnableTagExclusion').checked = config.EnableTagExclusion !== false
+        page.querySelector('#ExclusionTag').value = config.ExclusionTag || 'mediacleaner_keep'
+        page.querySelector('#ReplaceExclusionTag').checked = config.ReplaceExclusionTag === true
+
+        const formElement = page.querySelector('#MediaCleanerConfigForm')
+        formElement.dataset.oldExclusionTag = config.ExclusionTag || 'mediacleaner_keep'
+
         commons.fireEvent([
             $KeepPlayedMovies,
             $KeepPlayedEpisodes,
@@ -97,6 +111,8 @@ function onViewShow(commons) {
             $MarkAsUnplayed,
             $AllowDeleteIfPlayedBeforeAdded,
             $CountAsNotPlayedAfter,
+            $EnableTagExclusion,
+            $ReplaceExclusionTag,
         ], 'change')
 
         Dashboard.hideLoadingMsg()
@@ -149,8 +165,47 @@ function onFormSubmit(commons) {
         config.AllowDeleteIfPlayedBeforeAdded = form.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked
         config.CountAsNotPlayedAfter = form.querySelector('#CountAsNotPlayedAfter').value
 
+        config.EnableTagExclusion = form.querySelector('#EnableTagExclusion').checked
+        config.ReplaceExclusionTag = form.querySelector('#ReplaceExclusionTag').checked
+        const newExclusionTag = form.querySelector('#ExclusionTag').value || 'mediacleaner_keep'
+        const oldExclusionTag = form.dataset.oldExclusionTag
+        config.ExclusionTag = newExclusionTag
+
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
-            Dashboard.processPluginConfigurationUpdateResult(result)
+            if (config.EnableTagExclusion && config.ReplaceExclusionTag && oldExclusionTag !== newExclusionTag) {
+                Dashboard.showLoadingMsg()
+                ApiClient.fetch({
+                    type: 'POST',
+                    url: ApiClient.getUrl('MediaCleaner/ReplaceTag'),
+                    data: JSON.stringify({
+                        oldTag: oldExclusionTag,
+                        newTag: newExclusionTag
+                    }),
+                    contentType: 'application/json',
+                    dataType: 'json'
+                }).then(function (response) {
+                    Dashboard.hideLoadingMsg()
+                    if (response && response.UpdatedCount > 0) {
+                        Dashboard.alert({
+                            message: `Successfully replaced tag "${oldExclusionTag}" with "${newExclusionTag}" on ${response.UpdatedCount} items.`,
+                            title: 'Tag Replacement Complete'
+                        })
+                    }
+                    form.dataset.oldExclusionTag = newExclusionTag;
+                    Dashboard.processPluginConfigurationUpdateResult(result)
+                }).catch(function (error) {
+                    console.error('Error replacing tags:', error)
+                    Dashboard.hideLoadingMsg()
+                    Dashboard.alert({
+                        message: `Error replacing tags: ${error.message || 'Unknown error'}`,
+                        title: 'Tag Replacement Failed'
+                    })
+                    form.dataset.oldExclusionTag = newExclusionTag;
+                    Dashboard.processPluginConfigurationUpdateResult(result)
+                })
+            } else {
+                Dashboard.processPluginConfigurationUpdateResult(result)
+            }
         })
     })
 }
@@ -232,6 +287,32 @@ function allowDeleteIfPlayedBeforeAddedChanged(event) {
         field.innerHTML = `Files will be deleted even if they were played before being added to the library`
     } else {
         field.innerHTML = `Files will not be deleted if they were played before being added to the library`
+    }
+}
+
+function enableTagExclusionChanged(event) {
+    const field = this.parentNode.parentNode.querySelector('.fieldDescription')
+    const page = this.closest('#MediaCleanerConfigPage')
+    const exclusionTagInput = page.querySelector('#ExclusionTagContainer')
+    const replaceExclusionTagCheckbox = page.querySelector('#ReplaceExclusionTagContainer')
+
+    if (this.checked) {
+        field.innerHTML = `Items can be excluded from the cleaner by adding the tag <b>mediacleaner_keep</b> to them`
+        exclusionTagInput.style.display = 'block'
+        replaceExclusionTagCheckbox.style.display = 'block'
+    } else {
+        field.innerHTML = `Items will not be excluded from the cleaner based on tags`
+        exclusionTagInput.style.display = 'none'
+        replaceExclusionTagCheckbox.style.display = 'none'
+    }
+}
+
+function replaceExclusionTagChanged(event) {
+    const field = this.parentNode.parentNode.querySelector('.fieldDescription')
+    if (this.checked) {
+        field.innerHTML = `When the tag name is changed, all items with the old tag will automatically have it replaced with the new tag. This helps ensure that previously excluded items remain protected from deletion.`
+    } else {
+        field.innerHTML = `If checked, when you change the tag name, all items with the old tag will have it replaced with the new tag. This helps ensure that previously excluded items remain protected from deletion.`
     }
 }
 

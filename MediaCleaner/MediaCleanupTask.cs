@@ -268,6 +268,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var moviesCollector = new MoviesJunkCollector(_loggerFactory.CreateLogger<MoviesJunkCollector>(), itemsAdapter);
             var expiredMovies = moviesCollector.Execute(users, filters, startDate, cancellationToken);
             return expiredMovies;
@@ -288,6 +291,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var moviesCollector = new MoviesJunkCollector(_loggerFactory.CreateLogger<MoviesJunkCollector>(), itemsAdapter);
             var movies = moviesCollector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return movies;
@@ -311,6 +317,9 @@ namespace MediaCleaner
                         _fileSystem),
                     new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var seriesCollector = new SeriesJunkCollector(_loggerFactory.CreateLogger<SeriesJunkCollector>(), itemsAdapter);
             var expiredSeries = seriesCollector.Execute(users, filters, startDate, cancellationToken);
             return expiredSeries;
@@ -332,6 +341,9 @@ namespace MediaCleaner
                         _fileSystem),
                     new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var seriesCollector = new SeriesJunkCollector(_loggerFactory.CreateLogger<SeriesJunkCollector>(), itemsAdapter);
             var expiredSeries = seriesCollector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredSeries;
@@ -354,6 +366,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var videosCollector = new VideosJunkCollector(_loggerFactory.CreateLogger<VideosJunkCollector>(), itemsAdapter);
             var expiredVideos = videosCollector.Execute(users, filters, startDate, cancellationToken);
             return expiredVideos;
@@ -374,6 +389,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var videosCollector = new VideosJunkCollector(_loggerFactory.CreateLogger<VideosJunkCollector>(), itemsAdapter);
             var expiredVideos = videosCollector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredVideos;
@@ -396,6 +414,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var collector = new AudioJunkCollector(_loggerFactory.CreateLogger<AudioJunkCollector>(), itemsAdapter);
             var expiredItems = collector.Execute(users, filters, startDate, cancellationToken);
             return expiredItems;
@@ -416,6 +437,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var collector = new AudioJunkCollector(_loggerFactory.CreateLogger<AudioJunkCollector>(), itemsAdapter);
             var expiredItems = collector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredItems;
@@ -438,6 +462,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var collector = new AudioBookJunkCollector(_loggerFactory.CreateLogger<AudioBookJunkCollector>(), itemsAdapter);
             var expiredItems = collector.Execute(users, filters, startDate, cancellationToken);
             return expiredItems;
@@ -458,6 +485,9 @@ namespace MediaCleaner
                         Configuration.LocationsExcluded,
                         _fileSystem)
                 };
+
+            AddTagFilterIfEnabled(filters);
+
             var collector = new AudioBookJunkCollector(_loggerFactory.CreateLogger<AudioBookJunkCollector>(), itemsAdapter);
             var expiredItems = collector.ExecuteNotPlayed(users, filters, startDate, cancellationToken);
             return expiredItems;
@@ -604,6 +634,21 @@ namespace MediaCleaner
             var hasYtdlSubMeta = Directory.EnumerateFiles(item.Path, ".ytdl-sub-*-download-archive.json").Any();
 
             return hasYtdlSubMeta;
+        }
+
+        /// <summary>
+        /// Adds a tag filter to the filter list if tag exclusion is enabled in the configuration.
+        /// </summary>
+        private void AddTagFilterIfEnabled(List<IExpiredItemFilter> filters)
+        {
+            if (Configuration.EnableTagExclusion)
+            {
+                _logger.LogDebug("Adding tag exclusion filter with tag: {ExclusionTag}", Configuration.ExclusionTag);
+                filters.Add(
+                    new TagFilter(
+                        _loggerFactory.CreateLogger<TagFilter>(),
+                        Configuration.ExclusionTag));
+            }
         }
     }
 }
