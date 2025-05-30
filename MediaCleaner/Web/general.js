@@ -51,6 +51,16 @@ function onViewShow(commons) {
     const $CountAsNotPlayedAfter = page.querySelector('#CountAsNotPlayedAfter')
     $CountAsNotPlayedAfter.addEventListener('change', countAsNotPlayedAfterChanged)
 
+    const $EnableTagExclusion = page.querySelector('#EnableTagExclusion')
+    $EnableTagExclusion.addEventListener('change', enableTagExclusionChanged)
+
+    const $TagFilterMode = page.querySelector('#TagFilterMode')
+    $TagFilterMode.addEventListener('change', tagFilterModeChanged)
+
+    const $ReplaceExclusionTag = page.querySelector('#ReplaceExclusionTag')
+    $ReplaceExclusionTag.addEventListener('change', replaceExclusionTagChanged)
+
+
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page.querySelector('#KeepMoviesFor').value = config.KeepMoviesFor
         page.querySelector('#KeepMoviesNotPlayedFor').value = config.KeepMoviesNotPlayedFor
@@ -82,6 +92,16 @@ function onViewShow(commons) {
         page.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked = config.AllowDeleteIfPlayedBeforeAdded
         page.querySelector('#CountAsNotPlayedAfter').value = config.CountAsNotPlayedAfter
 
+        page.querySelector('#EnableTagExclusion').checked = config.EnableTagExclusion !== false
+        page.querySelector('#TagFilterMode').value = config.TagFilterMode || 'Exclusion'
+        page.querySelector('#ExclusionTag').value = config.ExclusionTag || 'mediacleaner_keep'
+        page.querySelector('#InclusionTag').value = config.InclusionTag || 'mediacleaner_delete'
+        page.querySelector('#ReplaceExclusionTag').checked = config.ReplaceExclusionTag === true
+
+        const formElement = page.querySelector('#MediaCleanerConfigForm')
+        formElement.dataset.oldExclusionTag = config.ExclusionTag || 'mediacleaner_keep'
+        formElement.dataset.oldInclusionTag = config.InclusionTag || 'mediacleaner_delete'
+
         commons.fireEvent([
             $KeepPlayedMovies,
             $KeepPlayedEpisodes,
@@ -97,6 +117,8 @@ function onViewShow(commons) {
             $MarkAsUnplayed,
             $AllowDeleteIfPlayedBeforeAdded,
             $CountAsNotPlayedAfter,
+            $EnableTagExclusion,
+            $ReplaceExclusionTag,
         ], 'change')
 
         Dashboard.hideLoadingMsg()
@@ -149,8 +171,80 @@ function onFormSubmit(commons) {
         config.AllowDeleteIfPlayedBeforeAdded = form.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked
         config.CountAsNotPlayedAfter = form.querySelector('#CountAsNotPlayedAfter').value
 
+        config.EnableTagExclusion = form.querySelector('#EnableTagExclusion').checked
+        config.TagFilterMode = form.querySelector('#TagFilterMode').value
+        config.ReplaceExclusionTag = form.querySelector('#ReplaceExclusionTag').checked
+
+        const newExclusionTag = form.querySelector('#ExclusionTag').value || 'mediacleaner_keep'
+        const oldExclusionTag = form.dataset.oldExclusionTag
+        config.ExclusionTag = newExclusionTag
+
+        const newInclusionTag = form.querySelector('#InclusionTag').value || 'mediacleaner_delete'
+        const oldInclusionTag = form.dataset.oldInclusionTag
+        config.InclusionTag = newInclusionTag
+
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
-            Dashboard.processPluginConfigurationUpdateResult(result)
+            let replaceTagNeeded = false;
+            let oldTag = '';
+            let newTag = '';
+
+            if (config.EnableTagExclusion && config.ReplaceExclusionTag && 
+                config.TagFilterMode === 'Exclusion' && oldExclusionTag !== newExclusionTag) {
+                replaceTagNeeded = true;
+                oldTag = oldExclusionTag;
+                newTag = newExclusionTag;
+            }
+
+            if (config.EnableTagExclusion && config.ReplaceExclusionTag &&
+                config.TagFilterMode === 'Inclusion' && oldInclusionTag !== newInclusionTag) {
+                replaceTagNeeded = true;
+                oldTag = oldInclusionTag;
+                newTag = newInclusionTag;
+            }
+
+            if (replaceTagNeeded) {
+                Dashboard.showLoadingMsg()
+                ApiClient.fetch({
+                    type: 'POST',
+                    url: ApiClient.getUrl('MediaCleaner/ReplaceTag'),
+                    data: JSON.stringify({
+                        oldTag: oldTag,
+                        newTag: newTag
+                    }),
+                    contentType: 'application/json',
+                    dataType: 'json'
+                }).then(function (response) {
+                    Dashboard.hideLoadingMsg()
+                    if (response && response.UpdatedCount > 0) {
+                        Dashboard.alert({
+                            message: `Successfully replaced tag "${oldTag}" with "${newTag}" on ${response.UpdatedCount} items.`,
+                            title: 'Tag Replacement Complete'
+                        })
+                    }
+
+                    if (config.TagFilterMode === 'Exclusion') {
+                        form.dataset.oldExclusionTag = newExclusionTag;
+                    } else {
+                        form.dataset.oldInclusionTag = newInclusionTag;
+                    }
+                    Dashboard.processPluginConfigurationUpdateResult(result)
+                }).catch(function (error) {
+                    console.error('Error replacing tags:', error)
+                    Dashboard.hideLoadingMsg()
+                    Dashboard.alert({
+                        message: `Error replacing tags: ${error.message || 'Unknown error'}`,
+                        title: 'Tag Replacement Failed'
+                    })
+                    if (config.TagFilterMode === 'Exclusion') {
+                        form.dataset.oldExclusionTag = newExclusionTag;
+                    } else {
+                        form.dataset.oldInclusionTag = newInclusionTag;
+                    }
+                    Dashboard.processPluginConfigurationUpdateResult(result)
+                })
+            } else {
+                Dashboard.processPluginConfigurationUpdateResult(result)
+            }
         })
     })
 }
@@ -232,6 +326,47 @@ function allowDeleteIfPlayedBeforeAddedChanged(event) {
         field.innerHTML = `Files will be deleted even if they were played before being added to the library`
     } else {
         field.innerHTML = `Files will not be deleted if they were played before being added to the library`
+    }
+}
+
+function enableTagExclusionChanged(event) {
+    const field = this.parentNode.parentNode.querySelector('.fieldDescription')
+    const page = this.closest('#MediaCleanerConfigPage')
+    const tagSettingsContainer = page.querySelector('#TagFilterSettingsContainer')
+
+    if (this.checked) {
+        field.innerHTML = `Items will be filtered based on tags according to the selected mode.`
+        tagSettingsContainer.style.display = 'block'
+        tagFilterModeChanged.call(page.querySelector('#TagFilterMode'))
+    } else {
+        field.innerHTML = `Items will not be filtered based on tags`
+        tagSettingsContainer.style.display = 'none'
+    }
+}
+
+function tagFilterModeChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    const page = this.closest('#MediaCleanerConfigPage')
+    const exclusionTagContainer = page.querySelector('#ExclusionTagContainer')
+    const inclusionTagContainer = page.querySelector('#InclusionTagContainer')
+
+    if (this.value === 'Exclusion') {
+        field.innerHTML = `In exclusion mode, items with the specified tag will be protected from deletion, even if they meet other deletion criteria.`
+        exclusionTagContainer.style.display = 'block'
+        inclusionTagContainer.style.display = 'none'
+    } else {
+        field.innerHTML = `In inclusion mode, only items with the specified tag will be deleted, regardless of other criteria.`
+        exclusionTagContainer.style.display = 'none'
+        inclusionTagContainer.style.display = 'block'
+    }
+}
+
+function replaceExclusionTagChanged(event) {
+    const field = this.parentNode.parentNode.querySelector('.fieldDescription')
+    if (this.checked) {
+        field.innerHTML = `When the tag name is changed, all items with the old tag will automatically have it replaced with the new tag. This helps ensure that previously excluded items remain protected from deletion.`
+    } else {
+        field.innerHTML = `If checked, when you change the tag name, all items with the old tag will have it replaced with the new tag. This helps ensure that previously excluded items remain protected from deletion.`
     }
 }
 
