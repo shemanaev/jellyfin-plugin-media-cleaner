@@ -3,6 +3,12 @@ using MediaBrowser.Model.Plugins;
 
 namespace MediaCleaner.Configuration
 {
+    public enum TagMode
+    {
+        Exclusion,
+        Inclusion
+    }
+
     public enum FavoriteKeepKind
     {
         DontKeep,
@@ -81,7 +87,9 @@ namespace MediaCleaner.Configuration
         public bool AllowDeleteIfPlayedBeforeAdded { get; set; } = false;
 
         public bool EnableTagExclusion { get; set; } = true;
+        public TagMode TagFilterMode { get; set; } = TagMode.Exclusion;
         public string ExclusionTag { get; set; } = "mediacleaner_keep";
+        public string InclusionTag { get; set; } = "mediacleaner_delete";
         public bool ReplaceExclusionTag { get; set; } = false;
     }
 }

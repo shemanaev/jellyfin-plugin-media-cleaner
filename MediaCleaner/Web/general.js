@@ -54,6 +54,9 @@ function onViewShow(commons) {
     const $EnableTagExclusion = page.querySelector('#EnableTagExclusion')
     $EnableTagExclusion.addEventListener('change', enableTagExclusionChanged)
 
+    const $TagFilterMode = page.querySelector('#TagFilterMode')
+    $TagFilterMode.addEventListener('change', tagFilterModeChanged)
+
     const $ReplaceExclusionTag = page.querySelector('#ReplaceExclusionTag')
     $ReplaceExclusionTag.addEventListener('change', replaceExclusionTagChanged)
 
@@ -90,11 +93,14 @@ function onViewShow(commons) {
         page.querySelector('#CountAsNotPlayedAfter').value = config.CountAsNotPlayedAfter
 
         page.querySelector('#EnableTagExclusion').checked = config.EnableTagExclusion !== false
+        page.querySelector('#TagFilterMode').value = config.TagFilterMode || 'Exclusion'
         page.querySelector('#ExclusionTag').value = config.ExclusionTag || 'mediacleaner_keep'
+        page.querySelector('#InclusionTag').value = config.InclusionTag || 'mediacleaner_delete'
         page.querySelector('#ReplaceExclusionTag').checked = config.ReplaceExclusionTag === true
 
         const formElement = page.querySelector('#MediaCleanerConfigForm')
         formElement.dataset.oldExclusionTag = config.ExclusionTag || 'mediacleaner_keep'
+        formElement.dataset.oldInclusionTag = config.InclusionTag || 'mediacleaner_delete'
 
         commons.fireEvent([
             $KeepPlayedMovies,
@@ -166,20 +172,44 @@ function onFormSubmit(commons) {
         config.CountAsNotPlayedAfter = form.querySelector('#CountAsNotPlayedAfter').value
 
         config.EnableTagExclusion = form.querySelector('#EnableTagExclusion').checked
+        config.TagFilterMode = form.querySelector('#TagFilterMode').value
         config.ReplaceExclusionTag = form.querySelector('#ReplaceExclusionTag').checked
+
         const newExclusionTag = form.querySelector('#ExclusionTag').value || 'mediacleaner_keep'
         const oldExclusionTag = form.dataset.oldExclusionTag
         config.ExclusionTag = newExclusionTag
 
+        const newInclusionTag = form.querySelector('#InclusionTag').value || 'mediacleaner_delete'
+        const oldInclusionTag = form.dataset.oldInclusionTag
+        config.InclusionTag = newInclusionTag
+
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
-            if (config.EnableTagExclusion && config.ReplaceExclusionTag && oldExclusionTag !== newExclusionTag) {
+            let replaceTagNeeded = false;
+            let oldTag = '';
+            let newTag = '';
+
+            if (config.EnableTagExclusion && config.ReplaceExclusionTag && 
+                config.TagFilterMode === 'Exclusion' && oldExclusionTag !== newExclusionTag) {
+                replaceTagNeeded = true;
+                oldTag = oldExclusionTag;
+                newTag = newExclusionTag;
+            }
+
+            if (config.EnableTagExclusion && config.ReplaceExclusionTag &&
+                config.TagFilterMode === 'Inclusion' && oldInclusionTag !== newInclusionTag) {
+                replaceTagNeeded = true;
+                oldTag = oldInclusionTag;
+                newTag = newInclusionTag;
+            }
+
+            if (replaceTagNeeded) {
                 Dashboard.showLoadingMsg()
                 ApiClient.fetch({
                     type: 'POST',
                     url: ApiClient.getUrl('MediaCleaner/ReplaceTag'),
                     data: JSON.stringify({
-                        oldTag: oldExclusionTag,
-                        newTag: newExclusionTag
+                        oldTag: oldTag,
+                        newTag: newTag
                     }),
                     contentType: 'application/json',
                     dataType: 'json'
@@ -187,11 +217,16 @@ function onFormSubmit(commons) {
                     Dashboard.hideLoadingMsg()
                     if (response && response.UpdatedCount > 0) {
                         Dashboard.alert({
-                            message: `Successfully replaced tag "${oldExclusionTag}" with "${newExclusionTag}" on ${response.UpdatedCount} items.`,
+                            message: `Successfully replaced tag "${oldTag}" with "${newTag}" on ${response.UpdatedCount} items.`,
                             title: 'Tag Replacement Complete'
                         })
                     }
-                    form.dataset.oldExclusionTag = newExclusionTag;
+
+                    if (config.TagFilterMode === 'Exclusion') {
+                        form.dataset.oldExclusionTag = newExclusionTag;
+                    } else {
+                        form.dataset.oldInclusionTag = newInclusionTag;
+                    }
                     Dashboard.processPluginConfigurationUpdateResult(result)
                 }).catch(function (error) {
                     console.error('Error replacing tags:', error)
@@ -200,7 +235,11 @@ function onFormSubmit(commons) {
                         message: `Error replacing tags: ${error.message || 'Unknown error'}`,
                         title: 'Tag Replacement Failed'
                     })
-                    form.dataset.oldExclusionTag = newExclusionTag;
+                    if (config.TagFilterMode === 'Exclusion') {
+                        form.dataset.oldExclusionTag = newExclusionTag;
+                    } else {
+                        form.dataset.oldInclusionTag = newInclusionTag;
+                    }
                     Dashboard.processPluginConfigurationUpdateResult(result)
                 })
             } else {
@@ -293,17 +332,32 @@ function allowDeleteIfPlayedBeforeAddedChanged(event) {
 function enableTagExclusionChanged(event) {
     const field = this.parentNode.parentNode.querySelector('.fieldDescription')
     const page = this.closest('#MediaCleanerConfigPage')
-    const exclusionTagInput = page.querySelector('#ExclusionTagContainer')
-    const replaceExclusionTagCheckbox = page.querySelector('#ReplaceExclusionTagContainer')
+    const tagSettingsContainer = page.querySelector('#TagFilterSettingsContainer')
 
     if (this.checked) {
-        field.innerHTML = `Items can be excluded from the cleaner by adding the tag <b>mediacleaner_keep</b> to them`
-        exclusionTagInput.style.display = 'block'
-        replaceExclusionTagCheckbox.style.display = 'block'
+        field.innerHTML = `Items will be filtered based on tags according to the selected mode.`
+        tagSettingsContainer.style.display = 'block'
+        tagFilterModeChanged.call(page.querySelector('#TagFilterMode'))
     } else {
-        field.innerHTML = `Items will not be excluded from the cleaner based on tags`
-        exclusionTagInput.style.display = 'none'
-        replaceExclusionTagCheckbox.style.display = 'none'
+        field.innerHTML = `Items will not be filtered based on tags`
+        tagSettingsContainer.style.display = 'none'
+    }
+}
+
+function tagFilterModeChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    const page = this.closest('#MediaCleanerConfigPage')
+    const exclusionTagContainer = page.querySelector('#ExclusionTagContainer')
+    const inclusionTagContainer = page.querySelector('#InclusionTagContainer')
+
+    if (this.value === 'Exclusion') {
+        field.innerHTML = `In exclusion mode, items with the specified tag will be protected from deletion, even if they meet other deletion criteria.`
+        exclusionTagContainer.style.display = 'block'
+        inclusionTagContainer.style.display = 'none'
+    } else {
+        field.innerHTML = `In inclusion mode, only items with the specified tag will be deleted, regardless of other criteria.`
+        exclusionTagContainer.style.display = 'none'
+        inclusionTagContainer.style.display = 'block'
     }
 }
 

@@ -198,25 +198,45 @@
                     <div class="fieldDescription">-1 to disable</div>
                 </div>
 
-                <h2>Tag Exclusion</h2>
+                <h2>Tag Filtering</h2>
                 <div class="checkboxContainer checkboxContainer-withDescription">
                     <label>
                         <input is="emby-checkbox" type="checkbox" id="EnableTagExclusion" />
-                        <span>Enable tag-based exclusion</span>
+                        <span>Enable tag-based filtering</span>
                     </label>
-                    <div class="fieldDescription checkboxFieldDescription">If checked, items with the specified tag will not be deleted, even if they otherwise meet the deletion criteria.</div>
+                    <div class="fieldDescription checkboxFieldDescription">If checked, items will be filtered based on tags according to the selected mode.</div>
                 </div>
-                <div id="ExclusionTagContainer" class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="ExclusionTag">Exclusion tag name</label>
-                    <input id="ExclusionTag" name="ExclusionTag" type="text" is="emby-input" />
-                    <div class="fieldDescription">Items with this tag will be kept. If the tag is on a Season, all episodes of that season will be kept. If the tag is on a Series, all episodes of all seasons will be kept.</div>
-                </div>
-                <div id="ReplaceExclusionTagContainer" class="checkboxContainer checkboxContainer-withDescription">
-                    <label>
-                        <input is="emby-checkbox" type="checkbox" id="ReplaceExclusionTag" />
-                        <span>Replace old exclusion tag with new one if changed</span>
-                    </label>
-                    <div class="fieldDescription checkboxFieldDescription">If checked, when you change the tag name, all items with the old tag will have it replaced with the new tag. This helps ensure that previously excluded items remain protected from deletion.</div>
+
+                <div id="TagFilterSettingsContainer">
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="TagFilterMode">Tag filter mode</label>
+                        <select is="emby-select" id="TagFilterMode" name="TagFilterMode" class="emby-select-withcolor emby-select">
+                            <option value="Exclusion">Exclusion mode - keep tagged items</option>
+                            <option value="Inclusion">Inclusion mode - only delete tagged items</option>
+                        </select>
+                        <div class="fieldDescription" id="TagFilterModeDescription">In exclusion mode, items with the tag will be protected from deletion. In inclusion mode, only items with the tag will be eligible for deletion.</div>
+                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
+                    </div>
+
+                    <div id="ExclusionTagContainer" class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ExclusionTag">Exclusion tag name</label>
+                        <input id="ExclusionTag" name="ExclusionTag" type="text" is="emby-input" />
+                        <div class="fieldDescription">Items with this tag will be kept. If the tag is on a Season, all episodes of that season will be kept. If the tag is on a Series, all episodes of all seasons will be kept.</div>
+                    </div>
+
+                    <div id="InclusionTagContainer" class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="InclusionTag">Inclusion tag name</label>
+                        <input id="InclusionTag" name="InclusionTag" type="text" is="emby-input" />
+                        <div class="fieldDescription">Only items with this tag will be deleted. If the tag is on a Season, all episodes of that season will be eligible for deletion. If the tag is on a Series, all episodes of all seasons will be eligible for deletion.</div>
+                    </div>
+
+                    <div id="ReplaceExclusionTagContainer" class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="ReplaceExclusionTag" />
+                            <span>Replace old tag with new one if changed</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">If checked, when you change a tag name, all items with the old tag will have it replaced with the new tag. This helps ensure that previously tagged items maintain the same protection or deletion status.</div>
+                    </div>
                 </div>
 
                 <div>
