@@ -643,11 +643,15 @@ namespace MediaCleaner
         {
             if (Configuration.EnableTagExclusion)
             {
-                _logger.LogDebug("Adding tag exclusion filter with tag: {ExclusionTag}", Configuration.ExclusionTag);
+                string tagName = Configuration.TagFilterMode == TagMode.Exclusion 
+                    ? Configuration.ExclusionTag 
+                    : Configuration.InclusionTag;
+                _logger.LogDebug("Adding tag filter with mode: {TagMode}, tag: {TagName}", Configuration.TagFilterMode, tagName);
                 filters.Add(
                     new TagFilter(
                         _loggerFactory.CreateLogger<TagFilter>(),
-                        Configuration.ExclusionTag));
+                        tagName,
+                        Configuration.TagFilterMode));
             }
         }
     }
