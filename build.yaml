@@ -1,7 +1,7 @@
 ---
 name: "Media Cleaner"
 guid: "607fee77-97eb-41fe-bf22-26844d99ffb0"
-version: "2.20.0.0"
+version: "2.21.0.0"
 targetAbi: "10.9.0.0"
 framework: "net8.0"
 overview: "Delete played media after specified time"
@@ -13,5 +13,4 @@ owner: "shemanaev"
 artifacts:
 - "MediaCleaner.dll"
 changelog: >
-  Old plays should be checked first (NicolaSmaniotto)
-  Add option to allow deletion of items played before being added (luigidotmoe)
+  Add tag exclusion system (luigidotmoe)
