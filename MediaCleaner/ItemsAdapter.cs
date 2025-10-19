@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Jellyfin.Data.Entities;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaCleaner.Configuration;
 using Microsoft.Extensions.Logging;
+using Jellyfin.Database.Implementations.Enums;
 
 namespace MediaCleaner;
 
@@ -41,6 +42,7 @@ internal class ItemsAdapter
         {
             cancellationToken.ThrowIfCancellationRequested();
             var userData = _userDataManager.GetUserData(user, item);
+            if (userData == null) continue;
 
             var isWatching = userData.PlaybackPositionTicks != 0;
             if (!userData.Played && !isWatching) continue;
@@ -99,6 +101,7 @@ internal class ItemsAdapter
         {
             cancellationToken.ThrowIfCancellationRequested();
             var userData = _userDataManager.GetUserData(user, item);
+            if (userData == null) continue;
 
             var isWatching = userData.PlaybackPositionTicks != 0;
             var isPlayedAfterItemCreated = _config.AllowDeleteIfPlayedBeforeAdded || userData.LastPlayedDate >= item.DateCreated;
@@ -133,7 +136,7 @@ internal class ItemsAdapter
     }
 
     private List<BaseItem> GetUserItems(BaseItemKind kind, User user, ItemSortBy sortBy) =>
-        _libraryManager.GetItemList(
+        [.. _libraryManager.GetItemList(
                 new InternalItemsQuery(user)
                 {
                     IncludeItemTypes =
@@ -141,9 +144,9 @@ internal class ItemsAdapter
                         kind,
                     ],
                     IsVirtualItem = false,
-                    OrderBy = new (ItemSortBy, SortOrder)[]
-                    {
+                    OrderBy =
+                    [
                         (sortBy, SortOrder.Descending),
-                    }
-                });
+                    ]
+                })];
 }
