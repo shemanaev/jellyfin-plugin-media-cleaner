@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using MediaCleaner.Configuration;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Dto;
+using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;
@@ -26,6 +28,7 @@ internal class SeriesFilter : IExpiredItemFilter
         switch (_kind)
         {
             case SeriesDeleteKind.Season:
+            case SeriesDeleteKind.SeasonKeepLast:
                 var seasons = items.GroupBy(x => ((Episode)x.Item).Season?.Id ?? ((Episode)x.Item).Series?.Id);
                 foreach (var season in seasons)
                 {
@@ -39,14 +42,30 @@ internal class SeriesFilter : IExpiredItemFilter
 
                     if (allWatched)
                     {
-                        result.Add(new ExpiredItem
+                        var expiredItem = new ExpiredItem
                         {
                             Item = episode.Season,
                             Data = first.Data,
                             Kind = first.Kind,
-                        });
+                        };
 
-                        _logger.LogTrace("Season \"{SeriesName}\": \"{SeasonName}\" was added to expired items", episode.SeriesName, episode.Season.Name);
+                        if (_kind == SeriesDeleteKind.SeasonKeepLast)
+                        {
+                            var seriesStatus = episode.Series.Status;
+                            var lastSeasonId = episode.Series.GetSeasons(first.Data?.First()?.User, new DtoOptions()).LastOrDefault()?.Id;
+                            if (seriesStatus.HasValue
+                                && seriesStatus.Value != SeriesStatus.Ended
+                                && episode.SeasonId == lastSeasonId)
+                            {
+                                _logger.LogTrace("Season \"{SeasonName}\" was NOT added to expired items because this is the last one and metadata indicates that show is continued",
+                                    expiredItem.FullName);
+                                continue;
+                            }
+                        }
+
+                        result.Add(expiredItem);
+
+                        _logger.LogTrace("Season \"{SeasonName}\" was added to expired items", expiredItem.FullName);
                     }
                 }
 
@@ -67,28 +86,50 @@ internal class SeriesFilter : IExpiredItemFilter
 
                     if (allWatched)
                     {
-                        if (_kind == SeriesDeleteKind.SeriesEnded)
-                        {
-                            if (episode.Series.Status.HasValue
-                                && episode.Series.Status.Value != MediaBrowser.Model.Entities.SeriesStatus.Ended)
-                            {
-                                _logger.LogTrace("Series \"{SeriesName}\" was NOT added to expired items because metadata indicates that it's not yet finished",
-                                    episode.SeriesName);
-                                continue;
-                            }
-                        }
-
-                        result.Add(new ExpiredItem
+                        var expiredItem = new ExpiredItem
                         {
                             Item = episode.Series,
                             Data = first.Data,
                             Kind = first.Kind,
-                        });
+                        };
+
+                        if (_kind == SeriesDeleteKind.SeriesEnded)
+                        {
+                            var seriesStatus = episode.Series.Status;
+                            if (seriesStatus.HasValue
+                                && seriesStatus.Value != SeriesStatus.Ended)
+                            {
+                                _logger.LogTrace("Series \"{SeriesName}\" was NOT added to expired items because metadata indicates that it's not yet finished",
+                                    expiredItem.FullName);
+                                continue;
+                            }
+                        }
+
+                        result.Add(expiredItem);
 
                         _logger.LogTrace("Series \"{SeriesName}\" was added to expired items", episode.SeriesName);
                     }
                 }
 
+                break;
+
+            case SeriesDeleteKind.EpisodeKeepLast:
+                foreach (var item in items)
+                {
+                    var episode = (Episode)item.Item;
+                    var seriesStatus = episode.Series.Status;
+                    var lastEpisodeId = episode.Series.GetEpisodes(item.Data?.First()?.User, new DtoOptions()).LastOrDefault()?.Id;
+                    if (seriesStatus.HasValue
+                        && seriesStatus.Value != SeriesStatus.Ended
+                        && episode.Id == lastEpisodeId)
+                    {
+                        _logger.LogTrace("Episode \"{EpisodeName}\" was NOT added to expired items because this is the last one and metadata indicates that show is not yet finished",
+                            item.FullName);
+                        continue;
+                    }
+
+                    result.Add(item);
+                }
                 break;
 
             default:

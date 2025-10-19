@@ -292,6 +292,14 @@ function deleteEpisodesChanged(event) {
             field.innerHTML = `Don't delete unless series status changes to "Ended" in metadata`
             break
 
+        case 'EpisodeKeepLast':
+            field.innerHTML = `Keep the last episode of the show unless series status changes to "Ended" in metadata`
+            break
+
+        case 'SeasonKeepLast':
+            field.innerHTML = `Keep the last season of the show unless series status changes to "Ended" in metadata`
+            break
+
         default:
             field.innerHTML = ''
     }
