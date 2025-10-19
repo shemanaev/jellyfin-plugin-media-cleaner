@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Data.Entities;
+using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Tasks;
@@ -44,14 +44,14 @@ namespace MediaCleaner
 
         public string Category => _localization.GetLocalizedString("TasksMaintenanceCategory");
 
-        public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => new[]
-            {
+        public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() =>
+            [
                 new TaskTriggerInfo
                 {
-                    Type = TaskTriggerInfo.TriggerInterval,
+                    Type = TaskTriggerInfoType.IntervalTrigger,
                     IntervalTicks = TimeSpan.FromDays(1).Ticks
                 }
-            };
+            ];
 
         public MediaCleanupTask(
             IUserManager userManager,
