@@ -31,11 +31,16 @@ internal class SeriesFilter : IExpiredItemFilter
                 {
                     var first = season.MaxBy(x => x.Data?.First()?.LastPlayedDate ?? x.Item.DateCreated);
                     if (first?.Item is not Episode episode) continue;
+                    if (episode.Season is null)
+                    {
+                        _logger.LogDebug("Skipping episode \"{EpisodeName}\" because it has no season", episode.Name);
+                        continue;
+                    }
                     var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
 
                     _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
-                        season.First().Data?.First()?.User.Username ?? "[None]", season.Count(), episodes.Count, episode.Series.Name, episode.Season.Name);
+                        season.First().Data?.First()?.User.Username ?? "[None]", season.Count(), episodes.Count, episode.Series?.Name ?? "[Unknown]", episode.Season.Name);
 
                     if (allWatched)
                     {
@@ -59,6 +64,11 @@ internal class SeriesFilter : IExpiredItemFilter
                 {
                     var first = show.MaxBy(x => x.Data?.First()?.LastPlayedDate ?? x.Item.DateCreated);
                     if (first?.Item is not Episode episode) continue;
+                    if (episode.Series is null)
+                    {
+                        _logger.LogDebug("Skipping episode \"{EpisodeName}\" because it has no series", episode.Name);
+                        continue;
+                    }
                     var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
 
