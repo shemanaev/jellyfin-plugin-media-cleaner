@@ -29,8 +29,13 @@ namespace MediaCleaner.Configuration
         Season,
         Series,
         SeriesEnded,
-        EpisodeKeepLast,
-        SeasonKeepLast,
+    }
+
+    public enum SeriesKeepKind
+    {
+        None,
+        First,
+        Last,
     }
 
     public enum LocationsListMode
@@ -57,6 +62,7 @@ namespace MediaCleaner.Configuration
         public PlayedKeepKind KeepPlayedEpisodes { get; set; } = PlayedKeepKind.AnyUser;
         public FavoriteKeepKind KeepFavoriteEpisodes { get; set; } = FavoriteKeepKind.AnyUser;
         public SeriesDeleteKind DeleteEpisodes { get; set; } = SeriesDeleteKind.Season;
+        public SeriesKeepKind KeepSeriesKind { get; set; } = SeriesKeepKind.None;
 
         public int KeepVideosFor { get; set; } = -1;
         public int KeepVideosNotPlayedFor { get; set; } = -1;

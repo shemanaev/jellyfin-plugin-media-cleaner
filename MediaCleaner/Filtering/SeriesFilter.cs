@@ -8,27 +8,17 @@ using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;
 
-internal class SeriesFilter : IExpiredItemFilter
+internal class SeriesFilter(ILogger<SeriesFilter> logger, SeriesDeleteKind kind, SeriesKeepKind keepKind) : IExpiredItemFilter
 {
-    private readonly ILogger<SeriesFilter> _logger;
-    private readonly SeriesDeleteKind _kind;
-
-    public SeriesFilter(ILogger<SeriesFilter> logger, SeriesDeleteKind kind)
-    {
-        _logger = logger;
-        _kind = kind;
-    }
-
     public string Name => "Series";
 
     public List<ExpiredItem> Apply(List<ExpiredItem> items)
     {
         var result = new List<ExpiredItem>();
 
-        switch (_kind)
+        switch (kind)
         {
             case SeriesDeleteKind.Season:
-            case SeriesDeleteKind.SeasonKeepLast:
                 var seasons = items.GroupBy(x => ((Episode)x.Item).Season?.Id ?? ((Episode)x.Item).Series?.Id);
                 foreach (var season in seasons)
                 {
@@ -36,13 +26,13 @@ internal class SeriesFilter : IExpiredItemFilter
                     if (first?.Item is not Episode episode) continue;
                     if (episode.Season is null)
                     {
-                        _logger.LogDebug("Skipping episode \"{EpisodeName}\" because it has no season", episode.Name);
+                        logger.LogDebug("Skipping episode \"{EpisodeName}\" because it has no season", episode.Name);
                         continue;
                     }
                     var episodes = episode.Season.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = season.Count() == episodes.Count && season.All(value => episodes.Contains(value.Item));
 
-                    _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
+                    logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in season \"{SeriesName}\": \"{SeasonName}\"",
                         season.First().Data?.First()?.User.Username ?? "[None]", season.Count(), episodes.Count, episode.Series?.Name ?? "[Unknown]", episode.Season.Name);
 
                     if (allWatched)
@@ -54,15 +44,23 @@ internal class SeriesFilter : IExpiredItemFilter
                             Kind = first.Kind,
                         };
 
-                        if (_kind == SeriesDeleteKind.SeasonKeepLast)
+                        if (keepKind == SeriesKeepKind.First)
                         {
-                            var seriesStatus = episode.Series.Status;
-                            var lastSeasonId = episode.Series.GetSeasons(first.Data?.First()?.User, new DtoOptions()).LastOrDefault()?.Id;
-                            if (seriesStatus.HasValue
-                                && seriesStatus.Value != SeriesStatus.Ended
-                                && episode.SeasonId == lastSeasonId)
+                            var firstSeasonId = episode.Series?.GetSeasons(first.Data?.First()?.User, new DtoOptions()).FirstOrDefault()?.Id;
+                            if (episode.Season.Id == firstSeasonId)
                             {
-                                _logger.LogTrace("Season \"{SeasonName}\" was NOT added to expired items because this is the last one and metadata indicates that show is continued",
+                                logger.LogTrace("Season \"{SeasonName}\" was NOT added to expired items because this is the first one",
+                                    expiredItem.FullName);
+                                continue;
+                            }
+                        }
+
+                        if (keepKind == SeriesKeepKind.Last)
+                        {
+                            var lastSeasonId = episode.Series?.GetSeasons(first.Data?.First()?.User, new DtoOptions()).LastOrDefault()?.Id;
+                            if (episode.Season.Id == lastSeasonId)
+                            {
+                                logger.LogTrace("Season \"{SeasonName}\" was NOT added to expired items because this is the last one",
                                     expiredItem.FullName);
                                 continue;
                             }
@@ -70,7 +68,7 @@ internal class SeriesFilter : IExpiredItemFilter
 
                         result.Add(expiredItem);
 
-                        _logger.LogTrace("Season \"{SeasonName}\" was added to expired items", expiredItem.FullName);
+                        logger.LogTrace("Season \"{SeasonName}\" was added to expired items", expiredItem.FullName);
                     }
                 }
 
@@ -85,13 +83,13 @@ internal class SeriesFilter : IExpiredItemFilter
                     if (first?.Item is not Episode episode) continue;
                     if (episode.Series is null)
                     {
-                        _logger.LogDebug("Skipping episode \"{EpisodeName}\" because it has no series", episode.Name);
+                        logger.LogDebug("Skipping episode \"{EpisodeName}\" because it has no series", episode.Name);
                         continue;
                     }
                     var episodes = episode.Series.GetEpisodes().Where(x => !x.IsVirtualItem).ToList();
                     var allWatched = show.Count() == episodes.Count && show.All(value => episodes.Contains(value.Item));
 
-                    _logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
+                    logger.LogDebug("\"{Username}\" has watched episodes {Count} of {Total} in series \"{SeriesName}\"'",
                         show.First().Data?.First()?.User.Username ?? "[None]", show.Count(), episodes.Count, episode.Series.Name);
 
                     if (allWatched)
@@ -103,13 +101,13 @@ internal class SeriesFilter : IExpiredItemFilter
                             Kind = first.Kind,
                         };
 
-                        if (_kind == SeriesDeleteKind.SeriesEnded)
+                        if (kind == SeriesDeleteKind.SeriesEnded)
                         {
                             var seriesStatus = episode.Series.Status;
                             if (seriesStatus.HasValue
                                 && seriesStatus.Value != SeriesStatus.Ended)
                             {
-                                _logger.LogTrace("Series \"{SeriesName}\" was NOT added to expired items because metadata indicates that it's not yet finished",
+                                logger.LogTrace("Series \"{SeriesName}\" was NOT added to expired items because metadata indicates that it's not yet finished",
                                     expiredItem.FullName);
                                 continue;
                             }
@@ -117,25 +115,37 @@ internal class SeriesFilter : IExpiredItemFilter
 
                         result.Add(expiredItem);
 
-                        _logger.LogTrace("Series \"{SeriesName}\" was added to expired items", episode.SeriesName);
+                        logger.LogTrace("Series \"{SeriesName}\" was added to expired items", episode.SeriesName);
                     }
                 }
 
                 break;
 
-            case SeriesDeleteKind.EpisodeKeepLast:
+            case SeriesDeleteKind.Episode:
                 foreach (var item in items)
                 {
                     var episode = (Episode)item.Item;
-                    var seriesStatus = episode.Series.Status;
-                    var lastEpisodeId = episode.Series.GetEpisodes(item.Data?.First()?.User, new DtoOptions()).LastOrDefault()?.Id;
-                    if (seriesStatus.HasValue
-                        && seriesStatus.Value != SeriesStatus.Ended
-                        && episode.Id == lastEpisodeId)
+
+                    if (keepKind == SeriesKeepKind.First)
                     {
-                        _logger.LogTrace("Episode \"{EpisodeName}\" was NOT added to expired items because this is the last one and metadata indicates that show is not yet finished",
-                            item.FullName);
-                        continue;
+                        var firstEpisodeId = episode.Series.GetEpisodes(item.Data?.First()?.User, new DtoOptions(), false).FirstOrDefault()?.Id;
+                        if (episode.Id == firstEpisodeId)
+                        {
+                            logger.LogTrace("Episode \"{EpisodeName}\" was NOT added to expired items because this is the first one",
+                                item.FullName);
+                            continue;
+                        }
+                    }
+
+                    if (keepKind == SeriesKeepKind.Last)
+                    {
+                        var lastEpisodeId = episode.Series.GetEpisodes(item.Data?.First()?.User, new DtoOptions(), false).LastOrDefault()?.Id;
+                        if (episode.Id == lastEpisodeId)
+                        {
+                            logger.LogTrace("Episode \"{EpisodeName}\" was NOT added to expired items because this is the last one",
+                                item.FullName);
+                            continue;
+                        }
                     }
 
                     result.Add(item);

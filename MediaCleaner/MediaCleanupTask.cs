@@ -315,7 +315,7 @@ namespace MediaCleaner
                         Configuration.LocationsMode,
                         Configuration.LocationsExcluded,
                         _fileSystem),
-                    new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes)
+                    new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes, Configuration.KeepSeriesKind)
                 };
 
             AddTagFilterIfEnabled(filters);
@@ -339,7 +339,7 @@ namespace MediaCleaner
                         Configuration.LocationsMode,
                         Configuration.LocationsExcluded,
                         _fileSystem),
-                    new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes)
+                    new SeriesFilter(_loggerFactory.CreateLogger<SeriesFilter>(), Configuration.DeleteEpisodes, Configuration.KeepSeriesKind)
                 };
 
             AddTagFilterIfEnabled(filters);
