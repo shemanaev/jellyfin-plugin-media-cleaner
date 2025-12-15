@@ -42,6 +42,9 @@ function onViewShow(commons) {
     const $DeleteEpisodes = page.querySelector('#DeleteEpisodes')
     $DeleteEpisodes.addEventListener('change', deleteEpisodesChanged)
 
+    const $KeepSeriesKind = page.querySelector('#KeepSeriesKind')
+    $KeepSeriesKind.addEventListener('change', keepSeriesKindChanged)
+
     const $MarkAsUnplayed = page.querySelector('#MarkAsUnplayed')
     $MarkAsUnplayed.addEventListener('change', markAsUnplayedChanged)
 
@@ -70,6 +73,7 @@ function onViewShow(commons) {
         page.querySelector('#KeepEpisodesFor').value = config.KeepEpisodesFor
         page.querySelector('#KeepEpisodesNotPlayedFor').value = config.KeepEpisodesNotPlayedFor
         page.querySelector('#DeleteEpisodes').value = config.DeleteEpisodes
+        $KeepSeriesKind.value = config.KeepSeriesKind
         $KeepPlayedEpisodes.value = config.KeepPlayedEpisodes
         $KeepFavoriteEpisodes.value = config.KeepFavoriteEpisodes
 
@@ -114,6 +118,7 @@ function onViewShow(commons) {
             $KeepFavoriteAudio,
             $KeepFavoriteAudioBooks,
             $DeleteEpisodes,
+            $KeepSeriesKind,
             $MarkAsUnplayed,
             $AllowDeleteIfPlayedBeforeAdded,
             $CountAsNotPlayedAfter,
@@ -149,6 +154,7 @@ function onFormSubmit(commons) {
         config.KeepEpisodesFor = form.querySelector('#KeepEpisodesFor').value
         config.KeepEpisodesNotPlayedFor = form.querySelector('#KeepEpisodesNotPlayedFor').value
         config.DeleteEpisodes = form.querySelector('#DeleteEpisodes').value
+        config.KeepSeriesKind = form.querySelector('#KeepSeriesKind').value
         config.KeepPlayedEpisodes = form.querySelector('#KeepPlayedEpisodes').value
         config.KeepFavoriteEpisodes = form.querySelector('#KeepFavoriteEpisodes').value
 
@@ -287,19 +293,55 @@ function keepPlayedChanged(event) {
 
 function deleteEpisodesChanged(event) {
     const field = this.parentNode.querySelector('.fieldDescription')
+    const page = this.closest('#MediaCleanerConfigPage')
+    const $KeepSeriesKind = page.querySelector('#KeepSeriesKind')
+
     switch (this.value) {
         case 'SeriesEnded':
             field.innerHTML = `Don't delete unless series status changes to "Ended" in metadata`
             break
 
-        case 'EpisodeKeepLast':
-            field.innerHTML = `Keep the last episode of the show unless series status changes to "Ended" in metadata`
+        default:
+            field.innerHTML = ''
+    }
+
+    $KeepSeriesKind.dispatchEvent(new Event('change'))
+    switchSeriesKeepKind(page)
+}
+
+function switchSeriesKeepKind(page) {
+    const $DeleteEpisodes = page.querySelector('#DeleteEpisodes')
+    const $KeepSeriesKind = page.querySelector('#KeepSeriesKind')
+    const $KeepSeriesKindContainer = $KeepSeriesKind.closest('.selectContainer')
+
+    const valuesToHide = ['SeriesEnded', 'Series']
+    if (valuesToHide.includes($DeleteEpisodes.value)) {
+        $KeepSeriesKindContainer.style.display = 'none'
+        $KeepSeriesKind.value = 'None'
+    } else {
+        $KeepSeriesKindContainer.style.display = 'block'
+    }
+}
+
+function keepSeriesKindChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    const page = this.closest('#MediaCleanerConfigPage')
+    const $DeleteEpisodes = page.querySelector('#DeleteEpisodes')
+
+    const deleteSeriesDescriptionValues = {
+        Season: 'season',
+        Episode: 'episode',
+    }
+    const itemDescription = deleteSeriesDescriptionValues[$DeleteEpisodes.value]
+    const kindValue = this.value === 'First' ? 'first' : this.value === 'Last' ? 'last' : ''
+
+    switch (this.value) {
+        case 'First':
+        case 'Last':
+            field.innerHTML = `Keep the ${kindValue} ${itemDescription} of the show even if played`
             break
 
-        case 'SeasonKeepLast':
-            field.innerHTML = `Keep the last season of the show unless series status changes to "Ended" in metadata`
-            break
-
+        case 'None':
         default:
             field.innerHTML = ''
     }
