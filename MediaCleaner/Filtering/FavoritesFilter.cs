@@ -6,6 +6,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
+using MediaCleaner.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;

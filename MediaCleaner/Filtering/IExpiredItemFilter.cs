@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MediaCleaner.Models;
 
 namespace MediaCleaner.Filtering;
 

@@ -3,12 +3,10 @@ using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.JunkCollectors;
 
-internal class AudioJunkCollector : BaseJunkCollector
-{
-    public AudioJunkCollector(
-        ILogger<AudioJunkCollector> logger,
-        ItemsAdapter itemsAdapter)
-        : base(logger, itemsAdapter, BaseItemKind.Audio)
-    {
-    }
-}
+internal class AudioPlayedJunkCollector(
+    ILogger<AudioPlayedJunkCollector> logger,
+    ItemsAdapter itemsAdapter) : BasePlayedJunkCollector(logger, itemsAdapter, BaseItemKind.Audio);
+
+internal class AudioNotPlayedJunkCollector(
+    ILogger<AudioNotPlayedJunkCollector> logger,
+    ItemsAdapter itemsAdapter) : BaseNotPlayedJunkCollector(logger, itemsAdapter, BaseItemKind.Audio);

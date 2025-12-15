@@ -9,6 +9,7 @@ using System.Xml;
 using System.Xml.Serialization;
 using MediaBrowser.Common;
 using MediaBrowser.Common.Api;
+using MediaBrowser.Controller.Collections;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Globalization;
@@ -40,13 +41,14 @@ public class TroubleshootingController(
         var activityManager = scope.ServiceProvider.GetRequiredService<IActivityManager>();
         var localization = scope.ServiceProvider.GetRequiredService<ILocalizationManager>();
         var fileSystem = scope.ServiceProvider.GetRequiredService<IFileSystem>();
+        var collectionManager = scope.ServiceProvider.GetRequiredService<ICollectionManager>();
         var progress = new Progress<double>();
 
         Enum.TryParse<LogLevel>(level ?? "Trace", out var logLevel);
         var logOutput = new List<string>();
         var loggerFactory = new LoggerFactory([new TroubleshootingLoggerProvider(new TroubleshootingLoggerConfiguration { Output = logOutput, LogLevel = logLevel })]);
 
-        var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem)
+        var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem, collectionManager)
         {
             IsDryRun = true
         };
