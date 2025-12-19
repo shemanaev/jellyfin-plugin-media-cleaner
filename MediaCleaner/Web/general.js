@@ -54,6 +54,9 @@ function onViewShow(commons) {
     const $CountAsNotPlayedAfter = page.querySelector('#CountAsNotPlayedAfter')
     $CountAsNotPlayedAfter.addEventListener('change', countAsNotPlayedAfterChanged)
 
+    const $LeavingSoonDays = page.querySelector('#LeavingSoonDays')
+    $LeavingSoonDays.addEventListener('change', leavingSoonDaysChanged)
+
     const $EnableTagExclusion = page.querySelector('#EnableTagExclusion')
     $EnableTagExclusion.addEventListener('change', enableTagExclusionChanged)
 
@@ -95,6 +98,7 @@ function onViewShow(commons) {
         page.querySelector('#MarkAsUnplayed').checked = config.MarkAsUnplayed
         page.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked = config.AllowDeleteIfPlayedBeforeAdded
         page.querySelector('#CountAsNotPlayedAfter').value = config.CountAsNotPlayedAfter
+        page.querySelector('#LeavingSoonDays').value = config.LeavingSoonDays
 
         page.querySelector('#EnableTagExclusion').checked = config.EnableTagExclusion !== false
         page.querySelector('#TagFilterMode').value = config.TagFilterMode || 'Exclusion'
@@ -122,6 +126,7 @@ function onViewShow(commons) {
             $MarkAsUnplayed,
             $AllowDeleteIfPlayedBeforeAdded,
             $CountAsNotPlayedAfter,
+            $LeavingSoonDays,
             $EnableTagExclusion,
             $ReplaceExclusionTag,
         ], 'change')
@@ -176,6 +181,7 @@ function onFormSubmit(commons) {
         config.MarkAsUnplayed = form.querySelector('#MarkAsUnplayed').checked
         config.AllowDeleteIfPlayedBeforeAdded = form.querySelector('#AllowDeleteIfPlayedBeforeAdded').checked
         config.CountAsNotPlayedAfter = form.querySelector('#CountAsNotPlayedAfter').value
+        config.LeavingSoonDays = form.querySelector('#LeavingSoonDays').value
 
         config.EnableTagExclusion = form.querySelector('#EnableTagExclusion').checked
         config.TagFilterMode = form.querySelector('#TagFilterMode').value
@@ -194,7 +200,7 @@ function onFormSubmit(commons) {
             let oldTag = '';
             let newTag = '';
 
-            if (config.EnableTagExclusion && config.ReplaceExclusionTag && 
+            if (config.EnableTagExclusion && config.ReplaceExclusionTag &&
                 config.TagFilterMode === 'Exclusion' && oldExclusionTag !== newExclusionTag) {
                 replaceTagNeeded = true;
                 oldTag = oldExclusionTag;
@@ -367,6 +373,20 @@ function countAsNotPlayedAfterChanged(event) {
     } else {
         const playDate = addDays(-this.value)
         field.innerHTML = `All plays before <b>${playDate.toLocaleDateString()}</b> will not be counted. Set to <i>-1</i> to disable this behavior`
+    }
+}
+
+function leavingSoonDaysChanged(event) {
+    const field = this.parentNode.querySelector('.fieldDescription')
+    if (this.value == -1) {
+        field.innerHTML = `The "Leaving Soon" feature is disabled. Items will be deleted without prior addition to a collection.`
+    } else {
+        const exampleKeepDays = 30
+        const leavingSoonDays = this.value
+        const now = new Date()
+        const deletionDate = addDays(exampleKeepDays)
+        const leavingSoonDate = addDays(exampleKeepDays - leavingSoonDays)
+        field.innerHTML = `For example: an item is configured to be deleted after <b>${exampleKeepDays}</b> days. With this setting at <b>${leavingSoonDays}</b>, an item played today (<b>${now.toLocaleDateString()}</b>) will be added to "Leaving Soon" collection on <b>${leavingSoonDate.toLocaleDateString()}</b> and deleted on <b>${deletionDate.toLocaleDateString()}</b>. Set to <i>-1</i> to disable.<br><br><i>Note: If 'Leaving Soon Days' is set higher than an item's 'Keep Days', the item will be deleted before it can be marked as leaving soon.</i>`
     }
 }
 

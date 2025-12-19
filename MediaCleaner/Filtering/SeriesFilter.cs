@@ -4,6 +4,7 @@ using MediaCleaner.Configuration;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Model.Entities;
+using MediaCleaner.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;
@@ -41,7 +42,7 @@ internal class SeriesFilter(ILogger<SeriesFilter> logger, SeriesDeleteKind kind,
                         {
                             Item = episode.Season,
                             Data = first.Data,
-                            Kind = first.Kind,
+                            Reason = first.Reason,
                         };
 
                         if (keepKind == SeriesKeepKind.First)
@@ -98,7 +99,7 @@ internal class SeriesFilter(ILogger<SeriesFilter> logger, SeriesDeleteKind kind,
                         {
                             Item = episode.Series,
                             Data = first.Data,
-                            Kind = first.Kind,
+                            Reason = first.Reason,
                         };
 
                         if (kind == SeriesDeleteKind.SeriesEnded)

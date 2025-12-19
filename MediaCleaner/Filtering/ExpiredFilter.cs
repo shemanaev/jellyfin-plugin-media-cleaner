@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MediaCleaner.Configuration;
+using MediaCleaner.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;

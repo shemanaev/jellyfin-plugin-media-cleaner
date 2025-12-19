@@ -3,12 +3,10 @@ using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.JunkCollectors;
 
-internal class SeriesJunkCollector : BaseJunkCollector
-{
-    public SeriesJunkCollector(
-        ILogger<SeriesJunkCollector> logger,
-        ItemsAdapter itemsAdapter)
-        : base(logger, itemsAdapter, BaseItemKind.Episode)
-    {
-    }
-}
+internal class SeriesPlayedJunkCollector(
+    ILogger<SeriesPlayedJunkCollector> logger,
+    ItemsAdapter itemsAdapter) : BasePlayedJunkCollector(logger, itemsAdapter, BaseItemKind.Episode);
+
+internal class SeriesNotPlayedJunkCollector(
+    ILogger<SeriesNotPlayedJunkCollector> logger,
+    ItemsAdapter itemsAdapter) : BaseNotPlayedJunkCollector(logger, itemsAdapter, BaseItemKind.Episode);
