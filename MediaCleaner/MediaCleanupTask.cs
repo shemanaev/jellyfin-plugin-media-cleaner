@@ -76,21 +76,21 @@ namespace MediaCleaner
         {
             _logger.LogDebug("UsersPlayedMode: {Mode}", Configuration.UsersPlayedMode);
             _logger.LogDebug("UsersIgnorePlayed: {Users}",
-                 _userManager.Users
+                 _userManager.GetUsers()
                     .Where(x => Configuration.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
                     .Select(x => $"{x.Username}={x.Id}")
             );
             _logger.LogDebug("UsersFavoritedMode: {Mode}", Configuration.UsersFavoritedMode);
             _logger.LogDebug("UsersIgnoreFavorited: {Users}",
-                 _userManager.Users
+                 _userManager.GetUsers()
                     .Where(x => Configuration.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
                     .Select(x => $"{x.Username}={x.Id}")
             );
 
-            var users = _userManager.Users
+            var users = _userManager.GetUsers()
                 .Where(x => FilterUsersList(Configuration.UsersIgnorePlayed, Configuration.UsersPlayedMode, x))
                 .ToList();
-            var usersWithFavorites = _userManager.Users
+            var usersWithFavorites = _userManager.GetUsers()
                 .Where(x => FilterUsersList(Configuration.UsersIgnoreFavorited, Configuration.UsersFavoritedMode, x))
                 .ToList();
 
