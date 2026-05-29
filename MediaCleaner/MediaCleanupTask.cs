@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Collections;
-using MediaBrowser.Controller.Entities;
-using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Globalization;
@@ -15,6 +12,7 @@ using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Tasks;
 using MediaCleaner.Configuration;
 using MediaCleaner.Filtering;
+using MediaCleaner.Integrations;
 using MediaCleaner.JunkCollectors;
 using MediaCleaner.Models;
 using Microsoft.Extensions.Logging;
@@ -37,6 +35,9 @@ public class MediaCleanupTask(
     private readonly NotificationService _notificationService = new(activityManager);
     private readonly LeavingSoonCollectionService _leavingSoonCollectionService = new(loggerFactory.CreateLogger<LeavingSoonCollectionService>(), libraryManager, collectionManager);
     private readonly FilterService _filterService = new(loggerFactory.CreateLogger<FilterService>());
+    private readonly ArrDeletionService _deletionService = ArrDeletionService.Create(
+        loggerFactory,
+        StructuredConfig.CreateFromConfiguration(Plugin.Instance!.Configuration).Arr);
 
     public bool IsDryRun { get; init; }
 
@@ -138,11 +139,15 @@ public class MediaCleanupTask(
         {
             LogDeletion(item);
 
-            if (IsDryRun) continue;
+            var deletionResult = await _deletionService.DeleteAsync(item, IsDryRun, cancellationToken);
+            LogDeletionResult(item, deletionResult);
 
-            await _notificationService.CreateNotification(item);
+            if (IsDryRun || deletionResult.Status != ArrDeletionStatus.Deleted)
+            {
+                continue;
+            }
 
-            if (_config.Misc.MarkAsUnplayed)
+            if (_config.Misc.MarkAsUnplayed && item.Data is not null)
             {
                 foreach (var data in item.Data)
                 {
@@ -150,7 +155,7 @@ public class MediaCleanupTask(
                 }
             }
 
-            DeleteItem(item);
+            await _notificationService.CreateNotification(item);
         }
 
         progress.Report(100);
@@ -225,64 +230,22 @@ public class MediaCleanupTask(
         }
     }
 
-    private void DeleteItem(ExpiredItem item)
+    private void LogDeletionResult(ExpiredItem item, ArrDeletionResult result)
     {
-        var opts = new DeleteOptions { DeleteFileLocation = true };
-
-        try
+        switch (result.Status)
         {
-            switch (item.Item)
-            {
-                case Season season:
-                    foreach (var eps in season.GetEpisodes())
-                    {
-                        libraryManager.DeleteItem(eps, opts, true);
-                    }
-
-                    libraryManager.DeleteItem(season, opts, true);
-                    if (!(season.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(season.Series))
-                    {
-                        libraryManager.DeleteItem(season.Series!, opts, true);
-                    }
-
-                    break;
-
-                case Episode episode:
-                    libraryManager.DeleteItem(episode, opts, true);
-                    if (!episode.Season?.GetEpisodes().Any() ?? false)
-                    {
-                        libraryManager.DeleteItem(episode.Season!, opts, true);
-                    }
-
-                    if (!(episode.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(episode.Series))
-                    {
-                        libraryManager.DeleteItem(episode.Series!, opts, true);
-                    }
-
-                    break;
-
-                default:
-                    libraryManager.DeleteItem(item.Item, opts, true);
-                    break;
-            }
+            case ArrDeletionStatus.Planned:
+                _logger.LogInformation("{Name}: {Message}", item.FullName, result.Message);
+                break;
+            case ArrDeletionStatus.Deleted:
+                _logger.LogInformation("{Name}: {Message}", item.FullName, result.Message);
+                break;
+            case ArrDeletionStatus.Skipped:
+                _logger.LogWarning("{Name}: {Message}", item.FullName, result.Message);
+                break;
+            case ArrDeletionStatus.Failed:
+                _logger.LogError("{Name}: {Message}", item.FullName, result.Message);
+                break;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting item: {name}", item.FullName);
-        }
-    }
-
-    /// <summary>
-    /// Check if item has extra files and shouldn't be deleted.
-    /// </summary>
-    private static bool HasExtraFiles(BaseItem? item)
-    {
-        if (item == null) return false;
-        if (!Directory.Exists(item.Path)) return false;
-
-        // https://github.com/jmbannon/ytdl-sub
-        var hasYtdlSubMeta = Directory.EnumerateFiles(item.Path, ".ytdl-sub-*-download-archive.json").Any();
-
-        return hasYtdlSubMeta;
     }
 }

@@ -103,4 +103,14 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool ReplaceExclusionTag { get; set; } = false;
 
     public int LeavingSoonDays { get; set; } = -1;
+
+    public bool RadarrEnabled { get; set; } = false;
+    public string RadarrBaseUrl { get; set; } = string.Empty;
+    public string RadarrApiKey { get; set; } = string.Empty;
+    public int RadarrTimeoutSeconds { get; set; } = 30;
+
+    public bool SonarrEnabled { get; set; } = false;
+    public string SonarrBaseUrl { get; set; } = string.Empty;
+    public string SonarrApiKey { get; set; } = string.Empty;
+    public int SonarrTimeoutSeconds { get; set; } = 30;
 }
