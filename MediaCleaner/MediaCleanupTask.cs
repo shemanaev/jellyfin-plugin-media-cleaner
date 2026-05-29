@@ -57,21 +57,21 @@ public class MediaCleanupTask(
     {
         _logger.LogDebug("UsersPlayedMode: {Mode}", _config.UsersIgnore.Mode);
         _logger.LogDebug("UsersIgnorePlayed: {Users}",
-            userManager.Users
+            userManager.GetUsers()
                 .Where(x => _config.UsersIgnore.Users.Contains(x.Id.ToString("N")))
                 .Select(x => $"{x.Username}={x.Id}")
         );
         _logger.LogDebug("UsersFavoritedMode: {Mode}", _config.UsersFavorites.Mode);
         _logger.LogDebug("UsersIgnoreFavorited: {Users}",
-            userManager.Users
+            userManager.GetUsers()
                 .Where(x => _config.UsersFavorites.Users.Contains(x.Id.ToString("N")))
                 .Select(x => $"{x.Username}={x.Id}")
         );
 
-        var users = userManager.Users
+        var users = userManager.GetUsers()
             .Where(x => FilterUsersList(_config.UsersIgnore.Users, _config.UsersIgnore.Mode, x))
             .ToList();
-        var usersWithFavorites = userManager.Users
+        var usersWithFavorites = userManager.GetUsers()
             .Where(x => FilterUsersList(_config.UsersFavorites.Users, _config.UsersFavorites.Mode, x))
             .ToList();
 
