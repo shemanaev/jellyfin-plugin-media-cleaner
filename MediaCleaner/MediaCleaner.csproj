@@ -4,13 +4,13 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>MediaCleaner</RootNamespace>
-    <AssemblyVersion>2.24.0.0</AssemblyVersion>
-    <FileVersion>2.24.0.0</FileVersion>
+    <AssemblyVersion>2.24.0.1</AssemblyVersion>
+    <FileVersion>2.24.0.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.9-*" />
-    <PackageReference Include="Jellyfin.Model" Version="10.11.9-*" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.8-*" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.8-*" />
     <PackageReference Include="System.Text.Json" Version="9.0.11" />
   </ItemGroup>
 

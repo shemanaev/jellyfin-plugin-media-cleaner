@@ -63,15 +63,44 @@ function onFormSubmit(commons) {
 
 function testConnection(name) {
     const result = document.querySelector(`#${name}TestResult`)
-    result.innerHTML = 'Testing...'
+    result.textContent = 'Testing...'
 
     ApiClient.fetch({
         type: 'GET',
-        url: ApiClient.getUrl(`MediaCleaner/Integrations/${name}/Test`)
+        url: ApiClient.getUrl(`MediaCleaner/Integrations/${name}/Test`),
+        dataType: 'json'
     }).then(response => {
-        const version = response.Version ? ` Version: ${response.Version}` : ''
-        result.innerHTML = `${response.Message}${version}`
+        result.textContent = formatConnectionResult(response)
     }).catch(error => {
-        result.innerHTML = `Connection test failed: ${error.message || 'Unknown error'}`
+        result.textContent = `Connection test failed: ${getErrorMessage(error)}`
     })
+}
+
+function formatConnectionResult(response) {
+    const value = parseConnectionResponse(response)
+    const message = value.Message || value.message || 'No response message returned.'
+    const version = value.Version || value.version
+    const versionText = version ? ` Version: ${version}` : ''
+
+    return `${message}${versionText}`
+}
+
+function parseConnectionResponse(response) {
+    if (typeof response === 'string') {
+        try {
+            return JSON.parse(response)
+        } catch {
+            return { message: response }
+        }
+    }
+
+    return response || {}
+}
+
+function getErrorMessage(error) {
+    if (!error) {
+        return 'Unknown error'
+    }
+
+    return error.message || error.Message || String(error)
 }

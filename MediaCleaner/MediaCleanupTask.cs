@@ -10,6 +10,7 @@ using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Globalization;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Tasks;
+using MediaCleaner.Compatibility;
 using MediaCleaner.Configuration;
 using MediaCleaner.Filtering;
 using MediaCleaner.Integrations;
@@ -56,23 +57,25 @@ public class MediaCleanupTask(
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
+        var allUsers = UserManagerCompatibility.GetUsers(userManager);
+
         _logger.LogDebug("UsersPlayedMode: {Mode}", _config.UsersIgnore.Mode);
         _logger.LogDebug("UsersIgnorePlayed: {Users}",
-            userManager.GetUsers()
+            allUsers
                 .Where(x => _config.UsersIgnore.Users.Contains(x.Id.ToString("N")))
                 .Select(x => $"{x.Username}={x.Id}")
         );
         _logger.LogDebug("UsersFavoritedMode: {Mode}", _config.UsersFavorites.Mode);
         _logger.LogDebug("UsersIgnoreFavorited: {Users}",
-            userManager.GetUsers()
+            allUsers
                 .Where(x => _config.UsersFavorites.Users.Contains(x.Id.ToString("N")))
                 .Select(x => $"{x.Username}={x.Id}")
         );
 
-        var users = userManager.GetUsers()
+        var users = allUsers
             .Where(x => FilterUsersList(_config.UsersIgnore.Users, _config.UsersIgnore.Mode, x))
             .ToList();
-        var usersWithFavorites = userManager.GetUsers()
+        var usersWithFavorites = allUsers
             .Where(x => FilterUsersList(_config.UsersFavorites.Users, _config.UsersFavorites.Mode, x))
             .ToList();
 
