@@ -4,13 +4,13 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>MediaCleaner</RootNamespace>
-    <AssemblyVersion>2.24.0.0</AssemblyVersion>
-    <FileVersion>2.24.0.0</FileVersion>
+    <AssemblyVersion>2.24.0.1</AssemblyVersion>
+    <FileVersion>2.24.0.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.3-*" />
-    <PackageReference Include="Jellyfin.Model" Version="10.11.3-*" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.8-*" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.8-*" />
     <PackageReference Include="System.Text.Json" Version="9.0.11" />
   </ItemGroup>
 
@@ -18,6 +18,10 @@
     <None Remove="Web\commons.js" />
     <None Remove="Web\general.html" />
     <None Remove="Web\general.js" />
+    <None Remove="Web\integrations.html" />
+    <None Remove="Web\integrations.js" />
+    <None Remove="Web\leavingsoon.html" />
+    <None Remove="Web\leavingsoon.js" />
     <None Remove="Web\locations.html" />
     <None Remove="Web\locations.js" />
     <None Remove="Web\troubleshooting.html" />
@@ -30,6 +34,10 @@
     <EmbeddedResource Include="Web\commons.js" />
     <EmbeddedResource Include="Web\general.html" />
     <EmbeddedResource Include="Web\general.js" />
+    <EmbeddedResource Include="Web\integrations.html" />
+    <EmbeddedResource Include="Web\integrations.js" />
+    <EmbeddedResource Include="Web\leavingsoon.html" />
+    <EmbeddedResource Include="Web\leavingsoon.js" />
     <EmbeddedResource Include="Web\locations.html" />
     <EmbeddedResource Include="Web\locations.js" />
     <EmbeddedResource Include="Web\troubleshooting.html" />
@@ -39,7 +47,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="$(ConfigurationName) == Debug">
-    <Exec Command="xcopy /I /Y $(TargetDir) &quot;$(TargetDir)/data/plugins/MediaCleaner/&quot;" />
+    <Exec Command="xcopy /I /Y &quot;$(TargetDir)&quot; &quot;$(TargetDir)data\plugins\MediaCleaner\&quot;" />
   </Target>
 
 </Project>

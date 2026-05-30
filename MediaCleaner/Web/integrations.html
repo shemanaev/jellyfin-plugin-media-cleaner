@@ -1,0 +1,89 @@
+<div id="MediaCleanerConfigPageIntegrations" data-role="page" class="page type-interior pluginConfigurationPage withTabs" data-controller="__plugin/MediaCleaner_Integrations_js">
+    <div data-role="content">
+        <div class="content-primary">
+            <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
+
+            <form id="MediaCleanerConfigForm">
+                <fieldset class="verticalSection verticalSection-extrabottompadding">
+                    <legend><h3>Radarr</h3></legend>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="RadarrEnabled" />
+                            <span>Enable Radarr</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Movies will be deleted by Radarr.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="RadarrBaseUrl">Radarr URL</label>
+                        <input id="RadarrBaseUrl" name="RadarrBaseUrl" type="url" is="emby-input" />
+                        <div class="fieldDescription">Example: http://localhost:7878</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="RadarrApiKey">Radarr API key</label>
+                        <input id="RadarrApiKey" name="RadarrApiKey" type="password" is="emby-input" autocomplete="off" />
+                        <div class="fieldDescription"></div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="RadarrTimeoutSeconds">Radarr timeout seconds</label>
+                        <input id="RadarrTimeoutSeconds" name="RadarrTimeoutSeconds" type="number" is="emby-input" min="1" />
+                        <div class="fieldDescription"></div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="button" id="TestRadarr" class="raised emby-button">
+                            <span>Test Radarr</span>
+                        </button>
+                        <div id="RadarrTestResult" class="fieldDescription"></div>
+                    </div>
+                </fieldset>
+
+                <fieldset class="verticalSection verticalSection-extrabottompadding">
+                    <legend><h3>Sonarr</h3></legend>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="SonarrEnabled" />
+                            <span>Enable Sonarr</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Episodes, seasons and series will be deleted by Sonarr.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SonarrBaseUrl">Sonarr URL</label>
+                        <input id="SonarrBaseUrl" name="SonarrBaseUrl" type="url" is="emby-input" />
+                        <div class="fieldDescription">Example: http://localhost:8989</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SonarrApiKey">Sonarr API key</label>
+                        <input id="SonarrApiKey" name="SonarrApiKey" type="password" is="emby-input" autocomplete="off" />
+                        <div class="fieldDescription"></div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SonarrTimeoutSeconds">Sonarr timeout seconds</label>
+                        <input id="SonarrTimeoutSeconds" name="SonarrTimeoutSeconds" type="number" is="emby-input" min="1" />
+                        <div class="fieldDescription"></div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="button" id="TestSonarr" class="raised emby-button">
+                            <span>Test Sonarr</span>
+                        </button>
+                        <div id="SonarrTestResult" class="fieldDescription"></div>
+                    </div>
+                </fieldset>
+
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>${Save}</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

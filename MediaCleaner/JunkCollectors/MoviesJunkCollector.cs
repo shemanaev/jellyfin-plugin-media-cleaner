@@ -3,12 +3,10 @@ using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.JunkCollectors;
 
-internal class MoviesJunkCollector : BaseJunkCollector
-{
-    public MoviesJunkCollector(
-        ILogger<MoviesJunkCollector> logger,
-        ItemsAdapter itemsAdapter)
-        : base(logger, itemsAdapter, BaseItemKind.Movie)
-    {
-    }
-}
+internal class MoviesPlayedJunkCollector(
+    ILogger<MoviesPlayedJunkCollector> logger,
+    ItemsAdapter itemsAdapter) : BasePlayedJunkCollector(logger, itemsAdapter, BaseItemKind.Movie);
+
+internal class MoviesNotPlayedJunkCollector(
+    ILogger<MoviesNotPlayedJunkCollector> logger,
+    ItemsAdapter itemsAdapter) : BaseNotPlayedJunkCollector(logger, itemsAdapter, BaseItemKind.Movie);

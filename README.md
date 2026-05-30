@@ -1,3 +1,25 @@
+# Warning: AI-developed fork
+
+This fork contains commits developed with AI assistance. Review the changes before relying on them outside a personal environment.
+
+This is a personal fork of [`shemanaev/jellyfin-plugin-media-cleaner`](https://github.com/shemanaev/jellyfin-plugin-media-cleaner). It is not intended as criticism of the original developer or their work. I made this fork because I rely on this plugin to manage limited storage space, and the upstream project currently has unresolved issues that affect my setup.
+
+The main reasons for this fork are:
+
+* A critical compatibility issue in current Jellyfin versions. Upstream [PR #102](https://github.com/shemanaev/jellyfin-plugin-media-cleaner/pull/102) documents that Jellyfin 10.11.x removed `IUserManager.Users`, causing the played media cleanup task to crash at runtime with `MissingMethodException`. This fork includes compatibility handling for current Jellyfin.
+* Missing Leaving Soon functionality. Upstream [PR #91](https://github.com/shemanaev/jellyfin-plugin-media-cleaner/pull/91), opened on 19 December 2025, adds a Leaving Soon collection for [issue #68](https://github.com/shemanaev/jellyfin-plugin-media-cleaner/issues/68) and [issue #86](https://github.com/shemanaev/jellyfin-plugin-media-cleaner/issues/86), but it has not been merged upstream.
+* A playback safety fix from upstream [PR #104](https://github.com/shemanaev/jellyfin-plugin-media-cleaner/pull/104), which protects media that are currently being watched from being treated as deletion candidates in the rolling watched mode.
+
+I am concerned that upstream may now be inactive: upstream `master` was last pushed on 19 December 2025, while the PRs above remain open as of 30 May 2026. This fork exists to keep the plugin usable for my own storage-management needs.
+
+Enhancements in this fork include:
+
+* Deletion of Arr-managed media through Radarr and Sonarr where possible, rather than direct Jellyfin deletion. This gives a cleaner end-to-end process, including Arr-side file deletion and import exclusion or monitoring behaviour.
+* Updated Leaving Soon support that keeps the existing Jellyfin collection for normal clients and adds a read-only admin dashboard view.
+* Dry-run handling that avoids mutating the Leaving Soon collection.
+* Compatibility and safety fixes from the open upstream PRs noted above.
+
+<div style="page-break-after: always;"></div>
 
 # Media Cleaner for Jellyfin
 

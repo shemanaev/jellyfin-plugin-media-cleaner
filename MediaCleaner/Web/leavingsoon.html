@@ -1,0 +1,49 @@
+<div id="MediaCleanerConfigPageLeavingSoon" data-role="page" class="page type-interior pluginConfigurationPage withTabs" data-controller="__plugin/MediaCleaner_LeavingSoon_js">
+    <div data-role="content">
+        <div class="content-primary">
+            <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
+
+            <fieldset class="verticalSection verticalSection-extrabottompadding">
+                <legend><h3>Leaving Soon</h3></legend>
+                <button id="LeavingSoonRefresh" is="emby-button" type="button" class="raised emby-button">
+                    <span>Refresh</span>
+                </button>
+                <span id="LeavingSoonSummary" class="fieldDescription" style="margin-left: 1em;"></span>
+            </fieldset>
+
+            <div id="LeavingSoonEmpty" class="fieldDescription" style="display: none;"></div>
+            <div style="overflow-x: auto;">
+                <table id="LeavingSoonTable" class="detailTable" style="width: 100%; display: none;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Series</th>
+                            <th>Season</th>
+                            <th>Year</th>
+                            <th>Added</th>
+                        </tr>
+                    </thead>
+                    <tbody id="LeavingSoonItems"></tbody>
+                </table>
+            </div>
+
+            <style>
+                #LeavingSoonTable {
+                    border-collapse: collapse;
+                }
+
+                #LeavingSoonTable th,
+                #LeavingSoonTable td {
+                    padding: .6em .8em;
+                    text-align: left;
+                    border-bottom: 1px solid rgba(255, 255, 255, .12);
+                }
+
+                #LeavingSoonTable th {
+                    font-weight: 600;
+                }
+            </style>
+        </div>
+    </div>
+</div>

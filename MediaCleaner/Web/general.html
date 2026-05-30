@@ -5,7 +5,7 @@
 
             <form id="MediaCleanerConfigForm">
                 <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Movies</h3></legend> 
+                    <legend><h3>Movies</h3></legend>
 
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="KeepMoviesFor">Keep played for <i>X</i> days</label>
@@ -222,6 +222,12 @@
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="CountAsNotPlayedAfter">Consider items "not played" if the play was more than <i>X</i> days ago</label>
                         <input id="CountAsNotPlayedAfter" name="CountAsNotPlayedAfter" type="number" is="emby-input" min="-1" />
+                        <div class="fieldDescription">-1 to disable</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="LeavingSoonDays">"Leaving Soon" days</label>
+                        <input id="LeavingSoonDays" name="LeavingSoonDays" type="number" is="emby-input" min="-1" />
                         <div class="fieldDescription">-1 to disable</div>
                     </div>
                 </fieldset>

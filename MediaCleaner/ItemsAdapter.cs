@@ -5,9 +5,9 @@ using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaCleaner.Configuration;
 using Microsoft.Extensions.Logging;
 using Jellyfin.Database.Implementations.Enums;
+using MediaCleaner.Models;
 
 namespace MediaCleaner;
 
@@ -16,18 +16,18 @@ internal class ItemsAdapter
     private readonly ILogger<ItemsAdapter> _logger;
     private readonly IUserDataManager _userDataManager;
     private readonly ILibraryManager _libraryManager;
-    private readonly PluginConfiguration _config;
+    private readonly bool _allowDeleteIfPlayedBeforeAdded;
 
     public ItemsAdapter(
         ILogger<ItemsAdapter> logger,
         ILibraryManager libraryManager,
         IUserDataManager userDataManager,
-        PluginConfiguration config)
+        bool allowDeleteIfPlayedBeforeAdded)
     {
         _logger = logger;
         _libraryManager = libraryManager;
         _userDataManager = userDataManager;
-        _config = config;
+        _allowDeleteIfPlayedBeforeAdded = allowDeleteIfPlayedBeforeAdded;
     }
 
     public IEnumerable<ExpiredItem> GetPlayedItems(
@@ -59,7 +59,7 @@ internal class ItemsAdapter
                 continue;
             }
 
-            if (userData.LastPlayedDate < item.DateCreated && !_config.AllowDeleteIfPlayedBeforeAdded)
+            if (userData.LastPlayedDate < item.DateCreated && !_allowDeleteIfPlayedBeforeAdded)
             {
                 _logger.LogWarning("Ignoring \"{Name}\" ({Id}): played by \"{Username}\" at {LastPlayedDate}, but added at {DateCreated}",
                     item.Name, item.Id, user.Username, userData.LastPlayedDate.Value.ToLocalTime(), item.DateCreated.ToLocalTime());
@@ -69,7 +69,7 @@ internal class ItemsAdapter
             var expiredItem = new ExpiredItem
             {
                 Item = item,
-                Kind = ExpiredKind.Played,
+                Reason = ExpiredReason.Played,
                 Data = new List<ExpiredItemData> {
                     new() {
                         User = user,
@@ -104,7 +104,7 @@ internal class ItemsAdapter
             if (userData == null) continue;
 
             var isWatching = userData.PlaybackPositionTicks != 0;
-            var isPlayedAfterItemCreated = _config.AllowDeleteIfPlayedBeforeAdded || userData.LastPlayedDate >= item.DateCreated;
+            var isPlayedAfterItemCreated = _allowDeleteIfPlayedBeforeAdded || userData.LastPlayedDate >= item.DateCreated;
             var shouldSkip = (userData.Played && isPlayedAfterItemCreated) || isWatching;
 
             if (startDate != null)
@@ -128,7 +128,7 @@ internal class ItemsAdapter
             result.Add(new ExpiredItem
             {
                 Item = item,
-                Kind = ExpiredKind.NotPlayed,
+                Reason = ExpiredReason.NotPlayed,
             });
         }
 

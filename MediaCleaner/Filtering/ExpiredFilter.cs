@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MediaCleaner.Configuration;
+using MediaCleaner.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner.Filtering;
@@ -81,13 +82,21 @@ internal class ExpiredFilter : IExpiredItemFilter
 
     private bool IsAnyUserRollingWatched(List<ExpiredItemData> users)
     {
-        if (!users.Any(x => x.IsPlayed || x.IsWatching))
+        var watchingUsers = users.Where(x => x.IsWatching).ToList();
+        if (watchingUsers.Count > 0)
+        {
+            _logger.LogTrace("Currently being watched by \"{Usernames}\"", string.Join(", ", watchingUsers.Select(x => x.User.Username)));
+            return false;
+        }
+
+        var playedUsers = users.Where(x => x.IsPlayed).ToList();
+        if (playedUsers.Count == 0)
         {
             _logger.LogTrace("Not played by any user");
             return false;
         }
 
-        var user = users.OrderByDescending(x => x.LastPlayedDate).First();
+        var user = playedUsers.OrderByDescending(x => x.LastPlayedDate).First();
         var expirationTime = user.LastPlayedDate.AddDays(_keepFor);
 
         _logger.LogTrace("Latest played by \"{Username}\"", user.User.Username);
