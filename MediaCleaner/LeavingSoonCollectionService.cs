@@ -16,7 +16,7 @@ namespace MediaCleaner;
 
 internal class LeavingSoonCollectionService(ILogger<LeavingSoonCollectionService> logger, ILibraryManager libraryManager, ICollectionManager collectionManager)
 {
-    private const string CollectionName = "Leaving Soon";
+    internal const string CollectionName = "Leaving Soon";
     private const string Tag = "Media Cleaner";
 
     private readonly List<Guid> _items = [];
@@ -25,6 +25,11 @@ internal class LeavingSoonCollectionService(ILogger<LeavingSoonCollectionService
     {
         try
         {
+            logger.LogInformation(
+                "Finishing collection {CollectionName} with {ItemCount} candidate item(s).",
+                CollectionName,
+                _items.Count);
+
             var collection = await GetBoxSetByName(CollectionName, _items.Count > 0);
 
             if (collection is not null)
@@ -32,11 +37,25 @@ internal class LeavingSoonCollectionService(ILogger<LeavingSoonCollectionService
                 var query = new InternalItemsQuery { CollapseBoxSetItems = false, Recursive = true, Parent = collection };
                 var items = collection.GetItems(query).Items.Select(b => b.Id).ToList();
 
+                logger.LogInformation(
+                    "Removing {ItemCount} existing item(s) from collection {CollectionName}.",
+                    items.Count,
+                    CollectionName);
                 await collectionManager.RemoveFromCollectionAsync(collection.Id, items);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "Collection {CollectionName} was not found and no candidate items require it to be created.",
+                    CollectionName);
             }
 
             if (_items.Count > 0 && collection is not null)
             {
+                logger.LogInformation(
+                    "Adding {ItemCount} item(s) to collection {CollectionName}.",
+                    _items.Count,
+                    CollectionName);
                 await collectionManager.AddToCollectionAsync(collection.Id, _items);
                 await SetPhotoForCollection(collection);
             }
@@ -52,26 +71,42 @@ internal class LeavingSoonCollectionService(ILogger<LeavingSoonCollectionService
         _items.AddRange(ids);
     }
 
+    internal static BoxSet? GetExistingCollection(ILibraryManager libraryManager) =>
+        FindBoxSetByName(libraryManager, CollectionName);
+
     private async Task<BoxSet?> GetBoxSetByName(string name, bool create)
     {
-        var collection = libraryManager.GetItemList(new InternalItemsQuery
-        {
-            IncludeItemTypes = [BaseItemKind.BoxSet],
-            CollapseBoxSetItems = false,
-            Recursive = true,
-            Tags = [Tag],
-            Name = name,
-        }).Select(b => b as BoxSet).FirstOrDefault();
+        var collection = FindBoxSetByName(libraryManager, name);
 
         if (collection is null && create)
         {
             logger.LogInformation("{Name} not found, creating.", name);
             collection = await collectionManager.CreateCollectionAsync(new CollectionCreationOptions { Name = name, IsLocked = false });
             collection.Tags = [Tag];
+            await libraryManager.UpdateItemAsync(
+                collection,
+                collection.GetParent(),
+                ItemUpdateType.MetadataEdit,
+                CancellationToken.None);
+            logger.LogInformation("{Name} collection created with id {Id}.", name, collection.Id);
+        }
+        else if (collection is not null)
+        {
+            logger.LogInformation("{Name} collection found with id {Id}.", name, collection.Id);
         }
 
         return collection;
     }
+
+    private static BoxSet? FindBoxSetByName(ILibraryManager libraryManager, string name) =>
+        libraryManager.GetItemList(new InternalItemsQuery
+        {
+            IncludeItemTypes = [BaseItemKind.BoxSet],
+            CollapseBoxSetItems = false,
+            Recursive = true,
+            Tags = [Tag],
+            Name = name,
+        }).OfType<BoxSet>().FirstOrDefault();
 
     private async Task SetPhotoForCollection(BoxSet collection)
     {

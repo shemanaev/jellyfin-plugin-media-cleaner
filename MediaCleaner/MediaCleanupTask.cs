@@ -32,13 +32,9 @@ public class MediaCleanupTask(
     : IScheduledTask
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<MediaCleanupTask>();
-    private readonly StructuredConfig _config = StructuredConfig.CreateFromConfiguration(Plugin.Instance!.Configuration);
     private readonly NotificationService _notificationService = new(activityManager);
     private readonly LeavingSoonCollectionService _leavingSoonCollectionService = new(loggerFactory.CreateLogger<LeavingSoonCollectionService>(), libraryManager, collectionManager);
     private readonly FilterService _filterService = new(loggerFactory.CreateLogger<FilterService>());
-    private readonly ArrDeletionService _deletionService = ArrDeletionService.Create(
-        loggerFactory,
-        StructuredConfig.CreateFromConfiguration(Plugin.Instance!.Configuration).Arr);
 
     public bool IsDryRun { get; init; }
 
@@ -57,26 +53,38 @@ public class MediaCleanupTask(
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
+        var config = StructuredConfig.CreateFromConfiguration(Plugin.Instance!.Configuration);
+        var deletionService = ArrDeletionService.Create(loggerFactory, config.Arr);
         var allUsers = UserManagerCompatibility.GetUsers(userManager);
 
-        _logger.LogDebug("UsersPlayedMode: {Mode}", _config.UsersIgnore.Mode);
+        _logger.LogInformation(
+            "Media cleanup task started. Dry run: {IsDryRun}. LeavingSoonDays: {LeavingSoonDays}",
+            IsDryRun,
+            config.LeavingSoon.Days);
+
+        if (config.LeavingSoon.Days < 0)
+        {
+            _logger.LogInformation("Leaving Soon collection update disabled.");
+        }
+
+        _logger.LogDebug("UsersPlayedMode: {Mode}", config.UsersIgnore.Mode);
         _logger.LogDebug("UsersIgnorePlayed: {Users}",
             allUsers
-                .Where(x => _config.UsersIgnore.Users.Contains(x.Id.ToString("N")))
+                .Where(x => config.UsersIgnore.Users.Contains(x.Id.ToString("N")))
                 .Select(x => $"{x.Username}={x.Id}")
         );
-        _logger.LogDebug("UsersFavoritedMode: {Mode}", _config.UsersFavorites.Mode);
+        _logger.LogDebug("UsersFavoritedMode: {Mode}", config.UsersFavorites.Mode);
         _logger.LogDebug("UsersIgnoreFavorited: {Users}",
             allUsers
-                .Where(x => _config.UsersFavorites.Users.Contains(x.Id.ToString("N")))
+                .Where(x => config.UsersFavorites.Users.Contains(x.Id.ToString("N")))
                 .Select(x => $"{x.Username}={x.Id}")
         );
 
         var users = allUsers
-            .Where(x => FilterUsersList(_config.UsersIgnore.Users, _config.UsersIgnore.Mode, x))
+            .Where(x => FilterUsersList(config.UsersIgnore.Users, config.UsersIgnore.Mode, x))
             .ToList();
         var usersWithFavorites = allUsers
-            .Where(x => FilterUsersList(_config.UsersFavorites.Users, _config.UsersFavorites.Mode, x))
+            .Where(x => FilterUsersList(config.UsersFavorites.Users, config.UsersFavorites.Mode, x))
             .ToList();
 
         if (users.Count == 0)
@@ -87,20 +95,20 @@ public class MediaCleanupTask(
         }
 
         DateTime? startDate = null;
-        if (_config.Misc.CountAsNotPlayedAfter >= 0)
+        if (config.Misc.CountAsNotPlayedAfter >= 0)
         {
-            startDate = DateTime.Now.AddDays(-_config.Misc.CountAsNotPlayedAfter);
+            startDate = DateTime.Now.AddDays(-config.Misc.CountAsNotPlayedAfter);
         }
 
         var expired = new List<ExpiredItem>();
         var leavingSoon = new List<ExpiredItem>();
 
-        var itemsAdapter = new ItemsAdapter(loggerFactory.CreateLogger<ItemsAdapter>(), libraryManager, userDataManager, _config.Misc.AllowDeleteIfPlayedBeforeAdded);
+        var itemsAdapter = new ItemsAdapter(loggerFactory.CreateLogger<ItemsAdapter>(), libraryManager, userDataManager, config.Misc.AllowDeleteIfPlayedBeforeAdded);
 
         var progressCurrent = 0;
-        var progressStep = 75 / _config.MediaNodes.Count;
+        var progressStep = 75 / config.MediaNodes.Count;
 
-        foreach (var mediaConfig in _config.MediaNodes)
+        foreach (var mediaConfig in config.MediaNodes)
         {
             _logger.LogTrace("Processing media config: {Name} -> {MediaConfig}", mediaConfig.ItemKind, mediaConfig);
 
@@ -109,16 +117,24 @@ public class MediaCleanupTask(
                 var collector = JunkCollectorFactory.CreateInstance(loggerFactory, itemsAdapter, mediaConfig.ItemKind, mediaConfig.Reason);
                 var isNotPlayed = mediaConfig.Reason == ExpiredReason.NotPlayed;
                 var items = collector.Execute(users, startDate, cancellationToken);
-                var filters = GetFilters(loggerFactory, users, usersWithFavorites, mediaConfig, isNotPlayed, _config.Tags);
+                var filters = GetFilters(loggerFactory, users, usersWithFavorites, mediaConfig, isNotPlayed, config);
                 var expiredItems = _filterService.Execute(items, filters, cancellationToken);
 
-                if (_config.LeavingSoon.Days >= 0)
+                if (config.LeavingSoon.Days >= 0)
                 {
-                    _logger.LogInformation("Leaving soon started for {MediaConfig}", mediaConfig.ItemKind);
-                    var leavingSoonFilters = GetFilters(loggerFactory, users, usersWithFavorites, GetLeavingSoonConfig(mediaConfig), isNotPlayed, _config.Tags);
+                    var leavingSoonConfig = GetLeavingSoonConfig(mediaConfig, config);
+                    _logger.LogInformation(
+                        "Leaving Soon candidate selection started for {MediaConfig}. KeepDays: {KeepDays}, LeavingSoonKeepDays: {LeavingSoonKeepDays}",
+                        mediaConfig.ItemKind,
+                        mediaConfig.KeepDays,
+                        leavingSoonConfig.KeepDays);
+                    var leavingSoonFilters = GetFilters(loggerFactory, users, usersWithFavorites, leavingSoonConfig, isNotPlayed, config);
                     var leavingSoonItems = _filterService.Execute(items, leavingSoonFilters, cancellationToken);
                     leavingSoon.AddRange(leavingSoonItems);
-                    _logger.LogInformation("Leaving soon finished for {MediaConfig}", mediaConfig.ItemKind);
+                    _logger.LogInformation(
+                        "Leaving Soon candidate selection finished for {MediaConfig}: {Count} candidate(s) before deletion exclusion.",
+                        mediaConfig.ItemKind,
+                        leavingSoonItems.Count);
                 }
 
                 expired.AddRange(expiredItems);
@@ -128,10 +144,24 @@ public class MediaCleanupTask(
             progress.Report(progressCurrent);
         }
 
+        var leavingSoonCandidatesBeforeExpiredExclusion = leavingSoon.Count;
         var expiredIds = expired.Select(x => x.Item.Id).ToHashSet();
         leavingSoon.RemoveAll(item => expiredIds.Contains(item.Item.Id));
+        var leavingSoonExcludedAsExpired = leavingSoonCandidatesBeforeExpiredExclusion - leavingSoon.Count;
+        _logger.LogInformation(
+            "Leaving Soon candidates: {CandidateCount} candidate(s), {ExcludedCount} excluded because already due for deletion.",
+            leavingSoon.Count,
+            leavingSoonExcludedAsExpired);
         _leavingSoonCollectionService.AddItemRange(leavingSoon.Select(x => x.Item.Id));
-        if (!IsDryRun) await _leavingSoonCollectionService.Finish();
+        if (IsDryRun)
+        {
+            _logger.LogInformation("Dry run: Leaving Soon collection update skipped.");
+        }
+        else
+        {
+            await _leavingSoonCollectionService.Finish();
+        }
+
         progress.Report(85);
 
         var deletionItems = expired.OrderBy(x => x.Reason)
@@ -142,7 +172,7 @@ public class MediaCleanupTask(
         {
             LogDeletion(item);
 
-            var deletionResult = await _deletionService.DeleteAsync(item, IsDryRun, cancellationToken);
+            var deletionResult = await deletionService.DeleteAsync(item, IsDryRun, cancellationToken);
             LogDeletionResult(item, deletionResult);
 
             if (IsDryRun || deletionResult.Status != ArrDeletionStatus.Deleted)
@@ -150,9 +180,10 @@ public class MediaCleanupTask(
                 continue;
             }
 
-            if (_config.Misc.MarkAsUnplayed && item.Data is not null)
+            var itemData = item.Data;
+            if (config.Misc.MarkAsUnplayed && itemData is not null)
             {
-                foreach (var data in item.Data)
+                foreach (var data in itemData)
                 {
                     item.Item.MarkUnplayed(data.User);
                 }
@@ -164,8 +195,8 @@ public class MediaCleanupTask(
         progress.Report(100);
     }
 
-    private ConfigMediaNode GetLeavingSoonConfig(ConfigMediaNode config) =>
-        config with { KeepDays = config.KeepDays - _config.LeavingSoon.Days };
+    private static ConfigMediaNode GetLeavingSoonConfig(ConfigMediaNode mediaConfig, StructuredConfig config) =>
+        mediaConfig with { KeepDays = mediaConfig.KeepDays - config.LeavingSoon.Days };
 
     private static bool FilterUsersList(List<string> users, UsersListMode mode, User x) =>
         users.Contains(x.Id.ToString("N")) switch
@@ -177,40 +208,40 @@ public class MediaCleanupTask(
             _ => throw new NotImplementedException(),
         };
 
-    private List<IExpiredItemFilter> GetFilters(ILoggerFactory loggerFactory, List<User> users, List<User> usersWithFavorites, ConfigMediaNode config, bool isNotPlayed, ConfigTagsNode configTags)
+    private List<IExpiredItemFilter> GetFilters(ILoggerFactory loggerFactory, List<User> users, List<User> usersWithFavorites, ConfigMediaNode mediaConfig, bool isNotPlayed, StructuredConfig config)
     {
         var filters = new List<IExpiredItemFilter>();
 
         if (isNotPlayed)
         {
-            filters.Add(new ExpiredNotPlayedFilter(loggerFactory.CreateLogger<ExpiredNotPlayedFilter>(), config.KeepDays));
+            filters.Add(new ExpiredNotPlayedFilter(loggerFactory.CreateLogger<ExpiredNotPlayedFilter>(), mediaConfig.KeepDays));
         }
         else
         {
-            filters.Add(new ExpiredFilter(loggerFactory.CreateLogger<ExpiredFilter>(), config.KeepDays, users.Count, config.UserMode));
+            filters.Add(new ExpiredFilter(loggerFactory.CreateLogger<ExpiredFilter>(), mediaConfig.KeepDays, users.Count, mediaConfig.UserMode));
         }
 
-        filters.Add(new FavoritesFilter(loggerFactory.CreateLogger<FavoritesFilter>(), config.FavoriteMode, usersWithFavorites, userDataManager));
+        filters.Add(new FavoritesFilter(loggerFactory.CreateLogger<FavoritesFilter>(), mediaConfig.FavoriteMode, usersWithFavorites, userDataManager));
 
         filters.Add(new LocationsFilter(loggerFactory.CreateLogger<LocationsFilter>(),
-            _config.Locations.Mode,
-            _config.Locations.Locations,
+            config.Locations.Mode,
+            config.Locations.Locations,
             fileSystem));
 
-        if (config.SpecificOptions is not null)
+        if (mediaConfig.SpecificOptions is not null)
         {
             // TODO: more generic approach for different types
-            var specificOptions = (config.SpecificOptions as ConfigSeriesSpecificNode)!;
+            var specificOptions = (mediaConfig.SpecificOptions as ConfigSeriesSpecificNode)!;
             filters.AddRange(new SeriesFilter(loggerFactory.CreateLogger<SeriesFilter>(), specificOptions.GroupMode, specificOptions.KeepMode));
         }
 
-        if (configTags.Enabled)
+        if (config.Tags.Enabled)
         {
-            string tagName = configTags.Mode == TagMode.Exclusion
-                ? configTags.ExcludeTag
-                : configTags.IncludeTag;
-            _logger.LogDebug("Adding tag filter with mode: {TagMode}, tag: {TagName}", configTags.Mode, tagName);
-            filters.Add(new TagFilter(loggerFactory.CreateLogger<TagFilter>(), tagName, configTags.Mode));
+            string tagName = config.Tags.Mode == TagMode.Exclusion
+                ? config.Tags.ExcludeTag
+                : config.Tags.IncludeTag;
+            _logger.LogDebug("Adding tag filter with mode: {TagMode}, tag: {TagName}", config.Tags.Mode, tagName);
+            filters.Add(new TagFilter(loggerFactory.CreateLogger<TagFilter>(), tagName, config.Tags.Mode));
         }
 
         return filters;

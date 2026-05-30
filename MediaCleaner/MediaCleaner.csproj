@@ -20,6 +20,8 @@
     <None Remove="Web\general.js" />
     <None Remove="Web\integrations.html" />
     <None Remove="Web\integrations.js" />
+    <None Remove="Web\leavingsoon.html" />
+    <None Remove="Web\leavingsoon.js" />
     <None Remove="Web\locations.html" />
     <None Remove="Web\locations.js" />
     <None Remove="Web\troubleshooting.html" />
@@ -34,6 +36,8 @@
     <EmbeddedResource Include="Web\general.js" />
     <EmbeddedResource Include="Web\integrations.html" />
     <EmbeddedResource Include="Web\integrations.js" />
+    <EmbeddedResource Include="Web\leavingsoon.html" />
+    <EmbeddedResource Include="Web\leavingsoon.js" />
     <EmbeddedResource Include="Web\locations.html" />
     <EmbeddedResource Include="Web\locations.js" />
     <EmbeddedResource Include="Web\troubleshooting.html" />
