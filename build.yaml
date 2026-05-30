@@ -1,16 +1,20 @@
 ---
 name: "Media Cleaner"
 guid: "607fee77-97eb-41fe-bf22-26844d99ffb0"
-version: "2.24.0.1"
+version: "2.25.0.0"
 targetAbi: "10.11.8.0"
 framework: "net9.0"
-overview: "Delete played media after specified time"
+overview: "Delete played media after a specified time"
 description: >
   Keep your storage clean without hassle.
-  Works with movies and series.
+  Works with movies and series, with Jellyfin 10.11 compatibility,
+  Leaving Soon visibility, and optional Arr deletion delegation.
 category: "General"
-owner: "shemanaev"
+owner: "sym0nd0"
+imageUrl: "https://raw.githubusercontent.com/sym0nd0/jellyfin-plugin-media-cleaner/master/images/media-cleaner.png"
 artifacts:
 - "MediaCleaner.dll"
 changelog: >
-  Fix Arr integration connection test result display
+  Add Jellyfin 10.11 compatibility, Leaving Soon collection and
+  admin dashboard support, playback safety fixes, dry-run handling,
+  and optional Radarr/Sonarr deletion delegation.
