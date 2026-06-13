@@ -9,6 +9,9 @@ export default function (view, params) {
 const pageSelector = '[data-role="page"]'
 const logTextareaSelector = '#TroubleshootingLog'
 const logViewerSelector = '#TroubleshootingLogViewer'
+const logDateFormatSelector = '#TroubleshootingLogDateFormat'
+const defaultLogDateFormat = 'YYYYMMDD'
+const allowedLogDateFormats = ['YYYYMMDD', 'DDMMYYYY', 'MMDDYYYY']
 
 function onViewShow(commons) {
     const page = this
@@ -30,7 +33,21 @@ function onViewShow(commons) {
     const $LogLevel = page.querySelector('#LogLevel')
     $LogLevel.addEventListener('change', troubleshootingButtonGetLogClick)
 
-    getLog(page)
+    const $LogDateFormat = page.querySelector(logDateFormatSelector)
+    $LogDateFormat.addEventListener('change', event => troubleshootingLogDateFormatChanged(event, commons))
+
+    loadTroubleshootingConfiguration(commons, page).then(() => getLog(page))
+}
+
+function loadTroubleshootingConfiguration(commons, page) {
+    const $LogDateFormat = page.querySelector(logDateFormatSelector)
+
+    return ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
+        $LogDateFormat.value = normalizeLogDateFormat(config.TroubleshootingLogDateFormat)
+    }).catch(function (error) {
+        console.log(error)
+        $LogDateFormat.value = defaultLogDateFormat
+    })
 }
 
 function getLog(page) {
@@ -89,6 +106,25 @@ function troubleshootingButtonGetLogClick(event) {
     getLog(page)
 }
 
+function troubleshootingLogDateFormatChanged(event, commons) {
+    const page = event.currentTarget.closest(pageSelector)
+    const selectedFormat = normalizeLogDateFormat(event.currentTarget.value)
+    event.currentTarget.value = selectedFormat
+
+    Dashboard.showLoadingMsg()
+    ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
+        config.TroubleshootingLogDateFormat = selectedFormat
+        return ApiClient.updatePluginConfiguration(commons.pluginId, config)
+    }).then(result => {
+        Dashboard.processPluginConfigurationUpdateResult(result)
+        getLog(page)
+    }).catch(function (error) {
+        console.log(error)
+        Dashboard.hideLoadingMsg()
+        Dashboard.alert('Error saving log date format')
+    })
+}
+
 function troubleshootingButtonToggleViewerClick(event) {
     const page = this.closest(pageSelector)
     const log = page.querySelector(logTextareaSelector)
@@ -101,6 +137,14 @@ function troubleshootingButtonToggleViewerClick(event) {
         log.style.display = 'none'
         viewer.style.display = 'inline'
     }
+}
+
+function normalizeLogDateFormat(value) {
+    if (allowedLogDateFormats.includes(value)) {
+        return value
+    }
+
+    return defaultLogDateFormat
 }
 
 function colorizeLog(s, colors) {

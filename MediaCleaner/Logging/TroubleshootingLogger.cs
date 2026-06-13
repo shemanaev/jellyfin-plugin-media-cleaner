@@ -29,7 +29,9 @@ internal class TroubleshootingLogger : ILogger
             return;
         }
 
-        var s = $"[{logLevel.ToString()[..3]}] {_name}: {formatter(state, exception)}";
-        _getCurrentConfig().Output?.Add(s);
+        var config = _getCurrentConfig();
+        var message = TroubleshootingLogDateFormatter.FormatLogDates(formatter(state, exception), config.DateFormat);
+        var s = $"[{logLevel.ToString()[..3]}] {_name}: {message}";
+        config.Output?.Add(s);
     }
 }

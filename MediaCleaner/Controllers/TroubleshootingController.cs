@@ -45,8 +45,14 @@ public class TroubleshootingController(
         var progress = new Progress<double>();
 
         Enum.TryParse<LogLevel>(level ?? "Trace", out var logLevel);
+        var pluginConfiguration = Plugin.Instance!.Configuration;
         var logOutput = new List<string>();
-        var loggerFactory = new LoggerFactory([new TroubleshootingLoggerProvider(new TroubleshootingLoggerConfiguration { Output = logOutput, LogLevel = logLevel })]);
+        var loggerFactory = new LoggerFactory([new TroubleshootingLoggerProvider(new TroubleshootingLoggerConfiguration
+        {
+            Output = logOutput,
+            LogLevel = logLevel,
+            DateFormat = pluginConfiguration.TroubleshootingLogDateFormat,
+        })]);
 
         var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem, collectionManager)
         {
@@ -54,7 +60,7 @@ public class TroubleshootingController(
         };
         await task.ExecuteAsync(progress, default!);
 
-        var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
+        var pluginConfig = GetPrettyXml(pluginConfiguration);
 
         var log = $@"* Jellyfin version: {applicationHost.ApplicationVersionString}
 * Plugin version: {Plugin.Instance.Version}

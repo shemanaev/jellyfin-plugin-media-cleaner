@@ -52,6 +52,13 @@ public enum UsersListMode
     Acknowledge
 }
 
+public enum TroubleshootingLogDateFormat
+{
+    YYYYMMDD,
+    DDMMYYYY,
+    MMDDYYYY
+}
+
 public class PluginConfiguration : BasePluginConfiguration
 {
     public int KeepMoviesFor { get; set; } = -1;
@@ -113,4 +120,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public string SonarrBaseUrl { get; set; } = string.Empty;
     public string SonarrApiKey { get; set; } = string.Empty;
     public int SonarrTimeoutSeconds { get; set; } = 30;
+
+    public TroubleshootingLogDateFormat TroubleshootingLogDateFormat { get; set; } = TroubleshootingLogDateFormat.YYYYMMDD;
 }

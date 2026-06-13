@@ -1,7 +1,7 @@
 ---
 name: "Media Cleaner"
 guid: "607fee77-97eb-41fe-bf22-26844d99ffb0"
-version: "2.25.0.0"
+version: "2.26.0.0"
 targetAbi: "10.11.8.0"
 framework: "net9.0"
 overview: "Delete played media after a specified time"
@@ -15,6 +15,4 @@ imageUrl: "https://raw.githubusercontent.com/sym0nd0/jellyfin-plugin-media-clean
 artifacts:
 - "MediaCleaner.dll"
 changelog: >
-  Add Jellyfin 10.11 compatibility, Leaving Soon collection and
-  admin dashboard support, playback safety fixes, dry-run handling,
-  and optional Radarr/Sonarr deletion delegation.
+  Add a configurable date format for the troubleshooting log viewer.
