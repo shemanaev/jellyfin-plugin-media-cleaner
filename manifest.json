@@ -9,12 +9,12 @@
         "imageUrl": "https://raw.githubusercontent.com/sym0nd0/jellyfin-plugin-media-cleaner/master/images/media-cleaner.png",
         "versions": [
             {
-                "version": "2.26.0.0",
-                "changelog": "Add a configurable date format for the troubleshooting log viewer.\n",
+                "version": "2.26.1.0",
+                "changelog": "Fix troubleshooting log date format display and control alignment.\n",
                 "targetAbi": "10.11.8.0",
-                "sourceUrl": "https://github.com/sym0nd0/jellyfin-plugin-media-cleaner/releases/download/v2.26.0.0/media-cleaner_2.26.0.0.zip",
-                "checksum": "92e2dafe6254e34d57c7732483f00066",
-                "timestamp": "2026-06-13T16:27:27Z"
+                "sourceUrl": "https://github.com/sym0nd0/jellyfin-plugin-media-cleaner/releases/download/v2.26.1.0/media-cleaner_2.26.1.0.zip",
+                "checksum": "a4dc3712b1b182b532b81b2df73f50fa",
+                "timestamp": "2026-06-13T17:21:47Z"
             }
         ]
     }

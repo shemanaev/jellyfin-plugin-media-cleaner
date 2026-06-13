@@ -1,6 +1,7 @@
 using System.IO;
 using System.Xml.Serialization;
 using MediaCleaner.Configuration;
+using MediaCleaner.Controllers;
 using MediaCleaner.Logging;
 using Xunit;
 
@@ -57,5 +58,25 @@ public class TroubleshootingLogDateFormatterTests
         var config = Assert.IsType<PluginConfiguration>(serializer.Deserialize(reader));
 
         Assert.Equal(TroubleshootingLogDateFormat.YYYYMMDD, config.TroubleshootingLogDateFormat);
+    }
+
+    [Fact]
+    public void Resolve_log_date_format_uses_requested_format_over_config()
+    {
+        var result = TroubleshootingController.ResolveLogDateFormat(
+            TroubleshootingLogDateFormat.DDMMYYYY,
+            TroubleshootingLogDateFormat.YYYYMMDD);
+
+        Assert.Equal(TroubleshootingLogDateFormat.DDMMYYYY, result);
+    }
+
+    [Fact]
+    public void Resolve_log_date_format_uses_configured_format_without_request()
+    {
+        var result = TroubleshootingController.ResolveLogDateFormat(
+            null,
+            TroubleshootingLogDateFormat.MMDDYYYY);
+
+        Assert.Equal(TroubleshootingLogDateFormat.MMDDYYYY, result);
     }
 }

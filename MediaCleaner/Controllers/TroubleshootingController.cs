@@ -14,6 +14,7 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Globalization;
 using MediaBrowser.Model.IO;
+using MediaCleaner.Configuration;
 using MediaCleaner.Logging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,7 +33,7 @@ public class TroubleshootingController(
 {
     [HttpGet("Log")]
     [Produces(MediaTypeNames.Text.Plain)]
-    public async Task<string> GetLog(string? level)
+    public async Task<string> GetLog(string? level, TroubleshootingLogDateFormat? dateFormat)
     {
         using var scope = scopeFactory.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<IUserManager>();
@@ -51,7 +52,7 @@ public class TroubleshootingController(
         {
             Output = logOutput,
             LogLevel = logLevel,
-            DateFormat = pluginConfiguration.TroubleshootingLogDateFormat,
+            DateFormat = ResolveLogDateFormat(dateFormat, pluginConfiguration.TroubleshootingLogDateFormat),
         })]);
 
         var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem, collectionManager)
@@ -80,6 +81,11 @@ public class TroubleshootingController(
 
         return log;
     }
+
+    internal static TroubleshootingLogDateFormat ResolveLogDateFormat(
+        TroubleshootingLogDateFormat? requestedDateFormat,
+        TroubleshootingLogDateFormat configuredDateFormat) =>
+        requestedDateFormat ?? configuredDateFormat;
 
     private static string GetPrettyXml(object o)
     {
