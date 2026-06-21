@@ -1,6 +1,5 @@
 <Project>
   <PropertyGroup>
-    <PluginBaseVersion Condition="'$(PluginBaseVersion)' == ''">2.24.0</PluginBaseVersion>
     <PluginName Condition="'$(PluginName)' == ''">Media Cleaner</PluginName>
     <PluginGuid Condition="'$(PluginGuid)' == ''">607fee77-97eb-41fe-bf22-26844d99ffb0</PluginGuid>
     <PluginOverview Condition="'$(PluginOverview)' == ''">Delete played media after specified time</PluginOverview>
@@ -15,6 +14,7 @@
   <Import Project="Directory.JellyfinProfiles.props" Condition="Exists('Directory.JellyfinProfiles.props')" />
 
   <PropertyGroup>
+    <PluginBaseVersion Condition="'$(PluginBaseVersion)' == ''">0.0.0</PluginBaseVersion>
     <PluginVersion Condition="'$(PluginVersion)' == ''">$(PluginBaseVersion).0</PluginVersion>
     <PluginAssemblyVersion Condition="'$(PluginAssemblyVersion)' == ''">$(PluginBaseVersion).0</PluginAssemblyVersion>
     <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(PluginAssemblyVersion)</AssemblyVersion>

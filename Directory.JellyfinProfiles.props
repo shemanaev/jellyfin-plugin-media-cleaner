@@ -2,7 +2,7 @@
   <!-- Generated from eng/jellyfin-profiles.json. Run eng/generate-jellyfin-props.ps1 to update. -->
 
   <PropertyGroup>
-    <PluginBaseVersion Condition="'$(PluginBaseVersion)' == ''">2.26.0</PluginBaseVersion>
+    <PluginBaseVersion Condition="'$(PluginBaseVersion)' == ''">2.27.0</PluginBaseVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.10.7'">

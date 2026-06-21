@@ -1,5 +1,5 @@
 {
-  "baseVersion": "2.26.0",
+  "baseVersion": "2.27.0",
   "buildProfiles": [
     {
       "profile": "10.10.7",
