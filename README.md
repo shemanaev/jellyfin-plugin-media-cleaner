@@ -28,3 +28,32 @@ For the correct operation of the "*Delete not played items*" function, there are
 ## Debugging
 
 Define `JellyfinHome` environment variable pointing to Jellyfin distribution to be able to run debug configuration.
+
+## Jellyfin ABI support
+
+Builds are selected through `JellyfinProfile`. Server profiles are mapped to ABI build profiles in `eng/jellyfin-profiles.json`, so compatible server versions share release artifacts. `Directory.JellyfinProfiles.props` is generated from that JSON and imported by MSBuild.
+
+```powershell
+dotnet build MediaCleaner.sln -p:JellyfinProfile=10.10.7
+dotnet build MediaCleaner.sln -p:JellyfinProfile=10.11.0
+dotnet build MediaCleaner.sln -p:JellyfinProfile=10.11.3
+dotnet build MediaCleaner.sln -p:JellyfinProfile=10.11.11
+```
+
+Use the packaging helper to generate ABI build artifacts and `build.yaml` files under `artifacts/<build-profile>`:
+
+```powershell
+.\eng\build-plugin.ps1 -Configuration Release
+```
+
+When Jellyfin changes ABI, add or update a build profile in `eng/jellyfin-profiles.json` with the package version, target ABI, target framework, `versionPatchOffset` and any compile constants needed by `MediaCleaner/Compatibility/JellyfinCompatibility.cs`. Map server versions to build profiles in the same file, then run `.\eng\generate-jellyfin-props.ps1`. Keep direct Jellyfin API changes in the compatibility layer first; the task, filters and controllers should call that layer instead of branching on server versions directly.
+
+## Contributing
+
+### Generative AI Policy
+
+You're welcome to use "generative AI" coding tools when contributing, however:
+
+* You (the human contributor) should always be reading and validating new code before submitting it to us for review.
+* You (the human contributor) should be prepared to communicate with us personally during the PR review process. Copy-pasting to and from a chatbot is unacceptable, unless you're only using it for translation to and from English. If you don't know something then please tell us the prompt you would use for the question, instead of pasting the chatbot's answer - because chatbots are not always correct!
+* Please do not allow "AI Agents" to submit Pull Requests by themselves. Human maintainers will make time to review your code, and we expect a human contributor to make time as well.

@@ -1,0 +1,82 @@
+<Project>
+  <!-- Generated from eng/jellyfin-profiles.json. Run eng/generate-jellyfin-props.ps1 to update. -->
+
+  <PropertyGroup>
+    <PluginBaseVersion Condition="'$(PluginBaseVersion)' == ''">2.24.0</PluginBaseVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.10.7'">
+    <JellyfinBuildProfile>10.10.7</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.0'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.2'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.3'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.4'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.5'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.6'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.7'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.8'">
+    <JellyfinBuildProfile>10.11.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.9'">
+    <JellyfinBuildProfile>10.11.9</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.10'">
+    <JellyfinBuildProfile>10.11.9</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '10.11.11'">
+    <JellyfinBuildProfile>10.11.9</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '10.10.7'">
+    <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">10.10.7</JellyfinPackageVersion>
+    <JellyfinTargetAbi Condition="'$(JellyfinTargetAbi)' == ''">10.10.7.0</JellyfinTargetAbi>
+    <JellyfinTargetFramework>net8.0</JellyfinTargetFramework>
+    <JellyfinVersionPatchOffset>101007</JellyfinVersionPatchOffset>
+    <PluginVersion Condition="'$(PluginVersion)' == ''">$(PluginBaseVersion).101007</PluginVersion>
+    <JellyfinCompatibilityConstants>JELLYFIN_10_10;JELLYFIN_USER_IN_DATA_ENTITIES;JELLYFIN_USER_MANAGER_USERS_PROPERTY</JellyfinCompatibilityConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '10.11.0'">
+    <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">10.11.0</JellyfinPackageVersion>
+    <JellyfinTargetAbi Condition="'$(JellyfinTargetAbi)' == ''">10.11.0.0</JellyfinTargetAbi>
+    <JellyfinTargetFramework>net9.0</JellyfinTargetFramework>
+    <JellyfinVersionPatchOffset>101100</JellyfinVersionPatchOffset>
+    <PluginVersion Condition="'$(PluginVersion)' == ''">$(PluginBaseVersion).101100</PluginVersion>
+    <JellyfinCompatibilityConstants>JELLYFIN_10_11;JELLYFIN_USER_IN_DATABASE_ENTITIES;JELLYFIN_USER_MANAGER_USERS_PROPERTY</JellyfinCompatibilityConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '10.11.9'">
+    <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">10.11.9</JellyfinPackageVersion>
+    <JellyfinTargetAbi Condition="'$(JellyfinTargetAbi)' == ''">10.11.9.0</JellyfinTargetAbi>
+    <JellyfinTargetFramework>net9.0</JellyfinTargetFramework>
+    <JellyfinVersionPatchOffset>101109</JellyfinVersionPatchOffset>
+    <PluginVersion Condition="'$(PluginVersion)' == ''">$(PluginBaseVersion).101109</PluginVersion>
+    <JellyfinCompatibilityConstants>JELLYFIN_10_11;JELLYFIN_USER_IN_DATABASE_ENTITIES;JELLYFIN_USER_MANAGER_GET_USERS_METHOD</JellyfinCompatibilityConstants>
+  </PropertyGroup>
+</Project>

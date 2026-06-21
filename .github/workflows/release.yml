@@ -7,30 +7,96 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      jellyfin-matrix: ${{ steps.jellyfin-matrix.outputs.matrix }}
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      -
+        name: Prepare Jellyfin Matrix
+        id: jellyfin-matrix
+        shell: pwsh
+        run: |-
+          $matrix = ./eng/get-jellyfin-profiles.ps1 -Format GitHubMatrix
+          "matrix=$matrix" >> $env:GITHUB_OUTPUT
+      -
+        name: Verify Generated Jellyfin Profiles
+        shell: pwsh
+        run: |-
+          ./eng/generate-jellyfin-props.ps1
+          git diff --exit-code Directory.JellyfinProfiles.props
+
+  build:
+    runs-on: ubuntu-latest
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.jellyfin-matrix) }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       -
         name: Setup .NET Core
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: |-
+            8.0.x
+            9.0.x
       -
-        name: Build Jellyfin Plugin
+        name: Prepare Jellyfin Metadata (${{ matrix.jellyfin-profile }})
+        shell: pwsh
+        run: ./eng/write-build-yaml.ps1 -Profile ${{ matrix.jellyfin-profile }} -OutputPath build.yaml
+      -
+        name: Build Jellyfin Plugin (${{ matrix.jellyfin-profile }})
         uses: oddstr13/jellyfin-plugin-repository-manager@v1.1.1
         id: jprm
+        env:
+          JellyfinProfile: ${{ matrix.jellyfin-profile }}
         with:
-          dotnet-target: net9.0
+          output: ./artifacts/${{ matrix.jellyfin-profile }}
+          dotnet-config: Release
+          dotnet-target: ${{ matrix.dotnet-target }}
+      -
+        name: Normalize Release Asset Name (${{ matrix.jellyfin-profile }})
+        run: cp "${{ steps.jprm.outputs.artifact }}" "artifacts/${{ matrix.jellyfin-profile }}/MediaCleaner-${{ matrix.jellyfin-profile }}.zip"
+      -
+        name: Upload Release Asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asset-${{ matrix.jellyfin-profile }}
+          retention-days: 1
+          if-no-files-found: error
+          path: artifacts/${{ matrix.jellyfin-profile }}/MediaCleaner-${{ matrix.jellyfin-profile }}.zip
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      -
+        name: Download Release Assets
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-asset-*
+          merge-multiple: true
+          path: release-assets
       -
         name: Prepare Release Checksums
         run: |-
-          hash="$(md5sum ${{ steps.jprm.outputs.artifact }} | cut -d ' ' -f 1)"
-          echo "$hash $(basename ${{ steps.jprm.outputs.artifact }})" >> checksums.txt
+          for artifact in release-assets/*.zip; do
+            hash="$(md5sum "$artifact" | cut -d ' ' -f 1)"
+            echo "$hash $(basename "$artifact")" >> checksums.txt
+          done
       -
         name: Changelog
         uses: Bullrich/generate-release-changelog@master
@@ -44,4 +110,4 @@ jobs:
           body: ${{ steps.changelog.outputs.changelog }}
           files: |
             checksums.txt
-            ${{ steps.jprm.outputs.artifact }}
+            release-assets/*.zip

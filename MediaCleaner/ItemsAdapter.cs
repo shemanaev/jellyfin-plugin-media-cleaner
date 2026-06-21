@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaCleaner.Configuration;
+using MediaCleaner.Compatibility;
 using Microsoft.Extensions.Logging;
-using Jellyfin.Database.Implementations.Enums;
 
 namespace MediaCleaner;
 
@@ -32,7 +31,7 @@ internal class ItemsAdapter
 
     public IEnumerable<ExpiredItem> GetPlayedItems(
         BaseItemKind kind,
-        User user,
+        JellyfinUser user,
         DateTime? startDate,
         CancellationToken cancellationToken)
     {
@@ -91,7 +90,7 @@ internal class ItemsAdapter
 
     public IEnumerable<ExpiredItem> GetNotPlayedItems(
         BaseItemKind kind,
-        User user,
+        JellyfinUser user,
         DateTime? startDate,
         CancellationToken cancellationToken)
     {
@@ -135,18 +134,6 @@ internal class ItemsAdapter
         return result;
     }
 
-    private List<BaseItem> GetUserItems(BaseItemKind kind, User user, ItemSortBy sortBy) =>
-        [.. _libraryManager.GetItemList(
-                new InternalItemsQuery(user)
-                {
-                    IncludeItemTypes =
-                    [
-                        kind,
-                    ],
-                    IsVirtualItem = false,
-                    OrderBy =
-                    [
-                        (sortBy, SortOrder.Descending),
-                    ]
-                })];
+    private List<BaseItem> GetUserItems(BaseItemKind kind, JellyfinUser user, ItemSortBy sortBy) =>
+        JellyfinCompatibility.GetUserItemList(_libraryManager, kind, user, sortBy);
 }

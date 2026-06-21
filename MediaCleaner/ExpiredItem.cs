@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
@@ -38,7 +37,7 @@ namespace MediaCleaner
 
     internal class ExpiredItemData
     {
-        public User User { get; set; } = default!;
+        public JellyfinUser User { get; set; } = default!;
         public DateTime LastPlayedDate { get; set; }
         public bool IsPlayed { get; set; }
         public bool IsWatching { get; set; }

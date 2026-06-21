@@ -1,0 +1,91 @@
+{
+  "baseVersion": "2.24.0",
+  "buildProfiles": [
+    {
+      "profile": "10.10.7",
+      "packageVersion": "10.10.7",
+      "targetAbi": "10.10.7.0",
+      "targetFramework": "net8.0",
+      "versionPatchOffset": "101007",
+      "constants": [
+        "JELLYFIN_10_10",
+        "JELLYFIN_USER_IN_DATA_ENTITIES",
+        "JELLYFIN_USER_MANAGER_USERS_PROPERTY"
+      ]
+    },
+    {
+      "profile": "10.11.0",
+      "packageVersion": "10.11.0",
+      "targetAbi": "10.11.0.0",
+      "targetFramework": "net9.0",
+      "versionPatchOffset": "101100",
+      "constants": [
+        "JELLYFIN_10_11",
+        "JELLYFIN_USER_IN_DATABASE_ENTITIES",
+        "JELLYFIN_USER_MANAGER_USERS_PROPERTY"
+      ]
+    },
+    {
+      "profile": "10.11.9",
+      "packageVersion": "10.11.9",
+      "targetAbi": "10.11.9.0",
+      "targetFramework": "net9.0",
+      "versionPatchOffset": "101109",
+      "constants": [
+        "JELLYFIN_10_11",
+        "JELLYFIN_USER_IN_DATABASE_ENTITIES",
+        "JELLYFIN_USER_MANAGER_GET_USERS_METHOD"
+      ]
+    }
+  ],
+  "serverProfiles": [
+    {
+      "profile": "10.10.7",
+      "buildProfile": "10.10.7"
+    },
+    {
+      "profile": "10.11.0",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.2",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.3",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.4",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.5",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.6",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.7",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.8",
+      "buildProfile": "10.11.0"
+    },
+    {
+      "profile": "10.11.9",
+      "buildProfile": "10.11.9"
+    },
+    {
+      "profile": "10.11.10",
+      "buildProfile": "10.11.9"
+    },
+    {
+      "profile": "10.11.11",
+      "buildProfile": "10.11.9"
+    }
+  ]
+}

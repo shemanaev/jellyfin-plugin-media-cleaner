@@ -11,30 +11,69 @@ on:
       - '**/*.md'
 
 jobs:
-  build:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      jellyfin-matrix: ${{ steps.jellyfin-matrix.outputs.matrix }}
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      -
+        name: Prepare Jellyfin Matrix
+        id: jellyfin-matrix
+        shell: pwsh
+        run: |-
+          $matrix = ./eng/get-jellyfin-profiles.ps1 -Format GitHubMatrix
+          "matrix=$matrix" >> $env:GITHUB_OUTPUT
+      -
+        name: Verify Generated Jellyfin Profiles
+        shell: pwsh
+        run: |-
+          ./eng/generate-jellyfin-props.ps1
+          git diff --exit-code Directory.JellyfinProfiles.props
+
+  build:
+    runs-on: ubuntu-latest
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.jellyfin-matrix) }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       -
         name: Setup .NET Core
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: |-
+            8.0.x
+            9.0.x
       -
-        name: Build Jellyfin Plugin
+        name: Prepare Jellyfin Metadata (${{ matrix.jellyfin-profile }})
+        shell: pwsh
+        run: ./eng/write-build-yaml.ps1 -Profile ${{ matrix.jellyfin-profile }} -OutputPath build.yaml
+      -
+        name: Build Jellyfin Plugin (${{ matrix.jellyfin-profile }})
         uses: oddstr13/jellyfin-plugin-repository-manager@v1.1.1
         id: jprm
+        env:
+          JellyfinProfile: ${{ matrix.jellyfin-profile }}
         with:
-          dotnet-target: "net9.0"
+          output: ./artifacts/${{ matrix.jellyfin-profile }}
+          dotnet-config: Release
+          dotnet-target: ${{ matrix.dotnet-target }}
+      -
+        name: Normalize Artifact Name (${{ matrix.jellyfin-profile }})
+        run: cp "${{ steps.jprm.outputs.artifact }}" "artifacts/${{ matrix.jellyfin-profile }}/MediaCleaner-${{ matrix.jellyfin-profile }}.zip"
       -
         name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifact
+          name: build-artifact-${{ matrix.jellyfin-profile }}
           retention-days: 30
           if-no-files-found: error
-          path: ${{ steps.jprm.outputs.artifact }}
+          path: artifacts/${{ matrix.jellyfin-profile }}/MediaCleaner-${{ matrix.jellyfin-profile }}.zip
