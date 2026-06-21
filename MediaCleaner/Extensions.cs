@@ -1,8 +1,7 @@
 using System.Collections.Generic;
-using System.Linq;
-using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
+using MediaCleaner.Compatibility;
 
 namespace MediaCleaner
 {
@@ -10,7 +9,7 @@ namespace MediaCleaner
     {
         public static IEnumerable<BaseItem> GetEpisodes(this Series series)
         {
-            return series.GetSeasons(null, new DtoOptions(true)).SelectMany(x => ((Season)x).GetEpisodes());
+            return JellyfinCompatibility.GetEpisodes(series);
         }
     }
 }

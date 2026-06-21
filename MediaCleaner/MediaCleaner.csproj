@@ -1,17 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>$(JellyfinTargetFramework)</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>MediaCleaner</RootNamespace>
-    <AssemblyVersion>2.24.0.0</AssemblyVersion>
-    <FileVersion>2.24.0.0</FileVersion>
+    <DefineConstants>$(DefineConstants);$(JellyfinCompatibilityConstants)</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.3-*" />
-    <PackageReference Include="Jellyfin.Model" Version="10.11.3-*" />
-    <PackageReference Include="System.Text.Json" Version="9.0.11" />
+    <PackageReference Include="Jellyfin.Common">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Controller">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Data">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Jellyfin.Model">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
   <ItemGroup>

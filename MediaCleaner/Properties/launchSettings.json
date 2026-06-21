@@ -1,8 +1,10 @@
 {
+  "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
     "Jellyfin": {
       "commandName": "Executable",
       "executablePath": "$(JellyfinHome)\\jellyfin.exe",
+      "workingDirectory": "$(JellyfinHome)",
       "commandLineArgs": "-d \"$(TargetDir)data\""
     }
   }

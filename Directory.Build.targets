@@ -1,0 +1,7 @@
+<Project>
+  <Target Name="ValidateJellyfinProfile" BeforeTargets="Restore;Build">
+    <Error
+      Condition="'$(JellyfinPackageVersion)' == ''"
+      Text="Unsupported JellyfinProfile '$(JellyfinProfile)'. Add it to Directory.Build.props or pass JellyfinPackageVersion and JellyfinTargetAbi explicitly." />
+  </Target>
+</Project>

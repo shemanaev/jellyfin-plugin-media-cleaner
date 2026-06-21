@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Data.Enums;
 using MediaCleaner.Filtering;
 using Microsoft.Extensions.Logging;
@@ -26,7 +25,7 @@ internal abstract class BaseJunkCollector : IJunkCollector
     }
 
     public virtual List<ExpiredItem> Execute(
-        List<User> users,
+        List<JellyfinUser> users,
         IEnumerable<IExpiredItemFilter> filters,
         DateTime? startDate,
         CancellationToken cancellationToken)
@@ -68,7 +67,7 @@ internal abstract class BaseJunkCollector : IJunkCollector
     }
 
     public virtual List<ExpiredItem> ExecuteNotPlayed(
-        List<User> users,
+        List<JellyfinUser> users,
         IEnumerable<IExpiredItemFilter> filters,
         DateTime? startDate,
         CancellationToken cancellationToken)

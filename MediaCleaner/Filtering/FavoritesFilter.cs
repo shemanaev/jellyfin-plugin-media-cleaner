@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using Jellyfin.Database.Implementations.Entities;
 using MediaCleaner.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
@@ -14,13 +13,13 @@ internal class FavoritesFilter : IExpiredItemFilter
 {
     private readonly ILogger<FavoritesFilter> _logger;
     private readonly FavoriteKeepKind _kind;
-    private readonly List<User> _users;
+    private readonly List<JellyfinUser> _users;
     private readonly IUserDataManager _userDataManager;
 
     public FavoritesFilter(
         ILogger<FavoritesFilter> logger,
         FavoriteKeepKind kind,
-        List<User> users,
+        List<JellyfinUser> users,
         IUserDataManager userDataManager)
     {
         _logger = logger;
@@ -67,7 +66,7 @@ internal class FavoritesFilter : IExpiredItemFilter
         return result;
     }
 
-    private bool IsFavorite(User user, BaseItem item) => item switch
+    private bool IsFavorite(JellyfinUser user, BaseItem item) => item switch
     {
         Episode episode => (_userDataManager.GetUserData(user, episode)?.IsFavorite ?? false)
                         || (episode.Series != null && (_userDataManager.GetUserData(user, episode.Series)?.IsFavorite ?? false))

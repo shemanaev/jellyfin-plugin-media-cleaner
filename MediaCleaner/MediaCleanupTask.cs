@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Tasks;
@@ -14,6 +13,7 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Globalization;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Model.IO;
+using MediaCleaner.Compatibility;
 using MediaCleaner.Filtering;
 using MediaCleaner.Configuration;
 using System.IO;
@@ -46,11 +46,7 @@ namespace MediaCleaner
 
         public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() =>
             [
-                new TaskTriggerInfo
-                {
-                    Type = TaskTriggerInfoType.IntervalTrigger,
-                    IntervalTicks = TimeSpan.FromDays(1).Ticks
-                }
+                JellyfinCompatibility.CreateIntervalTrigger(TimeSpan.FromDays(1)),
             ];
 
         public MediaCleanupTask(
@@ -74,23 +70,25 @@ namespace MediaCleaner
 
         public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         {
+            var allUsers = JellyfinCompatibility.GetUsers(_userManager);
+
             _logger.LogDebug("UsersPlayedMode: {Mode}", Configuration.UsersPlayedMode);
             _logger.LogDebug("UsersIgnorePlayed: {Users}",
-                 _userManager.Users
+                 allUsers
                     .Where(x => Configuration.UsersIgnorePlayed.Contains(x.Id.ToString("N")))
                     .Select(x => $"{x.Username}={x.Id}")
             );
             _logger.LogDebug("UsersFavoritedMode: {Mode}", Configuration.UsersFavoritedMode);
             _logger.LogDebug("UsersIgnoreFavorited: {Users}",
-                 _userManager.Users
+                 allUsers
                     .Where(x => Configuration.UsersIgnoreFavorited.Contains(x.Id.ToString("N")))
                     .Select(x => $"{x.Username}={x.Id}")
             );
 
-            var users = _userManager.Users
+            var users = allUsers
                 .Where(x => FilterUsersList(Configuration.UsersIgnorePlayed, Configuration.UsersPlayedMode, x))
                 .ToList();
-            var usersWithFavorites = _userManager.Users
+            var usersWithFavorites = allUsers
                 .Where(x => FilterUsersList(Configuration.UsersIgnoreFavorited, Configuration.UsersFavoritedMode, x))
                 .ToList();
 
@@ -201,7 +199,7 @@ namespace MediaCleaner
                 {
                     foreach (var data in item.Data)
                     {
-                        item.Item.MarkUnplayed(data.User);
+                        JellyfinCompatibility.MarkUnplayed(item.Item, data.User);
                     }
                 }
 
@@ -239,7 +237,7 @@ namespace MediaCleaner
             progress.Report(100);
         }
 
-        private static bool FilterUsersList(List<string> users, UsersListMode mode, User x)
+        private static bool FilterUsersList(List<string> users, UsersListMode mode, JellyfinUser x)
         {
             return users.Contains(x.Id.ToString("N")) switch
             {
@@ -251,7 +249,7 @@ namespace MediaCleaner
             };
         }
 
-        private List<ExpiredItem> CollectMovies(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectMovies(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -276,7 +274,7 @@ namespace MediaCleaner
             return expiredMovies;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedMovies(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedMovies(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -299,7 +297,7 @@ namespace MediaCleaner
             return movies;
         }
 
-        private List<ExpiredItem> CollectSeries(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectSeries(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -325,7 +323,7 @@ namespace MediaCleaner
             return expiredSeries;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedSeries(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedSeries(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -349,7 +347,7 @@ namespace MediaCleaner
             return expiredSeries;
         }
 
-        private List<ExpiredItem> CollectVideos(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectVideos(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -374,7 +372,7 @@ namespace MediaCleaner
             return expiredVideos;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedVideos(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedVideos(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -397,7 +395,7 @@ namespace MediaCleaner
             return expiredVideos;
         }
 
-        private List<ExpiredItem> CollectAudio(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectAudio(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -422,7 +420,7 @@ namespace MediaCleaner
             return expiredItems;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedAudio(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedAudio(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -445,7 +443,7 @@ namespace MediaCleaner
             return expiredItems;
         }
 
-        private List<ExpiredItem> CollectAudioBook(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private List<ExpiredItem> CollectAudioBook(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -470,7 +468,7 @@ namespace MediaCleaner
             return expiredItems;
         }
 
-        private IEnumerable<ExpiredItem> CollectNotPlayedAudioBook(List<User> users, List<User> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
+        private IEnumerable<ExpiredItem> CollectNotPlayedAudioBook(List<JellyfinUser> users, List<JellyfinUser> usersWithFavorites, ItemsAdapter itemsAdapter, DateTime? startDate, CancellationToken cancellationToken)
         {
             var filters = new List<IExpiredItemFilter>
                 {
@@ -499,43 +497,43 @@ namespace MediaCleaner
             switch (item)
             {
                 case Movie movie:
-                    _libraryManager.DeleteItem(movie, opts, true);
+                    JellyfinCompatibility.DeleteItem(_libraryManager, movie, opts);
                     break;
 
                 case Series series:
-                    _libraryManager.DeleteItem(series, opts, true);
+                    JellyfinCompatibility.DeleteItem(_libraryManager, series, opts);
                     break;
 
                 case Season season:
                     foreach (var eps in season.GetEpisodes())
                     {
-                        _libraryManager.DeleteItem(eps, opts, true);
+                        JellyfinCompatibility.DeleteItem(_libraryManager, eps, opts);
                     }
-                    _libraryManager.DeleteItem(season, opts, true);
+                    JellyfinCompatibility.DeleteItem(_libraryManager, season, opts);
                     if (!(season.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(season.Series))
                     {
-                        _libraryManager.DeleteItem(season.Series!, opts, true);
+                        JellyfinCompatibility.DeleteItem(_libraryManager, season.Series!, opts);
                     }
                     break;
 
                 case Episode episode:
-                    _libraryManager.DeleteItem(episode, opts, true);
+                    JellyfinCompatibility.DeleteItem(_libraryManager, episode, opts);
                     if (!episode.Season?.GetEpisodes().Any() ?? false)
                     {
-                        _libraryManager.DeleteItem(episode.Season!, opts, true);
+                        JellyfinCompatibility.DeleteItem(_libraryManager, episode.Season!, opts);
                     }
                     if (!(episode.Series?.GetEpisodes().Any() ?? false) && !HasExtraFiles(episode.Series))
                     {
-                        _libraryManager.DeleteItem(episode.Series!, opts, true);
+                        JellyfinCompatibility.DeleteItem(_libraryManager, episode.Series!, opts);
                     }
                     break;
 
                 case Video video:
-                    _libraryManager.DeleteItem(video, opts, true);
+                    JellyfinCompatibility.DeleteItem(_libraryManager, video, opts);
                     break;
 
                 default:
-                    _libraryManager.DeleteItem(item, opts, true);
+                    JellyfinCompatibility.DeleteItem(_libraryManager, item, opts);
                     break;
             }
         }
@@ -615,11 +613,13 @@ namespace MediaCleaner
                     break;
             };
 
-            await _activityManager.CreateAsync(new ActivityLog(title, "MediaCleaner", Guid.Empty)
-            {
-                ShortOverview = shortOverview,
-                Overview = overview,
-            });
+            await _activityManager.CreateAsync(
+                JellyfinCompatibility.CreateActivityLog(
+                    title,
+                    "MediaCleaner",
+                    Guid.Empty,
+                    shortOverview,
+                    overview));
         }
 
         /// <summary>

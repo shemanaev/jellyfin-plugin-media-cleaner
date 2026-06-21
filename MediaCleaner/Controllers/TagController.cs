@@ -7,6 +7,7 @@ using MediaBrowser.Common;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using MediaCleaner.Compatibility;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,7 +50,7 @@ public class TagController : ControllerBase
         try
         {
             _logger.LogDebug("Querying items with tag '{OldTag}'", request.OldTag);
-            var allItems = _libraryManager.GetItemList(new InternalItemsQuery());
+            var allItems = JellyfinCompatibility.GetItemList(_libraryManager, new InternalItemsQuery());
             var itemsWithTag = allItems.Where(item => 
                 item.Tags != null && 
                 item.Tags.Contains(request.OldTag, StringComparer.OrdinalIgnoreCase)
@@ -81,7 +82,7 @@ public class TagController : ControllerBase
                         }
                         item.Tags = tags.ToArray();
                         _logger.LogDebug("Updating item '{ItemName}' (ID: {ItemId}) with new tags: [{Tags}]", item.Name, item.Id, string.Join(", ", item.Tags));
-                        await _libraryManager.UpdateItemAsync(item, item, ItemUpdateType.MetadataEdit, CancellationToken.None);
+                        await JellyfinCompatibility.UpdateMetadataAsync(_libraryManager, item, CancellationToken.None);
                         updatedCount++;
                     }
                     else
