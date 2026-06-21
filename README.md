@@ -48,6 +48,13 @@ Use the packaging helper to generate ABI build artifacts and `build.yaml` files 
 
 When Jellyfin changes ABI, add or update a build profile in `eng/jellyfin-profiles.json` with the package version, target ABI, target framework, `versionPatchOffset` and any compile constants needed by `MediaCleaner/Compatibility/JellyfinCompatibility.cs`. Map server versions to build profiles in the same file, then run `.\eng\generate-jellyfin-props.ps1`. Keep direct Jellyfin API changes in the compatibility layer first; the task, filters and controllers should call that layer instead of branching on server versions directly.
 
+To bump the plugin release version, update `baseVersion` and regenerate MSBuild profile properties:
+
+```powershell
+.\eng\bump-version.ps1
+.\eng\bump-version.ps1 -Version 2.25.0
+```
+
 ## Contributing
 
 ### Generative AI Policy
