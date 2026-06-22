@@ -29,9 +29,26 @@ jobs:
           ./eng/generate-jellyfin-props.ps1
           git diff --exit-code Directory.JellyfinProfiles.props
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Setup .NET Core
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |-
+            8.0.x
+            9.0.x
+      -
+        name: Run Unit Tests
+        run: dotnet test MediaCleaner.Tests/MediaCleaner.Tests.csproj -c Release
+
   build:
     runs-on: ubuntu-latest
-    needs: prepare
+    needs: [prepare, test]
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare.outputs.jellyfin-matrix) }}

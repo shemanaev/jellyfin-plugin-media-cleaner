@@ -29,6 +29,7 @@ $profilesConfig = Get-Content -Raw -Path $ProfilesPath | ConvertFrom-Json
 $buildProfiles = @($profilesConfig.buildProfiles)
 $serverProfiles = @($profilesConfig.serverProfiles)
 $pluginVersionsByBuildProfile = @{}
+$pluginArtifactsByBuildProfile = @{}
 
 function Resolve-BuildProfile {
     param([string]$CurrentProfile)
@@ -59,6 +60,25 @@ function Get-PluginVersion {
     }
 
     return $pluginVersionsByBuildProfile[$BuildProfile]
+}
+
+function Get-PluginArtifacts {
+    param([string]$BuildProfile)
+
+    if (-not $pluginArtifactsByBuildProfile.ContainsKey($BuildProfile)) {
+        $pluginArtifacts = (& dotnet msbuild $ProjectPath -nologo -p:JellyfinProfile=$BuildProfile -getProperty:PluginArtifacts).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pluginArtifacts)) {
+            throw "Unable to resolve PluginArtifacts for Jellyfin build profile '$BuildProfile'."
+        }
+
+        $pluginArtifactsByBuildProfile[$BuildProfile] = @(
+            $pluginArtifacts -split ";" |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+    }
+
+    return $pluginArtifactsByBuildProfile[$BuildProfile]
 }
 
 if ([string]::IsNullOrWhiteSpace($DockerPath)) {
@@ -186,6 +206,7 @@ $failedProfiles = New-Object System.Collections.Generic.List[string]
 foreach ($currentProfile in $Profile) {
     $currentBuildProfile = Resolve-BuildProfile -CurrentProfile $currentProfile
     $pluginVersion = Get-PluginVersion -BuildProfile $currentBuildProfile
+    $pluginArtifacts = @(Get-PluginArtifacts -BuildProfile $currentBuildProfile)
     $image = "jellyfin/jellyfin:$currentProfile"
     $containerName = "media-cleaner-smoke-$($currentProfile.Replace('.', '-'))"
     $profileArtifactRoot = Join-Path $ArtifactsRoot $currentBuildProfile
@@ -196,15 +217,20 @@ foreach ($currentProfile in $Profile) {
 
     Write-Host "==> Smoke testing Jellyfin $currentProfile with $image using build profile $currentBuildProfile"
 
-    if (-not (Test-Path (Join-Path $profileArtifactRoot "MediaCleaner.dll"))) {
-        throw "Missing build artifact for $currentProfile. Expected $profileArtifactRoot/MediaCleaner.dll"
+    foreach ($artifact in $pluginArtifacts) {
+        if (-not (Test-Path (Join-Path $profileArtifactRoot $artifact))) {
+            throw "Missing build artifact for $currentProfile. Expected $profileArtifactRoot/$artifact"
+        }
     }
 
     Remove-ContainerIfExists -Name $containerName
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $profileSmokeRoot
     New-Item -ItemType Directory -Force -Path $pluginRoot, $cacheRoot | Out-Null
 
-    Copy-Item -Force -Path (Join-Path $profileArtifactRoot "MediaCleaner.dll") -Destination $pluginRoot
+    foreach ($artifact in $pluginArtifacts) {
+        Copy-Item -Force -Path (Join-Path $profileArtifactRoot $artifact) -Destination $pluginRoot
+    }
+
     Copy-Item -Force -Path (Join-Path $profileArtifactRoot "MediaCleaner.deps.json") -Destination $pluginRoot
 
     Invoke-External -FilePath $DockerPath -Arguments @("pull", $image)

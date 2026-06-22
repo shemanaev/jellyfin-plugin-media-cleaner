@@ -1,0 +1,149 @@
+<div id="MediaCleanerAdvancedPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs" data-controller="__plugin/MediaCleaner_Advanced_js">
+    <style>
+        #MediaCleanerAdvancedPage .mediaCleanerAdvancedSection {
+            margin-bottom: 1.25em;
+            padding: .9em;
+            border-radius: 8px;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerAdvancedHeader {
+            margin-bottom: 1em;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerAdvancedHeader h3 {
+            margin-bottom: .25em;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerHint {
+            margin: 0;
+            opacity: .72;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerAdvancedPage .checkboxContainer {
+            margin: 0 0 .65em;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerWarning {
+            display: flex;
+            align-items: flex-start;
+            gap: .5em;
+            padding: .65em .75em;
+            border-radius: 6px;
+            background: rgba(255, 152, 0, .16);
+            color: inherit;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerWarning .material-icons {
+            flex: 0 0 auto;
+            font-size: 1.25em;
+            color: #ff9800;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerSaveArea {
+            display: flex;
+            flex-direction: column;
+            gap: .65em;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerSaveStatus {
+            display: inline-flex;
+            align-items: center;
+            align-self: flex-start;
+            gap: .4em;
+            color: #ffb74d;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerSaveStatus .material-icons {
+            font-size: 1.15em;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerSaveStatus.hide {
+            display: none;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerTagMaintenanceFields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
+            gap: .75em;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerTagMaintenanceActions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .75em;
+            margin-top: .5em;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerTagMaintenanceResult {
+            margin-top: .75em;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerAdvancedPage .mediaCleanerTagMaintenanceResult.hide {
+            display: none;
+        }
+    </style>
+    <div data-role="content">
+        <div class="content-primary">
+            <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
+
+            <form id="MediaCleanerAdvancedForm">
+                <section class="paperList mediaCleanerAdvancedSection" aria-label="Advanced playback matching">
+                    <div class="mediaCleanerAdvancedHeader">
+                        <h3>Advanced playback matching</h3>
+                        <p class="fieldDescription mediaCleanerHint">Controls how played and not-played rules handle media watched before Jellyfin says it was added.</p>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="MediaCleanerAllowDeleteIfPlayedBeforeAdded" data-field="AllowDeleteIfPlayedBeforeAdded" />
+                            <span>Count playback before Date Added</span>
+                        </label>
+                    </div>
+                    <div class="mediaCleanerWarning" role="alert">
+                        <span class="material-icons warning" aria-hidden="true"></span>
+                        <span>Counts playback even when Last Played is earlier than Date Added. This can help with upgraded or re-imported media where Jellyfin reset the added date. Risk: newly re-downloaded media can be deleted based on old watch history.</span>
+                    </div>
+                </section>
+
+                <section class="paperList mediaCleanerAdvancedSection" aria-label="Library tag maintenance">
+                    <div class="mediaCleanerAdvancedHeader">
+                        <h3>Library tag maintenance</h3>
+                        <p class="fieldDescription mediaCleanerHint">Renames a tag on matching library items. Rules are not changed automatically.</p>
+                    </div>
+                    <div class="mediaCleanerTagMaintenanceFields">
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="MediaCleanerOldTag">Old tag</label>
+                            <input id="MediaCleanerOldTag" type="text" is="emby-input" autocomplete="off" />
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="MediaCleanerNewTag">New tag</label>
+                            <input id="MediaCleanerNewTag" type="text" is="emby-input" autocomplete="off" />
+                        </div>
+                    </div>
+                    <div class="mediaCleanerTagMaintenanceActions">
+                        <button id="MediaCleanerPreviewTagRename" is="emby-button" type="button" class="raised emby-button">
+                            <span>Preview rename</span>
+                        </button>
+                        <button id="MediaCleanerRenameTag" is="emby-button" type="button" class="raised button-submit emby-button" disabled="disabled">
+                            <span>Rename tag</span>
+                        </button>
+                    </div>
+                    <div id="MediaCleanerTagRenameResult" class="fieldDescription mediaCleanerTagMaintenanceResult hide" role="status" aria-live="polite"></div>
+                </section>
+
+                <div class="mediaCleanerSaveArea">
+                    <div id="MediaCleanerAdvancedSaveStatus" class="mediaCleanerSaveStatus hide" role="status" aria-live="polite">
+                        <span class="material-icons edit" aria-hidden="true"></span>
+                        <span>Unsaved changes</span>
+                    </div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>${Save}</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

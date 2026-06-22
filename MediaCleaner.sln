@@ -4,6 +4,10 @@ VisualStudioVersion = 17.0.31423.177
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MediaCleaner", "MediaCleaner\MediaCleaner.csproj", "{049B6412-F362-482A-A163-1C33C111CBCF}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MediaCleaner.Core", "MediaCleaner.Core\MediaCleaner.Core.csproj", "{E1DBD555-955E-49E7-AD89-3D85DB4E1D7C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MediaCleaner.Tests", "MediaCleaner.Tests\MediaCleaner.Tests.csproj", "{5149691C-5FE1-409A-B909-3711C10C9B7D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +18,14 @@ Global
 		{049B6412-F362-482A-A163-1C33C111CBCF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{049B6412-F362-482A-A163-1C33C111CBCF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{049B6412-F362-482A-A163-1C33C111CBCF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1DBD555-955E-49E7-AD89-3D85DB4E1D7C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1DBD555-955E-49E7-AD89-3D85DB4E1D7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1DBD555-955E-49E7-AD89-3D85DB4E1D7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1DBD555-955E-49E7-AD89-3D85DB4E1D7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5149691C-5FE1-409A-B909-3711C10C9B7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5149691C-5FE1-409A-B909-3711C10C9B7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5149691C-5FE1-409A-B909-3711C10C9B7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5149691C-5FE1-409A-B909-3711C10C9B7D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

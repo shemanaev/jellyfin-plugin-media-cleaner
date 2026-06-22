@@ -2,11 +2,11 @@
   <PropertyGroup>
     <PluginName Condition="'$(PluginName)' == ''">Media Cleaner</PluginName>
     <PluginGuid Condition="'$(PluginGuid)' == ''">607fee77-97eb-41fe-bf22-26844d99ffb0</PluginGuid>
-    <PluginOverview Condition="'$(PluginOverview)' == ''">Delete played media after specified time</PluginOverview>
-    <PluginDescription Condition="'$(PluginDescription)' == ''">Keep your storage clean without hassle.&#x0A;Works with movies and series.</PluginDescription>
+    <PluginOverview Condition="'$(PluginOverview)' == ''">Rule-based media cleanup</PluginOverview>
+    <PluginDescription Condition="'$(PluginDescription)' == ''">Keep your storage clean without hassle.&#x0A;Works with all media types.</PluginDescription>
     <PluginCategory Condition="'$(PluginCategory)' == ''">General</PluginCategory>
     <PluginOwner Condition="'$(PluginOwner)' == ''">shemanaev</PluginOwner>
-    <PluginArtifacts Condition="'$(PluginArtifacts)' == ''">MediaCleaner.dll</PluginArtifacts>
+    <PluginArtifacts Condition="'$(PluginArtifacts)' == ''">MediaCleaner.dll;MediaCleaner.Core.dll</PluginArtifacts>
     <JellyfinProfile Condition="'$(JellyfinProfile)' == ''">10.11.9</JellyfinProfile>
     <JellyfinTargetFramework Condition="'$(JellyfinTargetFramework)' == ''">net9.0</JellyfinTargetFramework>
   </PropertyGroup>

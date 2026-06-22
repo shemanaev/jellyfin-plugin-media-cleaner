@@ -9,6 +9,7 @@ export default function (view, params) {
 const pageSelector = '[data-role="page"]'
 const logTextareaSelector = '#TroubleshootingLog'
 const logViewerSelector = '#TroubleshootingLogViewer'
+let issueMarkdown = ''
 
 function onViewShow(commons) {
     const page = this
@@ -21,102 +22,66 @@ function onViewShow(commons) {
         $TroubleshootingButtonCopy.style.display = 'inline-flex'
     }
 
-    const $TroubleshootingButtonGetLog = page.querySelector('#TroubleshootingButtonGetLog')
-    $TroubleshootingButtonGetLog.addEventListener('click', troubleshootingButtonGetLogClick)
+    const $TroubleshootingButtonRefreshReport = page.querySelector('#TroubleshootingButtonRefreshReport')
+    $TroubleshootingButtonRefreshReport.addEventListener('click', troubleshootingButtonRefreshReportClick)
 
-    const $TroubleshootingButtonToggleViewer = page.querySelector('#TroubleshootingButtonToggleViewer')
-    $TroubleshootingButtonToggleViewer.addEventListener('click', troubleshootingButtonToggleViewerClick)
-
-    const $LogLevel = page.querySelector('#LogLevel')
-    $LogLevel.addEventListener('change', troubleshootingButtonGetLogClick)
-
-    getLog(page)
+    getReport(page)
 }
 
-function getLog(page) {
-    const $LogLevel = page.querySelector('#LogLevel')
-
+function getReport(page) {
     const request = {
-        url: ApiClient.getUrl('MediaCleaner/Log') + "?level=" + $LogLevel.value,
+        url: ApiClient.getUrl('MediaCleaner/Report'),
     }
 
     Dashboard.showLoadingMsg()
-    ApiClient.fetch(request).then(function (result) {
+    ApiClient.fetch(request).then(normalizeReportResponse).then(function (report) {
         const log = page.querySelector(logTextareaSelector)
         const viewer = page.querySelector(logViewerSelector)
-        log.value = result
+        issueMarkdown = report.issueMarkdown || report.IssueMarkdown || ''
+        log.value = issueMarkdown
 
-        const el = document.createElement('html')
-        el.innerHTML = result
-        const details = el.querySelector('details:last-of-type > pre')
-
-        const colorizedDetails = document.createElement('div')
-        colorizedDetails.innerHTML = colorizeLog(details.innerHTML, {
-            'Tra': 'color: #8e8e94',
-            'Deb': 'color: #007dff',
-            'Inf': 'color: #00ca48',
-            'War': 'color: #ff7600',
-            'Err': 'color: #ff0c1b',
-            'Cri': 'background-color: #ff0c1b',
-        })
-
-        viewer.innerHTML = ''
-        viewer.appendChild(colorizedDetails)
+        viewer.innerHTML = report.formattedHtml || report.FormattedHtml || ''
 
         Dashboard.hideLoadingMsg()
     }).catch(function (error) {
         console.log(error)
         Dashboard.hideLoadingMsg()
-        Dashboard.alert('Error loading log')
+        Dashboard.alert('Could not generate the troubleshooting report')
     })
 }
 
-function troubleshootingButtonCopyClick(event) {
-    const page = this.closest(pageSelector)
-    const log = page.querySelector(logTextareaSelector)
+function normalizeReportResponse(result) {
+    if (!result) {
+        return {}
+    }
 
-    navigator.clipboard.writeText(log.value)
+    if (typeof result === 'string') {
+        return JSON.parse(result)
+    }
+
+    if (typeof result.json === 'function') {
+        return result.json()
+    }
+
+    if (typeof result.text === 'function') {
+        return result.text().then(text => JSON.parse(text))
+    }
+
+    return result
+}
+
+function troubleshootingButtonCopyClick(event) {
+    navigator.clipboard.writeText(issueMarkdown)
         .then(() => {
-            Dashboard.alert('Log copied to clipboard')
+            Dashboard.alert('GitHub issue report copied to clipboard')
         })
         .catch(error => {
-            console.log('Error copying log', error)
+            console.log('Error copying troubleshooting report', error)
+            Dashboard.alert('Could not copy the troubleshooting report')
         })
 }
 
-function troubleshootingButtonGetLogClick(event) {
+function troubleshootingButtonRefreshReportClick(event) {
     const page = this.closest(pageSelector)
-    getLog(page)
-}
-
-function troubleshootingButtonToggleViewerClick(event) {
-    const page = this.closest(pageSelector)
-    const log = page.querySelector(logTextareaSelector)
-    const viewer = page.querySelector(logViewerSelector)
-
-    if (log.style.display === 'none') {
-        log.style.display = 'inline'
-        viewer.style.display = 'none'
-    } else {
-        log.style.display = 'none'
-        viewer.style.display = 'inline'
-    }
-}
-
-function colorizeLog(s, colors) {
-    let level = Object.keys(colors)
-    let style = Object.values(colors)
-
-    let replacements = {}
-    level.forEach((tag, i) => replacements['\\[(' + tag + ')\\]'] = '[<span style="' + style[i] + '">$1</span>]')
-    let result = replaceBulk(s, replacements)
-    return result.replace(new RegExp('\n', 'g'), '<br>\n')
-}
-
-function replaceBulk(s, replacements) {
-    let find = Object.keys(replacements)
-    let replace = Object.values(replacements)
-    let modifiedString = s
-    find.forEach((tag, i) => modifiedString = modifiedString.replace(new RegExp(tag, 'g'), replace[i]))
-    return modifiedString
+    getReport(page)
 }
