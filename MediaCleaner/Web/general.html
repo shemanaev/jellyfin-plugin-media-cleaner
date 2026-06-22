@@ -1,276 +1,605 @@
 <div id="MediaCleanerConfigPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs" data-controller="__plugin/MediaCleaner_js">
+    <style>
+        #MediaCleanerConfigPage .mediaCleanerRuleCard {
+            margin-bottom: 1em;
+            padding: 1em;
+            border: 1px solid rgba(128, 128, 128, .22);
+            border-radius: 8px;
+            scroll-margin-top: 54px;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleCard-disabled {
+            opacity: .68;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleSummary {
+            display: flex;
+            gap: 1em;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleMain {
+            min-width: 0;
+            flex: 1;
+            cursor: pointer;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleMain:focus-visible {
+            outline: 2px solid rgba(0, 164, 220, .8);
+            outline-offset: 4px;
+            border-radius: 4px;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleTitleRow,
+        #MediaCleanerConfigPage .mediaCleanerEditorHeader,
+        #MediaCleanerConfigPage .mediaCleanerEditorActions {
+            display: flex;
+            gap: .75em;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRulesHeader,
+        #MediaCleanerConfigPage .mediaCleanerRuleGroupHeader {
+            margin-bottom: 1em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRulesHeader h3,
+        #MediaCleanerConfigPage .mediaCleanerRuleGroupHeader h3 {
+            margin-bottom: .25em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleGroup {
+            margin-bottom: 1.5em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerAddRuleActions {
+            display: flex;
+            gap: .75em;
+            flex-wrap: wrap;
+            margin-top: 1em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRulesHint {
+            margin: 0;
+            opacity: .72;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerOverview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
+            gap: .75em;
+            margin-bottom: 1.25em;
+            padding: .9em;
+            border-radius: 8px;
+            border: 1px solid rgba(128, 128, 128, .22);
+            background: rgba(128, 128, 128, .06);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerOverviewItem {
+            min-width: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerOverviewLabel {
+            margin: 0 0 .25em;
+            color: inherit;
+            opacity: .72;
+            font-size: .86em;
+            line-height: 1.25;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerOverviewValue {
+            margin: 0;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerOverviewValue-warning {
+            color: var(--jf-palette-warning-main);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMigrationReview {
+            display: flex;
+            align-items: flex-start;
+            gap: .6em;
+            margin: 0 0 1.25em;
+            padding: .75em .85em;
+            border-radius: 6px;
+            background: rgba(255, 152, 0, .16);
+            color: inherit;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMigrationReview.hide {
+            display: none;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMigrationReview .material-icons {
+            flex: 0 0 auto;
+            color: var(--jf-palette-warning-main, #ff9800);
+            font-size: 1.35em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMigrationReviewText {
+            margin: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMigrationReviewBody {
+            display: flex;
+            flex-direction: column;
+            gap: .6em;
+            min-width: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMigrationReviewActions {
+            display: flex;
+            gap: .5em;
+            flex-wrap: wrap;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerOverviewActions {
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-start;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleTitle {
+            margin: 0;
+            font-size: 1.05em;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleSentence {
+            margin: .45em 0 0;
+            line-height: 1.45;
+            opacity: .82;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleActions {
+            display: flex;
+            align-items: flex-start;
+            gap: .25em;
+            flex-wrap: nowrap;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerStatus {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.65em;
+            padding: 0 .55em;
+            border-radius: 6px;
+            font-size: .86em;
+            background: rgba(128, 128, 128, .18);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerStatus-on {
+            color: var(--jf-palette-text-secondary, rgb(255, 255, 255));
+            background: var(--jf-palette-action-selected, rgba(46, 125, 50, .22));
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerStatus-off {
+            color: var(--jf-palette-text-disabled, rgba(255, 255, 255, .22));
+            background: var(--jf-palette-action-selected, rgba(128, 128, 128, .22));
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleMenu {
+            position: relative;
+            display: flex;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleMenuPanel {
+            position: absolute;
+            z-index: 10;
+            top: 100%;
+            right: 0;
+            min-width: 12em;
+            width: max-content;
+            max-height: none;
+            margin: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerRuleMenuPanel .actionSheetContent,
+        #MediaCleanerConfigPage .mediaCleanerRuleMenuPanel .actionSheetScroller {
+            width: 100%;
+            max-height: none;
+            overflow: visible;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMenuCommand {
+            width: 100%;
+        }
+
+
+        #MediaCleanerConfigPage .mediaCleanerEnabledToggle {
+            margin: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerEditorPreview {
+            margin: .25em 0 1em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSentenceBuilder {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: .45em;
+            margin: .85em 0 1.25em;
+            padding: .75em .9em;
+            border-radius: 6px;
+            background: rgba(128, 128, 128, .08);
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSentenceWord {
+            color: inherit;
+            opacity: .7;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: .78em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSentencePill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35em;
+            min-height: 2em;
+            max-width: 100%;
+            padding: .15em .7em;
+            border-radius: 6px;
+            border: 1px solid rgba(128, 128, 128, .2);
+            background: rgba(128, 128, 128, .16);
+            color: inherit;
+            overflow-wrap: anywhere;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSentencePill-delete {
+            background: rgba(46, 125, 50, .26);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSentencePill-protect {
+            background: rgba(25, 118, 210, .28);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerConditionPill {
+            background: rgba(0, 164, 220, .18);
+        }
+
+
+        #MediaCleanerConfigPage .mediaCleanerPipeline {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerPipelineBand {
+            padding: 1.25em 0 0;
+            margin-top: 1.25em;
+            border-top: 1px solid rgba(128, 128, 128, .22);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerPipelineBand:first-child {
+            padding-top: 0;
+            margin-top: 0;
+            border-top: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerPipelineBandHeader {
+            margin-bottom: .5em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerPipelineBandHeader h3 {
+            margin: 0;
+            font-size: 1em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerPipelineBandHeader p,
+        #MediaCleanerConfigPage .mediaCleanerEmptyState {
+            margin: .25em 0 0;
+            color: inherit;
+            opacity: .7;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderGrid {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderBlock {
+            display: grid;
+            grid-template-columns: minmax(11em, 16em) minmax(0, 1fr) auto;
+            gap: 1em;
+            min-width: 0;
+            padding: .9em 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderBlock + .mediaCleanerBuilderBlock {
+            border-top: 1px solid rgba(128, 128, 128, .14);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderBlock[data-condition-id] {
+            margin: .35em 0;
+            padding: .85em;
+            border-radius: 6px;
+            background: rgba(128, 128, 128, .06);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderBlock[data-condition-id] + .mediaCleanerBuilderBlock[data-condition-id] {
+            border-top: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderBlockHeader {
+            min-width: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderBlockHeader h3 {
+            margin: 0;
+            font-size: 1em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderBlockHeader p {
+            margin: .25em 0 0;
+            color: inherit;
+            opacity: .7;
+            font-size: .9em;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderControls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(17em, 1fr));
+            gap: .65em 1em;
+            align-items: start;
+            min-width: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderControls .inputContainer,
+        #MediaCleanerConfigPage .mediaCleanerBuilderControls .selectContainer,
+        #MediaCleanerConfigPage .mediaCleanerBuilderControls .checkboxContainer {
+            margin: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerBuilderControls .mediaCleanerListBlock,
+        #MediaCleanerConfigPage .mediaCleanerBuilderControls .mediaCleanerMediaList {
+            grid-column: 1 / -1;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerTriggerDescription {
+            grid-column: 1 / -1;
+            margin: -.2em 0 .1em;
+            line-height: 1.4;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerAdvanced,
+        #MediaCleanerConfigPage .mediaCleanerWarning {
+            grid-column: 1 / -1;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerAdvanced {
+            padding: .65em .75em;
+            border: 1px solid rgba(128, 128, 128, .14);
+            border-radius: 6px;
+            background: rgba(128, 128, 128, .04);
+        }
+
+
+        #MediaCleanerConfigPage .mediaCleanerWarning {
+            display: flex;
+            align-items: flex-start;
+            gap: .5em;
+            padding: .65em .75em;
+            border-radius: 6px;
+            background: rgba(255, 152, 0, .16);
+            color: inherit;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerWarning .material-icons {
+            flex: 0 0 auto;
+            font-size: 1.25em;
+            color: #ff9800;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerAddCondition {
+            margin-top: .75em;
+            padding-top: .85em;
+            border-top: 1px dashed rgba(128, 128, 128, .2);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerAddCondition h3 {
+            margin: 0 0 .55em;
+            font-size: .9em;
+            font-weight: 500;
+            color: inherit;
+            opacity: .75;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerConditionPicker {
+            display: flex;
+            align-items: center;
+            gap: .55em;
+            flex-wrap: wrap;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerTextButton {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: .35em;
+            min-height: 2.5em;
+            border-radius: 4px;
+            line-height: 1.1 !important;
+            background: rgba(128, 128, 128, .18) !important;
+            color: inherit !important;
+            box-shadow: none !important;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerTextButton .material-icons {
+            display: block;
+            width: 1em;
+            height: 1em;
+            margin: 0;
+            color: inherit !important;
+            font-size: 1.25em;
+            line-height: 1;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerTextButton[hidden] {
+            display: none !important;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerTextButton:hover,
+        #MediaCleanerConfigPage .mediaCleanerTextButton:focus {
+            background: rgba(0, 164, 220, .24) !important;
+            color: inherit !important;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerConditionChoice {
+            border-radius: 6px;
+            padding: 0 .8em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerConditionRemove {
+            justify-self: end;
+            align-self: start;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerEditorGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(18em, 1fr));
+            gap: 1em;
+            align-items: start;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerEditorSection {
+            margin: 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMediaList,
+        #MediaCleanerConfigPage .mediaCleanerCheckList {
+            padding: .35em 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerMediaList {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(9em, 1fr));
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerListBlock {
+            margin: .85em 0;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerListLabel {
+            margin: 0 0 .35em;
+            font-size: .95em;
+            font-weight: 500;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerCheckList {
+            max-height: 16em;
+            overflow: auto;
+            border: 1px solid rgba(128, 128, 128, .14);
+            background: rgba(128, 128, 128, .05);
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerEditorActions {
+            justify-content: flex-end;
+            margin-top: 1em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSaveArea {
+            display: flex;
+            flex-direction: column;
+            gap: .65em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSaveStatus {
+            display: inline-flex;
+            align-items: center;
+            align-self: flex-start;
+            gap: .4em;
+            color: #ffb74d;
+            line-height: 1.35;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSaveStatus .material-icons {
+            font-size: 1.15em;
+        }
+
+        #MediaCleanerConfigPage .mediaCleanerSaveStatus.hide {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            #MediaCleanerConfigPage .mediaCleanerRuleSummary {
+                flex-direction: column;
+            }
+
+            #MediaCleanerConfigPage .mediaCleanerRuleActions {
+                width: 100%;
+                justify-content: flex-end;
+                flex-wrap: wrap;
+            }
+
+            #MediaCleanerConfigPage .mediaCleanerBuilderBlock {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
     <div data-role="content">
         <div class="content-primary">
             <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
 
             <form id="MediaCleanerConfigForm">
-                <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Movies</h3></legend> 
+                <section class="paperList mediaCleanerOverview" aria-label="Cleanup schedule status">
+                    <div class="mediaCleanerOverviewItem">
+                        <p class="mediaCleanerOverviewLabel">Cleanup rules</p>
+                        <p id="MediaCleanerRulesState" class="mediaCleanerOverviewValue">Loading...</p>
+                    </div>
+                    <div class="mediaCleanerOverviewItem">
+                        <p class="mediaCleanerOverviewLabel">Next scheduled run</p>
+                        <p id="MediaCleanerNextRun" class="mediaCleanerOverviewValue">Loading...</p>
+                    </div>
+                    <div class="mediaCleanerOverviewItem">
+                        <p class="mediaCleanerOverviewLabel">Scheduled task</p>
+                        <p id="MediaCleanerTaskState" class="mediaCleanerOverviewValue">Loading...</p>
+                    </div>
+                    <div class="mediaCleanerOverviewActions">
+                        <button is="emby-button" type="button" id="MediaCleanerScheduledTasksLink" class="emby-button mediaCleanerTextButton" hidden="hidden">
+                            <span class="material-icons schedule" aria-hidden="true"></span>
+                            <span>Open Scheduled Tasks</span>
+                        </button>
+                    </div>
+                </section>
 
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepMoviesFor">Keep played for <i>X</i> days</label>
-                        <input id="KeepMoviesFor" name="KeepMoviesFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a played movie before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepPlayedMovies">Keep while not played by</label>
-                        <select is="emby-select" id="KeepPlayedMovies" name="KeepPlayedMovies" class="emby-select-withcolor emby-select">
-                            <option value="AnyUser">Any user</option>
-                            <option value="AnyUserRolling">Any user (latest playback)</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepMoviesNotPlayedFor">Keep not played for <i>X</i> days</label>
-                        <input id="KeepMoviesNotPlayedFor" name="KeepMoviesNotPlayedFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a not played movie before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepFavoriteMovies">Keep favorites</label>
-                        <select is="emby-select" id="KeepFavoriteMovies" name="KeepFavoriteMovies" class="emby-select-withcolor emby-select">
-                            <option value="DontKeep">No</option>
-                            <option value="AnyUser">Any user</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                </fieldset>
-
-                <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Series</h3></legend>
-
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="KeepEpisodesFor">Keep played episodes for <i>X</i> days</label>
-                    <input id="KeepEpisodesFor" name="KeepEpisodesFor" type="number" is="emby-input" min="-1" />
-                    <div class="fieldDescription">How many days to keep a played episode before deleting. -1 to disable</div>
-                </div>
-                <div class="selectContainer">
-                    <label class="selectLabel" for="DeleteEpisodes">Delete after played</label>
-                    <select is="emby-select" id="DeleteEpisodes" name="DeleteEpisodes" class="emby-select-withcolor emby-select">
-                        <option value="Episode">Episode</option>
-                        <option value="Season">Entire season</option>
-                        <option value="Series">Entire series</option>
-                        <option value="SeriesEnded">Entire series has ended</option>
-                    </select>
-                    <div class="fieldDescription"></div>
-                    <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                </div>
-                <div class="selectContainer">
-                    <label class="selectLabel" for="KeepSeriesKind">Keep even if played</label>
-                    <select is="emby-select" id="KeepSeriesKind" name="KeepSeriesKind" class="emby-select-withcolor emby-select">
-                        <option value="None">None</option>
-                        <option value="First">First</option>
-                        <option value="Last">Last</option>
-                    </select>
-                    <div class="fieldDescription"></div>
-                    <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                </div>
-                <div class="selectContainer">
-                    <label class="selectLabel" for="KeepPlayedEpisodes">Keep while not played by</label>
-                    <select is="emby-select" id="KeepPlayedEpisodes" name="KeepPlayedEpisodes" class="emby-select-withcolor emby-select">
-                        <option value="AnyUser">Any user</option>
-                        <option value="AnyUserRolling">Any user (latest playback)</option>
-                        <option value="AllUsers">All users</option>
-                    </select>
-                    <div class="fieldDescription"></div>
-                    <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                </div>
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="KeepEpisodesNotPlayedFor">Keep not played episodes for <i>X</i> days</label>
-                    <input id="KeepEpisodesNotPlayedFor" name="KeepEpisodesNotPlayedFor" type="number" is="emby-input" min="-1" />
-                    <div class="fieldDescription">How many days to keep a not played episode before deleting. -1 to disable</div>
-                </div>
-                <div class="selectContainer">
-                    <label class="selectLabel" for="KeepFavoriteEpisodes">Keep favorites</label>
-                    <select is="emby-select" id="KeepFavoriteEpisodes" name="KeepFavoriteEpisodes" class="emby-select-withcolor emby-select">
-                        <option value="DontKeep">No</option>
-                        <option value="AnyUser">Any user</option>
-                        <option value="AllUsers">All users</option>
-                    </select>
-                    <div class="fieldDescription"></div>
-                    <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                </div>
-                </fieldset>
-
-                <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Videos</h3></legend>
-
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepVideosFor">Keep played for <i>X</i> days</label>
-                        <input id="KeepVideosFor" name="KeepVideosFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a played video before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepPlayedVideos">Keep while not played by</label>
-                        <select is="emby-select" id="KeepPlayedVideos" name="KeepPlayedVideos" class="emby-select-withcolor emby-select">
-                            <option value="AnyUser">Any user</option>
-                            <option value="AnyUserRolling">Any user (latest playback)</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepVideosNotPlayedFor">Keep not played for <i>X</i> days</label>
-                        <input id="KeepVideosNotPlayedFor" name="KeepVideosNotPlayedFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a not played video before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepFavoriteVideos">Keep favorites</label>
-                        <select is="emby-select" id="KeepFavoriteVideos" name="KeepFavoriteVideos" class="emby-select-withcolor emby-select">
-                            <option value="DontKeep">No</option>
-                            <option value="AnyUser">Any user</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                </fieldset>
-
-                <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Audio</h3></legend>
-
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepAudioFor">Keep played for <i>X</i> days</label>
-                        <input id="KeepAudioFor" name="KeepAudioFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a played audio before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepPlayedAudio">Keep while not played by</label>
-                        <select is="emby-select" id="KeepPlayedAudio" name="KeepPlayedAudio" class="emby-select-withcolor emby-select">
-                            <option value="AnyUser">Any user</option>
-                            <option value="AnyUserRolling">Any user (latest playback)</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepAudioNotPlayedFor">Keep not played for <i>X</i> days</label>
-                        <input id="KeepAudioNotPlayedFor" name="KeepAudioNotPlayedFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a not played audio before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepFavoriteAudio">Keep favorites</label>
-                        <select is="emby-select" id="KeepFavoriteAudio" name="KeepFavoriteAudio" class="emby-select-withcolor emby-select">
-                            <option value="DontKeep">No</option>
-                            <option value="AnyUser">Any user</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                </fieldset>
-
-                <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Audio books</h3></legend>
-
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepAudioBooksFor">Keep played for <i>X</i> days</label>
-                        <input id="KeepAudioBooksFor" name="KeepAudioBooksFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a played audio book before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepPlayedAudioBooks">Keep while not played by</label>
-                        <select is="emby-select" id="KeepPlayedAudioBooks" name="KeepPlayedAudioBooks" class="emby-select-withcolor emby-select">
-                            <option value="AnyUser">Any user</option>
-                            <option value="AnyUserRolling">Any user (latest playback)</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="KeepAudioBooksNotPlayedFor">Keep not played for <i>X</i> days</label>
-                        <input id="KeepAudioBooksNotPlayedFor" name="KeepAudioBooksNotPlayedFor" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">How many days to keep a not played audio book before deleting. -1 to disable</div>
-                    </div>
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="KeepFavoriteAudioBooks">Keep favorites</label>
-                        <select is="emby-select" id="KeepFavoriteAudioBooks" name="KeepFavoriteAudioBooks" class="emby-select-withcolor emby-select">
-                            <option value="DontKeep">No</option>
-                            <option value="AnyUser">Any user</option>
-                            <option value="AllUsers">All users</option>
-                        </select>
-                        <div class="fieldDescription"></div>
-                        <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                    </div>
-                 </fieldset>
-
-                <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Misc</h3></legend>
-
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="MarkAsUnplayed" />
-                            <span>Mark as unplayed on deletion</span>
-                        </label>
-                        <div class="fieldDescription checkboxFieldDescription"></div>
-                    </div>
-
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="AllowDeleteIfPlayedBeforeAdded" />
-                            <span>Allow deletion if played before added</span>
-                        </label>
-                        <div class="fieldDescription checkboxFieldDescription">If checked, files will be deleted even if they were played before they were added to the library.</div>
-                    </div>
-
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="CountAsNotPlayedAfter">Consider items "not played" if the play was more than <i>X</i> days ago</label>
-                        <input id="CountAsNotPlayedAfter" name="CountAsNotPlayedAfter" type="number" is="emby-input" min="-1" />
-                        <div class="fieldDescription">-1 to disable</div>
-                    </div>
-                </fieldset>
-
-                <fieldset class="verticalSection verticalSection-extrabottompadding">
-                    <legend><h3>Tag Filtering</h3></legend>
-
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="EnableTagExclusion" />
-                            <span>Enable tag-based filtering</span>
-                        </label>
-                        <div class="fieldDescription checkboxFieldDescription">If checked, items will be filtered based on tags according to the selected mode.</div>
-                    </div>
-
-                    <div id="TagFilterSettingsContainer">
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="TagFilterMode">Tag filter mode</label>
-                            <select is="emby-select" id="TagFilterMode" name="TagFilterMode" class="emby-select-withcolor emby-select">
-                                <option value="Exclusion">Exclusion mode - keep tagged items</option>
-                                <option value="Inclusion">Inclusion mode - only delete tagged items</option>
-                            </select>
-                            <div class="fieldDescription" id="TagFilterModeDescription">In exclusion mode, items with the tag will be protected from deletion. In inclusion mode, only items with the tag will be eligible for deletion.</div>
-                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                        </div>
-
-                        <div id="ExclusionTagContainer" class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="ExclusionTag">Exclusion tag name</label>
-                            <input id="ExclusionTag" name="ExclusionTag" type="text" is="emby-input" />
-                            <div class="fieldDescription">Items with this tag will be kept. If the tag is on a Season, all episodes of that season will be kept. If the tag is on a Series, all episodes of all seasons will be kept.</div>
-                        </div>
-
-                        <div id="InclusionTagContainer" class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="InclusionTag">Inclusion tag name</label>
-                            <input id="InclusionTag" name="InclusionTag" type="text" is="emby-input" />
-                            <div class="fieldDescription">Only items with this tag will be deleted. If the tag is on a Season, all episodes of that season will be eligible for deletion. If the tag is on a Series, all episodes of all seasons will be eligible for deletion.</div>
-                        </div>
-
-                        <div id="ReplaceExclusionTagContainer" class="checkboxContainer checkboxContainer-withDescription">
-                            <label>
-                                <input is="emby-checkbox" type="checkbox" id="ReplaceExclusionTag" />
-                                <span>Replace old tag with new one if changed</span>
-                            </label>
-                            <div class="fieldDescription checkboxFieldDescription">If checked, when you change a tag name, all items with the old tag will have it replaced with the new tag. This helps ensure that previously tagged items maintain the same protection or deletion status.</div>
+                <div id="MediaCleanerMigrationReview" class="mediaCleanerMigrationReview hide" role="status" aria-live="polite">
+                    <span class="material-icons warning" aria-hidden="true"></span>
+                    <div class="mediaCleanerMigrationReviewBody">
+                        <p class="mediaCleanerMigrationReviewText">Rules were migrated from legacy settings. Scheduled cleanup is paused until you review and save them.</p>
+                        <div class="mediaCleanerMigrationReviewActions">
+                            <button is="emby-button" type="button" id="MediaCleanerBackupConfig" class="emby-button mediaCleanerTextButton">
+                                <span class="material-icons download" aria-hidden="true"></span>
+                                <span>Download config backup</span>
+                            </button>
                         </div>
                     </div>
-                </fieldset>
+                </div>
 
-                <div>
+                <div class="verticalSection verticalSection-extrabottompadding">
+                    <div class="mediaCleanerRulesHeader">
+                        <h3>Rules</h3>
+                        <p class="fieldDescription mediaCleanerRulesHint">Cleanup rules delete media after it meets their conditions. Protection rules exclude matching media from deletion by any cleanup rule.</p>
+                    </div>
+                    <div id="RulesList"></div>
+                </div>
+
+                <div class="mediaCleanerSaveArea">
+                    <div id="MediaCleanerSaveStatus" class="mediaCleanerSaveStatus hide" role="status" aria-live="polite">
+                        <span class="material-icons edit" aria-hidden="true"></span>
+                        <span>Unsaved changes</span>
+                    </div>
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                         <span>${Save}</span>
                     </button>

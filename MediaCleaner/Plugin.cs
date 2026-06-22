@@ -43,24 +43,15 @@ namespace MediaCleaner
                 },
                 new PluginPageInfo
                 {
-                    Name = "MediaCleaner_Users",
-                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.users.html"
+                    Name = "MediaCleaner_Advanced",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.advanced.html"
                 },
                 new PluginPageInfo
                 {
-                    Name = "MediaCleaner_Users_js",
-                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.users.js"
+                    Name = "MediaCleaner_Advanced_js",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.advanced.js"
                 },
-                new PluginPageInfo
-                {
-                    Name = "MediaCleaner_Locations",
-                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.locations.html"
-                },
-                new PluginPageInfo
-                {
-                    Name = "MediaCleaner_Locations_js",
-                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.locations.js"
-                },
+
                 new PluginPageInfo
                 {
                     Name = "MediaCleaner_Troubleshooting",

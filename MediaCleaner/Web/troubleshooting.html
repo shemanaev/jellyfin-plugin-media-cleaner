@@ -3,35 +3,28 @@
         <div class="content-primary">
             <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
 
+            <div class="verticalSection">
+                <h2>Troubleshooting report</h2>
+                <p class="fieldDescription">Runs cleanup in dry-run mode and includes the plugin configuration and structured decision report. Review the report before sharing it because it may contain library paths, tags, and user identifiers.</p>
+            </div>
+
             <div class="verticalSection verticalSection-extrabottompadding">
-                <div style="margin: -2em auto;">
+                <div>
                     <button id="TroubleshootingButtonCopy" is="emby-button" class="raised button-submit emby-button" style="display: none;">
-                        <span>Copy to clipboard</span>
+                        <span>Copy GitHub issue report</span>
                     </button>
-                    <button id="TroubleshootingButtonGetLog" is="emby-button" class="raised emby-button">
-                        <span>Recreate</span>
+                    <button id="TroubleshootingButtonRefreshReport" is="emby-button" class="raised emby-button">
+                        <span>Refresh report</span>
                     </button>
-                    <button id="TroubleshootingButtonToggleViewer" is="emby-button" class="raised emby-button">
-                        <span>Toggle viewer</span>
-                    </button>
-                    <div style="display: inline-flex; position: relative; vertical-align: middle; margin-top: .65em; margin-left: .3em;">
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="LogLevel">Log level</label>
-                            <select is="emby-select" id="LogLevel" name="LogLevel" class="emby-select-withcolor emby-select">
-                                <option value="Trace" selected>Trace</option>
-                                <option value="Debug">Debug</option>
-                                <option value="Information">Information</option>
-                                <option value="Warning">Warning</option>
-                            </select>
-                            <div class="selectArrowContainer"><div style="visibility:hidden;display:none;">0</div><span class="selectArrow material-icons keyboard_arrow_down" aria-hidden="true"></span></div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
             <div>
-                <textarea id="TroubleshootingLog" rows="30"></textarea>
-                <div id="TroubleshootingLogViewer" style="display: none;"></div>
+                <div id="TroubleshootingLogViewer"></div>
+                <details class="mediaCleanerReportSource">
+                    <summary>GitHub issue source</summary>
+                    <textarea id="TroubleshootingLog" rows="12" aria-label="GitHub issue report source" readonly></textarea>
+                </details>
                 <style>
                     #TroubleshootingLog {
                         width: 100%;
@@ -41,6 +34,194 @@
                     #TroubleshootingLogViewer {
                         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
                         font-size: small;
+                    }
+
+                    #TroubleshootingLogViewer details {
+                        margin: .75em 0;
+                    }
+
+                    #TroubleshootingLogViewer summary {
+                        cursor: pointer;
+                        font-weight: 600;
+                    }
+
+                    #TroubleshootingLogViewer pre {
+                        overflow: auto;
+                        padding: .85em;
+                        border-left: 4px solid var(--jf-palette-grey-600, #757575);
+                        background: var(--jf-palette-action-hover, rgba(0, 0, 0, .04));
+                    }
+
+                    .mediaCleanerReportSource {
+                        margin-top: 1em;
+                    }
+
+                    .mediaCleanerReportSource summary {
+                        cursor: pointer;
+                        color: var(--jf-palette-text-secondary, rgba(0, 0, 0, .6));
+                    }
+
+                    .mediaCleanerReportSource textarea {
+                        margin-top: .65em;
+                    }
+
+                    .mediaCleanerReportMeta {
+                        margin: 0 0 1em;
+                        padding-left: 1.3em;
+                    }
+
+                    .mediaCleanerDecisionReport {
+                        display: grid;
+                        gap: 1em;
+                    }
+
+                    .mediaCleanerDecisionSummary {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(12em, 1fr));
+                        gap: .6em;
+                    }
+
+                    .mediaCleanerDecisionMetric {
+                        padding: .7em .85em;
+                        border-left: 4px solid var(--jf-palette-primary-main, #00a4dc);
+                        background: var(--jf-palette-Alert-infoStandardBg, rgb(229, 246, 253));
+                    }
+
+                    .mediaCleanerDecisionMetric span,
+                    .mediaCleanerDecisionItemId,
+                    .mediaCleanerDecisionRule {
+                        color: var(--jf-palette-text-secondary, rgba(0, 0, 0, .6));
+                    }
+
+                    .mediaCleanerDecisionMetric strong {
+                        display: block;
+                        margin-top: .25em;
+                        font-size: 1.45em;
+                        line-height: 1;
+                    }
+
+                    .mediaCleanerDecisionSection h3 {
+                        margin: .5em 0;
+                        font-size: 1.1em;
+                    }
+
+                    .mediaCleanerOutcomeSummary {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: .45em;
+                    }
+
+                    .mediaCleanerOutcomeLegend {
+                        display: grid;
+                        gap: .45em;
+                        margin: 0;
+                    }
+
+                    .mediaCleanerOutcomeLegendItem {
+                        display: grid;
+                        grid-template-columns: 8.5em minmax(0, 1fr);
+                        gap: .7em;
+                        align-items: start;
+                    }
+
+                    .mediaCleanerOutcomeLegendItem dt,
+                    .mediaCleanerOutcomeLegendItem dd {
+                        margin: 0;
+                    }
+
+                    .mediaCleanerDecisionGroup {
+                        padding: .7em .85em;
+                        border-left: 4px solid var(--jf-palette-divider, rgba(0, 0, 0, .12));
+                        background: var(--jf-palette-action-hover, rgba(0, 0, 0, .04));
+                    }
+
+                    .mediaCleanerDecisionGroup > summary {
+                        display: flex;
+                        flex-wrap: wrap;
+                        align-items: center;
+                        gap: .5em;
+                    }
+
+                    .mediaCleanerDecisionItemTitle {
+                        font-weight: 700;
+                    }
+
+                    .mediaCleanerDecisionList {
+                        display: grid;
+                        gap: .45em;
+                        margin: .75em 0 0;
+                        padding-left: 1.4em;
+                    }
+
+                    .mediaCleanerDecisionEntry {
+                        line-height: 1.6;
+                    }
+
+                    .mediaCleanerDecisionStage {
+                        font-weight: 700;
+                    }
+
+                    .mediaCleanerDecisionArrow {
+                        margin: 0 .35em;
+                        color: var(--jf-palette-text-secondary, rgba(0, 0, 0, .6));
+                    }
+
+                    .mediaCleanerDecisionRule {
+                        margin-left: .45em;
+                    }
+
+                    .mediaCleanerDecisionReason {
+                        margin-left: .45em;
+                    }
+
+                    .mediaCleanerDecisionBadge {
+                        display: inline-flex;
+                        align-items: center;
+                        min-height: 1.55em;
+                        padding: 0 .5em;
+                        border-radius: 4px;
+                        font-weight: 700;
+                        line-height: 1.55;
+                    }
+
+                    .mediaCleanerDecisionBadge-matched,
+                    .mediaCleanerDecisionBadge-planned {
+                        color: var(--jf-palette-success-contrastText, rgb(30, 70, 32));
+                        background: var(--jf-palette-success-main, rgb(237, 247, 237));
+                    }
+
+                    .mediaCleanerDecisionBadge-protected {
+                        color: var(--jf-palette-info-contrastText, rgb(1, 67, 97));
+                        background: var(--jf-palette-info-main, rgb(229, 246, 253));
+                    }
+
+                    .mediaCleanerDecisionBadge-suppressed,
+                    .mediaCleanerDecisionBadge-blocked {
+                        color: var(--jf-palette-error-contrastText, rgb(95, 33, 32));
+                        background: var(--jf-palette-error-main, rgb(253, 237, 237));
+                    }
+
+                    .mediaCleanerDecisionBadge-rejected {
+                        color: var(--jf-palette-warning-contrastText, rgb(102, 60, 0));
+                        background: var(--jf-palette-warning-main, rgb(255, 244, 229));
+                    }
+
+                    .mediaCleanerDecisionBadge-skipped {
+                        color: var(--jf-palette-text-secondary, rgba(0, 0, 0, .6));
+                        background: var(--jf-palette-action-selected, rgba(0, 0, 0, .08));
+                    }
+
+                    .mediaCleanerDecisionEmpty {
+                        padding: .8em;
+                        border-left: 4px solid var(--jf-palette-warning-main, #ed6c02);
+                        background: var(--jf-palette-Alert-warningFilledBg, rgb(255, 244, 229));
+                    }
+
+                    @media (max-width: 40em) {
+                        .mediaCleanerOutcomeLegendItem {
+                            grid-template-columns: 1fr;
+                            gap: .25em;
+                        }
                     }
                 </style>
             </div>

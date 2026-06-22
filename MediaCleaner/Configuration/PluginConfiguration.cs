@@ -50,8 +50,86 @@ namespace MediaCleaner.Configuration
         Acknowledge
     }
 
+    public enum RuleMediaKind
+    {
+        Movie,
+        Series,
+        Season,
+        Episode,
+        Video,
+        Audio,
+        AudioBook,
+        Other,
+    }
+
+    public enum CleanupRuleTriggerKind
+    {
+        Played,
+        NotPlayed,
+        AddedAge,
+    }
+
+    public enum CleanupRuleActionKind
+    {
+        Delete,
+        Protect,
+    }
+
+    public enum RuleFavoriteFilterKind
+    {
+        Ignore,
+        FavoriteByAnyUser,
+        FavoriteByAllUsers,
+        NotFavoriteByAnyUser,
+        NotFavoriteByAllUsers,
+    }
+
+    public class CleanupRuleTriggerConfiguration
+    {
+        public CleanupRuleTriggerKind Kind { get; set; } = CleanupRuleTriggerKind.Played;
+        public int Days { get; set; } = -1;
+        public PlayedKeepKind PlayedKeepKind { get; set; } = PlayedKeepKind.AnyUser;
+        public int CountAsNotPlayedAfter { get; set; } = -1;
+    }
+
+    public class CleanupRuleFiltersConfiguration
+    {
+        public List<RuleMediaKind> MediaKinds { get; set; } = new List<RuleMediaKind>();
+        public List<string> UserIds { get; set; } = new List<string>();
+        public UsersListMode UsersMode { get; set; } = UsersListMode.Ignore;
+        public List<string> FavoriteUserIds { get; set; } = new List<string>();
+        public UsersListMode FavoriteUsersMode { get; set; } = UsersListMode.Ignore;
+        public RuleFavoriteFilterKind FavoriteFilter { get; set; } = RuleFavoriteFilterKind.Ignore;
+        public List<string> Locations { get; set; } = new List<string>();
+        public LocationsListMode LocationsMode { get; set; } = LocationsListMode.Exclude;
+        public bool EnableTagFilter { get; set; } = false;
+        public TagMode TagFilterMode { get; set; } = TagMode.Exclusion;
+        public List<string> Tags { get; set; } = new List<string>();
+        public SeriesDeleteKind DeleteEpisodes { get; set; } = SeriesDeleteKind.Season;
+        public SeriesKeepKind KeepSeriesKind { get; set; } = SeriesKeepKind.None;
+    }
+
+    public class CleanupRuleActionsConfiguration
+    {
+        public CleanupRuleActionKind Kind { get; set; } = CleanupRuleActionKind.Delete;
+        public bool MarkAsUnplayed { get; set; } = false;
+    }
+
+    public class CleanupRuleConfiguration
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public bool Enabled { get; set; } = true;
+        public CleanupRuleTriggerConfiguration Trigger { get; set; } = new CleanupRuleTriggerConfiguration();
+        public CleanupRuleFiltersConfiguration Filters { get; set; } = new CleanupRuleFiltersConfiguration();
+        public CleanupRuleActionsConfiguration Actions { get; set; } = new CleanupRuleActionsConfiguration();
+    }
+
     public class PluginConfiguration : BasePluginConfiguration
     {
+        public int ConfigVersion { get; set; } = 1;
+        public List<CleanupRuleConfiguration> Rules { get; set; } = new List<CleanupRuleConfiguration>();
+
         public int KeepMoviesFor { get; set; } = -1;
         public int KeepMoviesNotPlayedFor { get; set; } = -1;
         public PlayedKeepKind KeepPlayedMovies { get; set; } = PlayedKeepKind.AnyUser;
