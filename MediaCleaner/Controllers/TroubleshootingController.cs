@@ -72,7 +72,7 @@ public class TroubleshootingController(
         {
             IsDryRun = true
         };
-        await task.ExecuteAsync(progress, default!);
+        await task.ExecuteAsync(progress, HttpContext.RequestAborted);
 
         var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
         var plan = task.LastPlan ?? CleanupPlan.Empty;

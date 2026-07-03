@@ -28,30 +28,31 @@ internal sealed class JellyfinMediaCatalogAdapter(
             .ToList();
         var usersById = jellyfinUsers.ToDictionary(GetUserId, StringComparer.OrdinalIgnoreCase);
 
+        var snapshot = new SnapshotContext(jellyfinUsers, cancellationToken);
         var itemsById = new Dictionary<string, BaseItem>(StringComparer.OrdinalIgnoreCase);
         var mediaItems = new Dictionary<string, MediaItem>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var source in CollectItems(policy, jellyfinUsers, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            AddItem(source.Item, source.Kind, jellyfinUsers, itemsById, mediaItems);
+            AddItem(source.Item, source.Kind, snapshot, itemsById, mediaItems);
 
             if (source.Item is Episode episode)
             {
                 if (episode.Season is not null)
                 {
-                    AddItem(episode.Season, MediaItemKind.Season, jellyfinUsers, itemsById, mediaItems);
+                    AddItem(episode.Season, MediaItemKind.Season, snapshot, itemsById, mediaItems);
                 }
 
                 if (episode.Series is not null)
                 {
-                    AddItem(episode.Series, MediaItemKind.Series, jellyfinUsers, itemsById, mediaItems);
+                    AddItem(episode.Series, MediaItemKind.Series, snapshot, itemsById, mediaItems);
                 }
             }
 
             if (source.Item is Season season && season.Series is not null)
             {
-                AddItem(season.Series, MediaItemKind.Series, jellyfinUsers, itemsById, mediaItems);
+                AddItem(season.Series, MediaItemKind.Series, snapshot, itemsById, mediaItems);
             }
         }
 
@@ -126,7 +127,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
     private void AddItem(
         BaseItem item,
         MediaItemKind kind,
-        IReadOnlyList<JellyfinUser> users,
+        SnapshotContext snapshot,
         Dictionary<string, BaseItem> itemsById,
         Dictionary<string, MediaItem> mediaItems)
     {
@@ -137,20 +138,20 @@ internal sealed class JellyfinMediaCatalogAdapter(
         }
 
         itemsById[id] = item;
-        mediaItems[id] = CreateMediaItem(item, kind, users);
+        mediaItems[id] = CreateMediaItem(item, kind, snapshot);
     }
 
-    private MediaItem CreateMediaItem(BaseItem item, MediaItemKind kind, IReadOnlyList<JellyfinUser> users)
+    private MediaItem CreateMediaItem(BaseItem item, MediaItemKind kind, SnapshotContext snapshot)
     {
         var tags = GetTags(item);
-        var playback = users.Select(user => CreatePlaybackState(user, item)).ToList();
+        var playback = snapshot.Users.Select(user => CreatePlaybackState(user, item)).ToList();
         var fullName = GetFullName(item);
-        var locationPath = GetLocationPath(item);
+        var locationPath = GetLocationPath(item, snapshot);
         var series = (item as Episode)?.Series ?? (item as Season)?.Series ?? item as Series;
         var season = (item as Episode)?.Season ?? item as Season;
-        var seasonEpisodes = season?.GetEpisodes().Where(x => !x.IsVirtualItem).Select(GetItemId).ToList();
-        var seriesEpisodes = series?.GetEpisodes().Where(x => !x.IsVirtualItem).Select(GetItemId).ToList();
-        var seasons = series?.GetSeasons(null, new DtoOptions()).Select(GetItemId).ToList();
+        var seasonEpisodes = season is null ? null : snapshot.GetSeasonEpisodes(season).Select(GetItemId).ToList();
+        var seriesEpisodes = series is null ? null : snapshot.GetSeriesEpisodes(series).Select(GetItemId).ToList();
+        var seasons = series is null ? null : snapshot.GetSeriesSeasons(series).Select(GetItemId).ToList();
 
         return new MediaItem(
             Id: GetItemId(item),
@@ -281,11 +282,11 @@ internal sealed class JellyfinMediaCatalogAdapter(
         _ => item.Name,
     };
 
-    private static string? GetLocationPath(BaseItem item) => item switch
+    private static string? GetLocationPath(BaseItem item, SnapshotContext snapshot) => item switch
     {
         Episode episode => episode.Path,
-        Season season => season.GetEpisodes().FirstOrDefault(x => !x.IsVirtualItem)?.Path,
-        Series series => series.GetEpisodes().FirstOrDefault(x => !x.IsVirtualItem)?.Path,
+        Season season => snapshot.GetSeasonEpisodes(season).FirstOrDefault()?.Path,
+        Series series => snapshot.GetSeriesEpisodes(series).FirstOrDefault()?.Path,
         Movie movie => movie.Path,
         _ => item.Path,
     };
@@ -309,4 +310,58 @@ internal sealed class JellyfinMediaCatalogAdapter(
     private sealed record EnabledKind(BaseItemKind BaseKind, MediaItemKind CoreKind, CleanupRule Rule);
 
     private sealed record CollectedItem(BaseItem Item, MediaItemKind Kind);
+
+    private sealed class SnapshotContext(IReadOnlyList<JellyfinUser> users, CancellationToken cancellationToken)
+    {
+        private readonly Dictionary<string, IReadOnlyList<BaseItem>> seasonEpisodes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, IReadOnlyList<BaseItem>> seriesEpisodes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, IReadOnlyList<BaseItem>> seriesSeasons = new(StringComparer.OrdinalIgnoreCase);
+
+        public IReadOnlyList<JellyfinUser> Users { get; } = users;
+
+        public IReadOnlyList<BaseItem> GetSeasonEpisodes(Season season)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return GetOrAdd(seasonEpisodes, season, () =>
+                season.GetEpisodes()
+                    .Where(x => !x.IsVirtualItem)
+                    .Cast<BaseItem>()
+                    .ToList());
+        }
+
+        public IReadOnlyList<BaseItem> GetSeriesEpisodes(Series series)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return GetOrAdd(seriesEpisodes, series, () =>
+                JellyfinCompatibility.GetEpisodes(series)
+                    .Where(x => !x.IsVirtualItem)
+                    .Cast<BaseItem>()
+                    .ToList());
+        }
+
+        public IReadOnlyList<BaseItem> GetSeriesSeasons(Series series)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return GetOrAdd(seriesSeasons, series, () =>
+                series.GetSeasons(null, new DtoOptions())
+                    .Cast<BaseItem>()
+                    .ToList());
+        }
+
+        private static IReadOnlyList<BaseItem> GetOrAdd(
+            Dictionary<string, IReadOnlyList<BaseItem>> cache,
+            BaseItem item,
+            Func<IReadOnlyList<BaseItem>> factory)
+        {
+            var id = GetItemId(item);
+            if (cache.TryGetValue(id, out var cached))
+            {
+                return cached;
+            }
+
+            var value = factory();
+            cache[id] = value;
+            return value;
+        }
+    }
 }
