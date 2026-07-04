@@ -313,55 +313,33 @@ internal sealed class JellyfinMediaCatalogAdapter(
 
     private sealed class SnapshotContext(IReadOnlyList<JellyfinUser> users, CancellationToken cancellationToken)
     {
-        private readonly Dictionary<string, IReadOnlyList<BaseItem>> seasonEpisodes = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, IReadOnlyList<BaseItem>> seriesEpisodes = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, IReadOnlyList<BaseItem>> seriesSeasons = new(StringComparer.OrdinalIgnoreCase);
+        private readonly SnapshotListCache<BaseItem> seasonEpisodes = new(GetItemId, cancellationToken);
+        private readonly SnapshotListCache<BaseItem> seriesEpisodes = new(GetItemId, cancellationToken);
+        private readonly SnapshotListCache<BaseItem> seriesSeasons = new(GetItemId, cancellationToken);
 
         public IReadOnlyList<JellyfinUser> Users { get; } = users;
 
-        public IReadOnlyList<BaseItem> GetSeasonEpisodes(Season season)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return GetOrAdd(seasonEpisodes, season, () =>
-                season.GetEpisodes()
+        public IReadOnlyList<BaseItem> GetSeasonEpisodes(Season season) =>
+            seasonEpisodes.GetOrAdd(
+                season,
+                () => season.GetEpisodes()
                     .Where(x => !x.IsVirtualItem)
                     .Cast<BaseItem>()
                     .ToList());
-        }
 
-        public IReadOnlyList<BaseItem> GetSeriesEpisodes(Series series)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return GetOrAdd(seriesEpisodes, series, () =>
-                JellyfinCompatibility.GetEpisodes(series)
+        public IReadOnlyList<BaseItem> GetSeriesEpisodes(Series series) =>
+            seriesEpisodes.GetOrAdd(
+                series,
+                () => JellyfinCompatibility.GetEpisodes(series)
                     .Where(x => !x.IsVirtualItem)
                     .Cast<BaseItem>()
                     .ToList());
-        }
 
-        public IReadOnlyList<BaseItem> GetSeriesSeasons(Series series)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return GetOrAdd(seriesSeasons, series, () =>
-                series.GetSeasons(null, new DtoOptions())
+        public IReadOnlyList<BaseItem> GetSeriesSeasons(Series series) =>
+            seriesSeasons.GetOrAdd(
+                series,
+                () => series.GetSeasons(null, new DtoOptions())
                     .Cast<BaseItem>()
                     .ToList());
-        }
-
-        private static IReadOnlyList<BaseItem> GetOrAdd(
-            Dictionary<string, IReadOnlyList<BaseItem>> cache,
-            BaseItem item,
-            Func<IReadOnlyList<BaseItem>> factory)
-        {
-            var id = GetItemId(item);
-            if (cache.TryGetValue(id, out var cached))
-            {
-                return cached;
-            }
-
-            var value = factory();
-            cache[id] = value;
-            return value;
-        }
     }
 }
