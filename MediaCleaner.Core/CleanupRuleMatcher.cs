@@ -93,7 +93,7 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
             filtered.Add(candidate);
         }
 
-        foreach (var item in SeriesPolicyEvaluator.Apply(filtered, rule, auditEntries))
+        foreach (var item in SeriesPolicyEvaluator.Apply(filtered, rule, auditEntries, request.Items))
         {
             yield return new RuleMatch(rule, item.Item, CleanupRuleKinds.ToExpiredKind(rule.Trigger.Kind), item.Playback);
         }

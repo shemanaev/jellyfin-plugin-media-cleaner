@@ -224,6 +224,24 @@ public class CleanupPlannerTests
         plan.AuditEntries.Should().Contain(x => x.ItemId == "s1" && x.Stage == CleanupAuditStage.SeriesPolicy && x.Outcome == CleanupAuditOutcome.Matched);
     }
 
+    [Fact]
+    public void Plan_UsesCatalogSeasonAndSeriesLists_WhenEpisodeSnapshotOmitsAggregateLists()
+    {
+        var rule = Rule(MediaItemKind.Episode, CleanupRuleTriggerKind.Played, 10) with
+        {
+            Filters = Filters(MediaItemKind.Episode) with { DeleteEpisodes = SeriesDeleteKind.Season }
+        };
+        var e1 = Episode("e1", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
+        var e2 = Episode("e2", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
+        var season = Season("s1", "show1", ["e1", "e2"]);
+        var series = Series("show1", ["e1", "e2"]) with { SeasonIds = ["s1"] };
+
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [e1, e2, season, series], false));
+
+        plan.Decisions.Should().ContainSingle(x => x.Item.Kind == MediaItemKind.Season && x.Item.EpisodeIds!.SequenceEqual(new[] { "e1", "e2" }));
+        plan.Deletions.Select(x => x.ItemId).Should().ContainInOrder("e1", "e2", "s1", "show1");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
