@@ -1,6 +1,10 @@
 using FluentAssertions;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
 using MediaCleaner.Adapters;
 using MediaCleaner.Core;
+using Moq;
 
 #if JELLYFIN_USER_IN_DATA_ENTITIES
 using JellyfinUser = Jellyfin.Data.Entities.User;
@@ -79,7 +83,16 @@ public class SnapshotListCacheTests
     private static object CreateSnapshotContext(CleanupPolicy policy)
     {
         var type = typeof(JellyfinMediaCatalogAdapter).GetNestedType("SnapshotContext", System.Reflection.BindingFlags.NonPublic)!;
-        return Activator.CreateInstance(type, [new List<JellyfinUser>(), policy, CancellationToken.None])!;
+        return Activator.CreateInstance(
+            type,
+            [
+                new List<JellyfinUser>(),
+                policy,
+                Mock.Of<ILibraryManager>(),
+                Mock.Of<IUserDataManager>(),
+                new EmptyTvHierarchyProvider(),
+                CancellationToken.None,
+            ])!;
     }
 
     private static bool GetFlag(object context, string propertyName) =>
@@ -107,4 +120,13 @@ public class SnapshotListCacheTests
         Actions: new CleanupRuleActions(CleanupRuleActionKind.Delete, false));
 
     private sealed record Node(string Id);
+
+    private sealed class EmptyTvHierarchyProvider : IJellyfinTvHierarchyProvider
+    {
+        public IReadOnlyList<BaseItem> GetSeasonEpisodes(Season season) => [];
+
+        public IReadOnlyList<BaseItem> GetSeriesEpisodes(Series series) => [];
+
+        public IReadOnlyList<BaseItem> GetSeriesSeasons(Series series) => [];
+    }
 }
