@@ -12,25 +12,33 @@ internal static class SeriesPolicyEvaluator
         List<CleanupAuditEntry> auditEntries,
         IReadOnlyList<MediaItem> catalogItems)
     {
-        var catalogById = catalogItems.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
-        var items = candidates.ToList();
-        foreach (var item in items.Where(x => x.Item.Kind != MediaItemKind.Episode))
+        var episodes = new List<CandidateItem>();
+        foreach (var item in candidates)
         {
-            yield return item;
+            if (item.Item.Kind == MediaItemKind.Episode)
+            {
+                episodes.Add(item);
+            }
+            else
+            {
+                yield return item;
+            }
         }
 
-        var episodes = items.Where(x => x.Item.Kind == MediaItemKind.Episode).ToList();
         if (episodes.Count == 0)
         {
             yield break;
         }
 
+        IReadOnlyDictionary<string, MediaItem>? catalogById = null;
+        IReadOnlyDictionary<string, MediaItem> GetCatalogById() =>
+            catalogById ??= catalogItems.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
         var seriesItems = rule.Filters.DeleteEpisodes switch
         {
             SeriesDeleteKind.Episode => KeepEpisodes(episodes, rule, auditEntries),
-            SeriesDeleteKind.Season => BuildSeasonCandidates(episodes, rule, auditEntries, catalogById),
-            SeriesDeleteKind.Series => BuildSeriesCandidates(episodes, rule, auditEntries, catalogById, requireEnded: false),
-            SeriesDeleteKind.SeriesEnded => BuildSeriesCandidates(episodes, rule, auditEntries, catalogById, requireEnded: true),
+            SeriesDeleteKind.Season => BuildSeasonCandidates(episodes, rule, auditEntries, GetCatalogById()),
+            SeriesDeleteKind.Series => BuildSeriesCandidates(episodes, rule, auditEntries, GetCatalogById(), requireEnded: false),
+            SeriesDeleteKind.SeriesEnded => BuildSeriesCandidates(episodes, rule, auditEntries, GetCatalogById(), requireEnded: true),
             _ => throw new NotSupportedException($"Unsupported series delete kind: {rule.Filters.DeleteEpisodes}"),
         };
 
@@ -80,6 +88,11 @@ internal static class SeriesPolicyEvaluator
         }
     }
 
+    private static DateTime? FirstPlaybackLastPlayedDate(IReadOnlyList<PlaybackState> playback)
+    {
+        return playback.Count == 0 ? null : playback[0].LastPlayedDate;
+    }
+
     private static IEnumerable<CandidateItem> BuildSeasonCandidates(
         IEnumerable<CandidateItem> items,
         CleanupRule rule,
@@ -88,7 +101,7 @@ internal static class SeriesPolicyEvaluator
     {
         foreach (var group in items.GroupBy(x => x.Item.SeasonId ?? x.Item.SeriesId ?? x.Item.Id))
         {
-            var first = group.MaxBy(x => x.Playback.FirstOrDefault()?.LastPlayedDate ?? x.Item.DateCreated);
+            var first = group.MaxBy(x => FirstPlaybackLastPlayedDate(x.Playback) ?? x.Item.DateCreated);
             if (first is null || first.Item.SeasonId is null)
             {
                 if (first is not null)
@@ -188,7 +201,7 @@ internal static class SeriesPolicyEvaluator
     {
         foreach (var group in items.GroupBy(x => x.Item.SeriesId ?? x.Item.Id))
         {
-            var first = group.MaxBy(x => x.Playback.FirstOrDefault()?.LastPlayedDate ?? x.Item.DateCreated);
+            var first = group.MaxBy(x => FirstPlaybackLastPlayedDate(x.Playback) ?? x.Item.DateCreated);
             if (first is null || first.Item.SeriesId is null)
             {
                 if (first is not null)

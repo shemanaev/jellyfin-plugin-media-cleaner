@@ -160,7 +160,7 @@ public sealed record CleanupPolicy(
 
 public sealed record MediaUser(string Id, string Username);
 
-public sealed record PlaybackState(
+public readonly record struct PlaybackState(
     string UserId,
     DateTime? LastPlayedDate,
     bool IsPlayed,
@@ -211,7 +211,7 @@ public sealed record CleanupDecision(
     IReadOnlyList<string> MarkUnplayedUserIds,
     IReadOnlyList<string> MatchedRules);
 
-public sealed record CleanupAuditEntry(
+public readonly record struct CleanupAuditEntry(
     string? ItemId,
     string? ItemName,
     MediaItemKind? ItemKind,
@@ -222,7 +222,7 @@ public sealed record CleanupAuditEntry(
     CleanupAuditOutcome Outcome,
     string Reason);
 
-public sealed record DeletionOperation(string ItemId, MediaItemKind Kind, string Name);
+public readonly record struct DeletionOperation(string ItemId, MediaItemKind Kind, string Name);
 
 public sealed record ActivityNotification(string Title, string ShortOverview, string Overview);
 

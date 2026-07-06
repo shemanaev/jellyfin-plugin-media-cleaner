@@ -28,7 +28,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
             .ToList();
         var usersById = jellyfinUsers.ToDictionary(GetUserId, StringComparer.OrdinalIgnoreCase);
 
-        var snapshot = new SnapshotContext(jellyfinUsers, cancellationToken);
+        var snapshot = new SnapshotContext(jellyfinUsers, policy, cancellationToken);
         var itemsById = new Dictionary<string, BaseItem>(StringComparer.OrdinalIgnoreCase);
         var mediaItems = new Dictionary<string, MediaItem>(StringComparer.OrdinalIgnoreCase);
 
@@ -67,7 +67,11 @@ internal sealed class JellyfinMediaCatalogAdapter(
     {
         foreach (var source in GetEnabledKinds(policy))
         {
-            foreach (var user in users)
+            var sourceUsers = source.Rule.Trigger.Kind is CleanupRuleTriggerKind.Played or CleanupRuleTriggerKind.NotPlayed
+                ? FilterUsersForRule(users, source.Rule)
+                : users.Take(1).ToList();
+
+            foreach (var user in sourceUsers)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -75,7 +79,11 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 {
                     foreach (var item in JellyfinCompatibility.GetUserItemList(libraryManager, source.BaseKind, user, ItemSortBy.DatePlayed))
                     {
-                        LogPlayedCandidate(item, user);
+                        if (!IsPlayedCandidate(item, user, source.Rule))
+                        {
+                            continue;
+                        }
+
                         yield return new CollectedItem(item, source.CoreKind);
                     }
                 }
@@ -83,7 +91,8 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 {
                     foreach (var item in JellyfinCompatibility.GetUserItemList(libraryManager, source.BaseKind, user, ItemSortBy.DateCreated))
                     {
-                        if (source.Rule.Trigger.Kind == CleanupRuleTriggerKind.NotPlayed)
+                        if (source.Rule.Trigger.Kind == CleanupRuleTriggerKind.NotPlayed
+                            && logger.IsEnabled(LogLevel.Trace))
                         {
                             LogNotPlayedCandidate(item, user, policy, source.Rule);
                         }
@@ -93,6 +102,44 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 }
             }
         }
+    }
+
+    private static IReadOnlyList<JellyfinUser> FilterUsersForRule(
+        IEnumerable<JellyfinUser> users,
+        CleanupRule rule)
+    {
+        var selectedUserIds = rule.Filters.UserIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return users
+            .Where(user => selectedUserIds.Contains(GetUserId(user)) switch
+            {
+                true when rule.Filters.UsersMode == UsersListMode.Ignore => false,
+                true when rule.Filters.UsersMode == UsersListMode.Acknowledge => true,
+                false when rule.Filters.UsersMode == UsersListMode.Ignore => true,
+                false when rule.Filters.UsersMode == UsersListMode.Acknowledge => false,
+                _ => throw new NotSupportedException($"Unsupported users list mode: {rule.Filters.UsersMode}"),
+            })
+            .ToList();
+    }
+
+    private bool IsPlayedCandidate(BaseItem item, JellyfinUser user, CleanupRule rule)
+    {
+        var data = userDataManager.GetUserData(user, item);
+        var isWatching = data?.PlaybackPositionTicks != 0;
+        if (data is null || (!data.Played && !isWatching) || !data.LastPlayedDate.HasValue)
+        {
+            return false;
+        }
+
+        var startDate = rule.Trigger.CountAsNotPlayedAfter >= 0
+            ? DateTime.UtcNow.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
+            : (DateTime?)null;
+        if (startDate is not null && data.LastPlayedDate < startDate)
+        {
+            return false;
+        }
+
+        logger.LogDebug("\"{Name}\" played by \"{Username}\" ({LastPlayedDate})", GetFullName(item), user.Username, data.LastPlayedDate.Value);
+        return true;
     }
 
     private static IEnumerable<EnabledKind> GetEnabledKinds(CleanupPolicy policy)
@@ -144,24 +191,24 @@ internal sealed class JellyfinMediaCatalogAdapter(
     private MediaItem CreateMediaItem(BaseItem item, MediaItemKind kind, SnapshotContext snapshot)
     {
         var tags = GetTags(item);
-        var playback = snapshot.Users.Select(user => CreatePlaybackState(user, item)).ToList();
+        var playback = snapshot.Users.Select(user => CreatePlaybackState(user, item)).ToArray();
         var fullName = GetFullName(item);
         var locationPath = GetLocationPath(item, snapshot);
         var series = (item as Episode)?.Series ?? (item as Season)?.Series ?? item as Series;
         var season = (item as Episode)?.Season ?? item as Season;
-        var seasonEpisodeIds = kind == MediaItemKind.Season && season is not null
+        var seasonEpisodeIds = kind == MediaItemKind.Season && season is not null && snapshot.NeedsSeasonEpisodeIds
             ? snapshot.GetSeasonEpisodeIds(season)
             : null;
-        var seriesEpisodeIds = kind == MediaItemKind.Series && series is not null
+        var seriesEpisodeIds = kind == MediaItemKind.Series && series is not null && snapshot.NeedsSeriesEpisodeIds
             ? snapshot.GetSeriesEpisodeIds(series)
             : null;
-        var seasonIds = kind == MediaItemKind.Series && series is not null
+        var seasonIds = kind == MediaItemKind.Series && series is not null && snapshot.NeedsSeriesSeasonIds
             ? snapshot.GetSeriesSeasonIds(series)
             : null;
-        var episodeOrderIds = kind == MediaItemKind.Episode && series is not null
+        var episodeOrderIds = kind == MediaItemKind.Episode && series is not null && snapshot.NeedsEpisodeOrderIds
             ? snapshot.GetSeriesEpisodeIds(series)
             : null;
-        var seasonOrderIds = kind == MediaItemKind.Episode && series is not null
+        var seasonOrderIds = kind == MediaItemKind.Episode && series is not null && snapshot.NeedsSeasonOrderIds
             ? snapshot.GetSeriesSeasonIds(series)
             : null;
 
@@ -204,7 +251,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
             LastPlayedDate: data?.LastPlayedDate,
             IsPlayed: data?.Played ?? false,
             IsWatching: data?.PlaybackPositionTicks != 0,
-            IsFavorite: IsFavorite(user, item),
+            IsFavorite: IsFavorite(user, item, data?.IsFavorite ?? false),
             UserName: user.Username,
             HasUserData: data is not null);
     }
@@ -253,19 +300,25 @@ internal sealed class JellyfinMediaCatalogAdapter(
         logger.LogTrace("\"{Name}\" ({Id}) added because not played by {Username}", item.Name, item.Id, user.Username);
     }
 
-    private bool IsFavorite(JellyfinUser user, BaseItem item) => item switch
+    private bool IsFavorite(JellyfinUser user, BaseItem item, bool itemIsFavorite) => item switch
     {
-        Episode episode => (userDataManager.GetUserData(user, episode)?.IsFavorite ?? false)
+        Episode episode => itemIsFavorite
             || (episode.Season is not null && (userDataManager.GetUserData(user, episode.Season)?.IsFavorite ?? false))
             || (episode.Series is not null && (userDataManager.GetUserData(user, episode.Series)?.IsFavorite ?? false)),
-        Season season => (userDataManager.GetUserData(user, season)?.IsFavorite ?? false)
+        Season season => itemIsFavorite
             || (season.Series is not null && (userDataManager.GetUserData(user, season.Series)?.IsFavorite ?? false)),
-        _ => userDataManager.GetUserData(user, item)?.IsFavorite ?? false,
+        _ => itemIsFavorite,
     };
 
     private static IReadOnlyList<string> GetTags(BaseItem item)
     {
-        var tags = new HashSet<string>(item.Tags ?? [], StringComparer.Ordinal);
+        var itemTags = item.Tags;
+        if ((itemTags is null || !itemTags.Any()) && item is not Episode)
+        {
+            return Array.Empty<string>();
+        }
+
+        var tags = new HashSet<string>(itemTags ?? [], StringComparer.Ordinal);
         if (item is Episode episode)
         {
             foreach (var tag in episode.Season?.Tags ?? [])
@@ -279,7 +332,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
             }
         }
 
-        return tags.ToList();
+        return tags.Count == 0 ? Array.Empty<string>() : tags.ToArray();
     }
 
     private static string GetFullName(BaseItem item) => item switch
@@ -295,8 +348,12 @@ internal sealed class JellyfinMediaCatalogAdapter(
     private static string? GetLocationPath(BaseItem item, SnapshotContext snapshot) => item switch
     {
         Episode episode => episode.Path,
-        Season season => snapshot.GetSeasonEpisodes(season).FirstOrDefault()?.Path,
-        Series series => snapshot.GetSeriesEpisodes(series).FirstOrDefault()?.Path,
+        Season season => snapshot.NeedsContainerLocationPath
+            ? snapshot.GetSeasonEpisodes(season).FirstOrDefault()?.Path
+            : season.Path,
+        Series series => snapshot.NeedsContainerLocationPath
+            ? snapshot.GetSeriesEpisodes(series).FirstOrDefault()?.Path
+            : series.Path,
         Movie movie => movie.Path,
         _ => item.Path,
     };
@@ -321,16 +378,52 @@ internal sealed class JellyfinMediaCatalogAdapter(
 
     private sealed record CollectedItem(BaseItem Item, MediaItemKind Kind);
 
-    private sealed class SnapshotContext(IReadOnlyList<JellyfinUser> users, CancellationToken cancellationToken)
+    private sealed class SnapshotContext
     {
-        private readonly SnapshotListCache<BaseItem> seasonEpisodes = new(GetItemId, cancellationToken);
-        private readonly SnapshotListCache<BaseItem> seriesEpisodes = new(GetItemId, cancellationToken);
-        private readonly SnapshotListCache<BaseItem> seriesSeasons = new(GetItemId, cancellationToken);
+        private readonly SnapshotListCache<BaseItem> seasonEpisodes;
+        private readonly SnapshotListCache<BaseItem> seriesEpisodes;
+        private readonly SnapshotListCache<BaseItem> seriesSeasons;
         private readonly Dictionary<string, IReadOnlyList<string>> seasonEpisodeIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, IReadOnlyList<string>> seriesEpisodeIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, IReadOnlyList<string>> seriesSeasonIds = new(StringComparer.OrdinalIgnoreCase);
 
-        public IReadOnlyList<JellyfinUser> Users { get; } = users;
+        public SnapshotContext(IReadOnlyList<JellyfinUser> users, CleanupPolicy policy, CancellationToken cancellationToken)
+        {
+            Users = users;
+            this.cancellationToken = cancellationToken;
+            seasonEpisodes = new SnapshotListCache<BaseItem>(GetItemId, cancellationToken);
+            seriesEpisodes = new SnapshotListCache<BaseItem>(GetItemId, cancellationToken);
+            seriesSeasons = new SnapshotListCache<BaseItem>(GetItemId, cancellationToken);
+            var enabledEpisodeRules = policy.Rules
+                .Where(rule => rule.Enabled && rule.Trigger.Days >= 0 && rule.Filters.MediaKinds.Contains(MediaItemKind.Episode))
+                .ToList();
+            NeedsSeasonEpisodeIds = enabledEpisodeRules.Any(rule => rule.Filters.DeleteEpisodes is SeriesDeleteKind.Episode or SeriesDeleteKind.Season);
+            NeedsSeriesEpisodeIds = enabledEpisodeRules.Count > 0;
+            NeedsSeriesSeasonIds = enabledEpisodeRules.Count > 0;
+            NeedsEpisodeOrderIds = enabledEpisodeRules.Any(rule =>
+                rule.Filters.DeleteEpisodes == SeriesDeleteKind.Episode
+                && rule.Filters.KeepSeriesKind != SeriesKeepKind.None);
+            NeedsSeasonOrderIds = enabledEpisodeRules.Any(rule =>
+                rule.Filters.DeleteEpisodes == SeriesDeleteKind.Season
+                && rule.Filters.KeepSeriesKind != SeriesKeepKind.None);
+            NeedsContainerLocationPath = policy.Rules.Any(rule => rule.Enabled && rule.Filters.Locations.Count > 0);
+        }
+
+        private readonly CancellationToken cancellationToken;
+
+        public IReadOnlyList<JellyfinUser> Users { get; }
+
+        public bool NeedsSeasonEpisodeIds { get; }
+
+        public bool NeedsSeriesEpisodeIds { get; }
+
+        public bool NeedsSeriesSeasonIds { get; }
+
+        public bool NeedsEpisodeOrderIds { get; }
+
+        public bool NeedsSeasonOrderIds { get; }
+
+        public bool NeedsContainerLocationPath { get; }
 
         public IReadOnlyList<BaseItem> GetSeasonEpisodes(Season season) =>
             seasonEpisodes.GetOrAdd(

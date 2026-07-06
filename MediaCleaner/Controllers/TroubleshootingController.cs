@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -32,6 +33,13 @@ public class TroubleshootingController(
 ) : ControllerBase
 {
     private const string CleanupTaskKey = "MediaCleanup";
+    private const int MaxDetailedReportItemGroups = 500;
+    private const int DefaultItemPageSize = 100;
+    private const int MaxItemPageSize = 1000;
+    private const int FullReportItemGroupThreshold = 100;
+    private static readonly TimeSpan ReportCacheLifetime = TimeSpan.FromMinutes(15);
+    private static readonly object ReportCacheLock = new();
+    private static CachedTroubleshootingReport? latestReport;
 
     [HttpGet("Status")]
     [Produces(MediaTypeNames.Application.Json)]
@@ -76,10 +84,89 @@ public class TroubleshootingController(
 
         var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
         var plan = task.LastPlan ?? CleanupPlan.Empty;
+        var reportId = Guid.NewGuid().ToString("N");
+        var jellyfinVersion = applicationHost.ApplicationVersionString;
+        var pluginVersion = Plugin.Instance.Version.ToString();
+        var itemGroups = BuildItemDecisionGroups(plan);
+        var report = new CachedTroubleshootingReport(
+            reportId,
+            jellyfinVersion,
+            pluginVersion,
+            pluginConfig,
+            plan,
+            itemGroups,
+            DateTime.UtcNow);
+
+        SetCachedReport(report);
 
         return new TroubleshootingReportResponse(
-            BuildFormattedHtml(applicationHost.ApplicationVersionString, Plugin.Instance.Version.ToString(), pluginConfig, plan),
-            BuildIssueMarkdown(applicationHost.ApplicationVersionString, Plugin.Instance.Version.ToString(), pluginConfig, plan));
+            reportId,
+            BuildFormattedHtmlPage(jellyfinVersion, pluginVersion, pluginConfig, plan, itemGroups, 0, DefaultItemPageSize),
+            string.Empty,
+            itemGroups.Count,
+            itemGroups.Count,
+            DefaultItemPageSize);
+    }
+
+    [HttpGet("ReportItems")]
+    [Produces(MediaTypeNames.Application.Json)]
+    public ActionResult<TroubleshootingReportItemsResponse> GetReportItems(
+        [FromQuery] string reportId,
+        [FromQuery] int start = 0,
+        [FromQuery] int limit = DefaultItemPageSize,
+        [FromQuery] string? search = null)
+    {
+        if (!TryGetCachedReport(reportId, out var report))
+        {
+            return NotFound(new { error = "Troubleshooting report has expired. Refresh the report and try again." });
+        }
+
+        var itemGroups = FilterItemDecisionGroups(report.ItemGroups, search);
+        start = Math.Max(0, start);
+        limit = ClampItemPageSize(limit);
+        return new TroubleshootingReportItemsResponse(
+            reportId,
+            start,
+            limit,
+            itemGroups.Count,
+            report.ItemGroups.Count,
+            BuildItemDecisionReport(itemGroups, start, limit));
+    }
+
+    [HttpGet("ReportIssueSource")]
+    [Produces(MediaTypeNames.Application.Json)]
+    public ActionResult<TroubleshootingIssueSourceResponse> GetReportIssueSource([FromQuery] string reportId)
+    {
+        if (!TryGetCachedReport(reportId, out var report))
+        {
+            return NotFound(new { error = "Troubleshooting report has expired. Refresh the report and try again." });
+        }
+
+        var includeItemDetails = report.ItemGroups.Count <= FullReportItemGroupThreshold;
+        return new TroubleshootingIssueSourceResponse(
+            reportId,
+            BuildIssueMarkdownCore(
+                report.JellyfinVersion,
+                report.PluginVersion,
+                report.PluginConfig,
+                report.Plan,
+                report.ItemGroups,
+                includeItemDetails));
+    }
+
+    [HttpGet("ReportIssueMarkdown")]
+    public async Task<IActionResult> GetReportIssueMarkdown([FromQuery] string reportId)
+    {
+        if (!TryGetCachedReport(reportId, out var report))
+        {
+            return NotFound("Troubleshooting report has expired. Refresh the report and try again.");
+        }
+
+        var fileName = $"media-cleaner-troubleshooting-{DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}.md";
+        Response.ContentType = "text/markdown; charset=utf-8";
+        Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
+        await WriteIssueMarkdownAsync(Response.Body, report);
+        return new EmptyResult();
     }
 
     [HttpGet("ConfigBackup")]
@@ -168,9 +255,26 @@ public class TroubleshootingController(
     private static TimeSpan TimeOfDay(long ticks) =>
         ticks <= 0 ? TimeSpan.Zero : TimeSpan.FromTicks(ticks % TimeSpan.TicksPerDay);
 
-    private static string BuildFormattedHtml(string jellyfinVersion, string pluginVersion, string pluginConfig, CleanupPlan plan)
+    private static string BuildFormattedHtml(string jellyfinVersion, string pluginVersion, string pluginConfig, CleanupPlan plan) =>
+        BuildFormattedHtmlPage(
+            jellyfinVersion,
+            pluginVersion,
+            pluginConfig,
+            plan,
+            BuildItemDecisionGroups(plan),
+            0,
+            MaxDetailedReportItemGroups);
+
+    private static string BuildFormattedHtmlPage(
+        string jellyfinVersion,
+        string pluginVersion,
+        string pluginConfig,
+        CleanupPlan plan,
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        int itemStart,
+        int itemLimit)
     {
-        var decisionReport = BuildDecisionReport(plan);
+        var decisionReport = BuildDecisionReport(plan, itemGroups, itemStart, itemLimit);
         return $@"<div class=""mediaCleanerTroubleshootingReport"">
 <ul class=""mediaCleanerReportMeta"">
 <li><strong>Jellyfin version:</strong> {HttpUtility.HtmlEncode(jellyfinVersion)}</li>
@@ -190,7 +294,11 @@ public class TroubleshootingController(
 ";
     }
 
-    private static string BuildDecisionReport(CleanupPlan plan)
+    private static string BuildDecisionReport(
+        CleanupPlan plan,
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        int itemStart,
+        int itemLimit)
     {
         var builder = new StringBuilder();
         builder.AppendLine("<div class=\"mediaCleanerDecisionReport\">");
@@ -252,39 +360,7 @@ public class TroubleshootingController(
             builder.AppendLine("</section>");
         }
 
-        var itemEntries = plan.AuditEntries
-            .Where(x => x.ItemId is not null)
-            .GroupBy(x => x.ItemId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x.First().ItemKind?.ToString())
-            .ThenBy(x => x.First().ItemName);
-        if (itemEntries.Any())
-        {
-            builder.AppendLine("<section class=\"mediaCleanerDecisionSection\">");
-            builder.AppendLine("<h3>Item-level decisions</h3>");
-            foreach (var group in itemEntries)
-            {
-                var first = group.First();
-                var finalOutcome = CleanupAuditFormatter.GetFinalOutcome(group);
-                builder.AppendLine("<details class=\"mediaCleanerDecisionGroup\">");
-                builder.Append("<summary>");
-                builder.Append("<span class=\"mediaCleanerDecisionItemTitle\">");
-                builder.Append(HttpUtility.HtmlEncode($"{first.ItemKind}: {first.ItemName}"));
-                builder.Append("</span> ");
-                builder.Append("<span class=\"mediaCleanerDecisionItemId\">");
-                builder.Append(HttpUtility.HtmlEncode(first.ItemId));
-                builder.Append("</span> ");
-                AppendOutcomeBadge(builder, finalOutcome);
-                builder.AppendLine("</summary>");
-                builder.AppendLine("<ol class=\"mediaCleanerDecisionList\">");
-                foreach (var entry in group)
-                {
-                    AppendAuditEntry(builder, entry);
-                }
-                builder.AppendLine("</ol>");
-                builder.AppendLine("</details>");
-            }
-            builder.AppendLine("</section>");
-        }
+        AppendItemDecisionReport(builder, itemGroups, itemStart, itemLimit);
 
         if (plan.AuditEntries.Count == 0)
         {
@@ -295,7 +371,78 @@ public class TroubleshootingController(
         return builder.ToString();
     }
 
-    private static string BuildIssueMarkdown(string jellyfinVersion, string pluginVersion, string pluginConfig, CleanupPlan plan)
+    private static string BuildItemDecisionReport(IReadOnlyList<ItemDecisionGroup> itemGroups, int itemStart, int itemLimit)
+    {
+        var builder = new StringBuilder();
+        AppendItemDecisionReport(builder, itemGroups, itemStart, itemLimit);
+        return builder.ToString();
+    }
+
+    private static void AppendItemDecisionReport(
+        StringBuilder builder,
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        int itemStart,
+        int itemLimit)
+    {
+        if (itemGroups.Count == 0)
+        {
+            return;
+        }
+
+        itemStart = Math.Max(0, itemStart);
+        itemLimit = ClampItemPageSize(itemLimit);
+        var endExclusive = Math.Min(itemGroups.Count, itemStart + itemLimit);
+
+        builder.AppendLine("<section class=\"mediaCleanerDecisionSection\" id=\"MediaCleanerItemDecisionSection\">");
+        builder.AppendLine("<h3>Item-level decisions</h3>");
+        if (itemGroups.Count > itemLimit)
+        {
+            builder.Append("<p class=\"mediaCleanerDecisionNotice\">");
+            builder.Append(HttpUtility.HtmlEncode($"Showing item-level decision groups {(itemStart + 1).ToString(CultureInfo.InvariantCulture)}-{endExclusive.ToString(CultureInfo.InvariantCulture)} of {itemGroups.Count.ToString(CultureInfo.InvariantCulture)}."));
+            builder.AppendLine("</p>");
+        }
+
+        foreach (var group in itemGroups.Skip(itemStart).Take(itemLimit))
+        {
+            builder.AppendLine("<details class=\"mediaCleanerDecisionGroup\">");
+            builder.Append("<summary>");
+            builder.Append("<span class=\"mediaCleanerDecisionItemTitle\">");
+            builder.Append(HttpUtility.HtmlEncode($"{group.ItemKind}: {group.ItemName}"));
+            builder.Append("</span> ");
+            builder.Append("<span class=\"mediaCleanerDecisionItemId\">");
+            builder.Append(HttpUtility.HtmlEncode(group.ItemId));
+            builder.Append("</span> ");
+            AppendOutcomeBadge(builder, group.FinalOutcome);
+            builder.AppendLine("</summary>");
+            builder.AppendLine("<ol class=\"mediaCleanerDecisionList\">");
+            foreach (var entry in group.Entries)
+            {
+                AppendAuditEntry(builder, entry);
+            }
+
+            builder.AppendLine("</ol>");
+            builder.AppendLine("</details>");
+        }
+
+        builder.AppendLine("</section>");
+    }
+
+    private static string BuildIssueMarkdown(string jellyfinVersion, string pluginVersion, string pluginConfig, CleanupPlan plan) =>
+        BuildIssueMarkdownCore(
+            jellyfinVersion,
+            pluginVersion,
+            pluginConfig,
+            plan,
+            BuildItemDecisionGroups(plan),
+            includeItemDetails: true);
+
+    private static string BuildIssueMarkdownCore(
+        string jellyfinVersion,
+        string pluginVersion,
+        string pluginConfig,
+        CleanupPlan plan,
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        bool includeItemDetails)
     {
         var builder = new StringBuilder();
         builder.AppendLine("### Environment");
@@ -323,7 +470,17 @@ public class TroubleshootingController(
         builder.AppendLine("</details>");
 
         AppendIssueRuleDecisions(builder, plan);
-        AppendIssueItemDecisions(builder, plan);
+        if (includeItemDetails)
+        {
+            AppendIssueItemDecisions(builder, itemGroups, MaxDetailedReportItemGroups);
+        }
+        else if (itemGroups.Count > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("### Item-level decisions");
+            builder.AppendLine();
+            builder.AppendLine($"Item-level decision groups are available in the full report. Total groups: {itemGroups.Count.ToString(CultureInfo.InvariantCulture)}.");
+        }
 
         if (plan.AuditEntries.Count == 0)
         {
@@ -336,6 +493,127 @@ public class TroubleshootingController(
 
     private static int CountPlannedDeletionOperations(CleanupPlan plan) =>
         plan.AuditEntries.Count(x => x.Stage == CleanupAuditStage.DeletionCascade && x.Outcome == CleanupAuditOutcome.Planned);
+
+    private static int ClampItemPageSize(int value) => Math.Clamp(value, 1, MaxItemPageSize);
+
+    private static bool TryGetCachedReport(string? reportId, out CachedTroubleshootingReport report)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+        {
+            report = null!;
+            return false;
+        }
+
+        lock (ReportCacheLock)
+        {
+            if (latestReport is null
+                || latestReport.CreatedUtc < DateTime.UtcNow - ReportCacheLifetime
+                || !string.Equals(latestReport.ReportId, reportId, StringComparison.Ordinal))
+            {
+                latestReport = null;
+                report = null!;
+                return false;
+            }
+
+            report = latestReport;
+            return true;
+        }
+    }
+
+    private static void SetCachedReport(CachedTroubleshootingReport report)
+    {
+        lock (ReportCacheLock)
+        {
+            latestReport = report;
+        }
+    }
+
+    private static async Task WriteIssueMarkdownAsync(Stream stream, CachedTroubleshootingReport report)
+    {
+        await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 16 * 1024, leaveOpen: true);
+        await writer.WriteLineAsync("### Environment");
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync($"- Jellyfin version: {report.JellyfinVersion}");
+        await writer.WriteLineAsync($"- Plugin version: {report.PluginVersion}");
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync("### Dry-run summary");
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync($"- Final delete decisions: {report.Plan.Decisions.Count.ToString(CultureInfo.InvariantCulture)}");
+        await writer.WriteLineAsync($"- Planned deletion operations: {CountPlannedDeletionOperations(report.Plan).ToString(CultureInfo.InvariantCulture)}");
+        await writer.WriteLineAsync($"- Audit entries: {report.Plan.AuditEntries.Count.ToString(CultureInfo.InvariantCulture)}");
+        foreach (var group in report.Plan.AuditEntries.GroupBy(x => x.Outcome).OrderBy(x => x.Key.ToString()))
+        {
+            await writer.WriteLineAsync($"- {group.Key}: {group.Count().ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync("<details>");
+        await writer.WriteLineAsync("<summary>Configuration</summary>");
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync("```xml");
+        await writer.WriteLineAsync(EscapeMarkdownFence(report.PluginConfig));
+        await writer.WriteLineAsync("```");
+        await writer.WriteLineAsync("</details>");
+
+        await WriteIssueRuleDecisionsAsync(writer, report.Plan);
+        await WriteIssueItemDecisionsAsync(writer, report.ItemGroups);
+
+        if (report.Plan.AuditEntries.Count == 0)
+        {
+            await writer.WriteLineAsync();
+            await writer.WriteLineAsync("No audit entries were produced. Check that at least one cleanup or protection rule is enabled.");
+        }
+    }
+
+    private static async Task WriteIssueRuleDecisionsAsync(TextWriter writer, CleanupPlan plan)
+    {
+        var ruleEntries = plan.AuditEntries
+            .Where(x => x.ItemId is null)
+            .GroupBy(x => x.RuleId ?? x.RuleName ?? string.Empty)
+            .OrderBy(x => x.First().RuleName)
+            .ToList();
+        if (ruleEntries.Count == 0)
+        {
+            return;
+        }
+
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync("### Rule-level decisions");
+        foreach (var group in ruleEntries)
+        {
+            var first = group.First();
+            await writer.WriteLineAsync();
+            await writer.WriteLineAsync($"#### {EscapeMarkdownText(first.RuleName ?? first.RuleId ?? "Unknown rule")}");
+            foreach (var entry in group)
+            {
+                await writer.WriteLineAsync($"- {CleanupAuditFormatter.FormatPlainTextEntry(entry, escapeText: EscapeMarkdownText)}");
+            }
+        }
+    }
+
+    private static async Task WriteIssueItemDecisionsAsync(TextWriter writer, IReadOnlyList<ItemDecisionGroup> itemGroups)
+    {
+        if (itemGroups.Count == 0)
+        {
+            return;
+        }
+
+        await writer.WriteLineAsync();
+        await writer.WriteLineAsync("### Item-level decisions");
+        foreach (var group in itemGroups)
+        {
+            await writer.WriteLineAsync();
+            await writer.WriteLineAsync("<details>");
+            await writer.WriteLineAsync($"<summary>{EscapeMarkdownText($"{group.ItemKind}: {group.ItemName} ({group.ItemId}) - {group.FinalOutcome}")}</summary>");
+            await writer.WriteLineAsync();
+            foreach (var entry in group.Entries)
+            {
+                await writer.WriteLineAsync($"- {CleanupAuditFormatter.FormatPlainTextEntry(entry, escapeText: EscapeMarkdownText)}");
+            }
+
+            await writer.WriteLineAsync("</details>");
+        }
+    }
 
     private static void AppendIssueRuleDecisions(StringBuilder builder, CleanupPlan plan)
     {
@@ -363,30 +641,31 @@ public class TroubleshootingController(
         }
     }
 
-    private static void AppendIssueItemDecisions(StringBuilder builder, CleanupPlan plan)
+    private static void AppendIssueItemDecisions(
+        StringBuilder builder,
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        int maxItemGroups)
     {
-        var itemEntries = plan.AuditEntries
-            .Where(x => x.ItemId is not null)
-            .GroupBy(x => x.ItemId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x.First().ItemKind?.ToString())
-            .ThenBy(x => x.First().ItemName)
-            .ToList();
-        if (itemEntries.Count == 0)
+        if (itemGroups.Count == 0)
         {
             return;
         }
 
         builder.AppendLine();
         builder.AppendLine("### Item-level decisions");
-        foreach (var group in itemEntries)
+        if (itemGroups.Count > maxItemGroups)
         {
-            var first = group.First();
-            var finalOutcome = CleanupAuditFormatter.GetFinalOutcome(group);
+            builder.AppendLine();
+            builder.AppendLine($"Showing first {maxItemGroups.ToString(CultureInfo.InvariantCulture)} of {itemGroups.Count.ToString(CultureInfo.InvariantCulture)} item-level decision groups to keep the troubleshooting report small.");
+        }
+
+        foreach (var group in itemGroups.Take(maxItemGroups))
+        {
             builder.AppendLine();
             builder.AppendLine("<details>");
-            builder.AppendLine($"<summary>{EscapeMarkdownText($"{first.ItemKind}: {first.ItemName} ({first.ItemId}) - {finalOutcome}")}</summary>");
+            builder.AppendLine($"<summary>{EscapeMarkdownText($"{group.ItemKind}: {group.ItemName} ({group.ItemId}) - {group.FinalOutcome}")}</summary>");
             builder.AppendLine();
-            foreach (var entry in group)
+            foreach (var entry in group.Entries)
             {
                 AppendIssueAuditEntry(builder, entry);
             }
@@ -399,6 +678,47 @@ public class TroubleshootingController(
     {
         builder.AppendLine($"- {CleanupAuditFormatter.FormatPlainTextEntry(entry, escapeText: EscapeMarkdownText)}");
     }
+
+    private static IReadOnlyList<ItemDecisionGroup> BuildItemDecisionGroups(CleanupPlan plan) =>
+        plan.AuditEntries
+            .Where(x => x.ItemId is not null)
+            .GroupBy(x => x.ItemId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var entries = group.ToList();
+                var first = entries[0];
+                return new ItemDecisionGroup(
+                    first.ItemId ?? string.Empty,
+                    first.ItemName ?? string.Empty,
+                    first.ItemKind,
+                    CleanupAuditFormatter.GetFinalOutcome(entries),
+                    entries);
+            })
+            .OrderBy(x => x.ItemKind?.ToString())
+            .ThenBy(x => x.ItemName)
+            .ToList();
+
+    private static IReadOnlyList<ItemDecisionGroup> FilterItemDecisionGroups(
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return itemGroups;
+        }
+
+        var value = search.Trim();
+        return itemGroups
+            .Where(group =>
+                ContainsSearch(group.ItemName, value)
+                || ContainsSearch(group.ItemId, value)
+                || ContainsSearch(group.ItemKind?.ToString(), value))
+            .ToList();
+    }
+
+    private static bool ContainsSearch(string? text, string search) =>
+        !string.IsNullOrWhiteSpace(text)
+        && text.Contains(search, StringComparison.OrdinalIgnoreCase);
 
     private static string EscapeMarkdownFence(string value) => value.Replace("```", "`\u200b``", StringComparison.Ordinal);
 
@@ -502,7 +822,41 @@ public class TroubleshootingController(
     }
 }
 
-public sealed record TroubleshootingReportResponse(string FormattedHtml, string IssueMarkdown);
+public sealed record TroubleshootingReportResponse(
+    string ReportId,
+    string FormattedHtml,
+    string IssueMarkdown,
+    int ItemGroupCount,
+    int TotalItemGroupCount,
+    int ItemPageSize);
+
+public sealed record TroubleshootingReportItemsResponse(
+    string ReportId,
+    int Start,
+    int Limit,
+    int ItemGroupCount,
+    int TotalItemGroupCount,
+    string FormattedHtml);
+
+public sealed record TroubleshootingIssueSourceResponse(
+    string ReportId,
+    string IssueMarkdown);
+
+internal sealed record CachedTroubleshootingReport(
+    string ReportId,
+    string JellyfinVersion,
+    string PluginVersion,
+    string PluginConfig,
+    CleanupPlan Plan,
+    IReadOnlyList<ItemDecisionGroup> ItemGroups,
+    DateTime CreatedUtc);
+
+internal sealed record ItemDecisionGroup(
+    string ItemId,
+    string ItemName,
+    MediaItemKind? ItemKind,
+    CleanupAuditOutcome FinalOutcome,
+    IReadOnlyList<CleanupAuditEntry> Entries);
 
 public sealed record MediaCleanerStatusResponse(
     int ActiveCleanupRuleCount,

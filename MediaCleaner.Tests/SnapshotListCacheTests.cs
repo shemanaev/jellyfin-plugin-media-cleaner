@@ -1,5 +1,12 @@
 using FluentAssertions;
 using MediaCleaner.Adapters;
+using MediaCleaner.Core;
+
+#if JELLYFIN_USER_IN_DATA_ENTITIES
+using JellyfinUser = Jellyfin.Data.Entities.User;
+#else
+using JellyfinUser = Jellyfin.Database.Implementations.Entities.User;
+#endif
 
 namespace MediaCleaner.Tests;
 
@@ -48,8 +55,56 @@ public class SnapshotListCacheTests
             .Throw<OperationCanceledException>();
     }
 
+    [Fact]
+    public void SnapshotContext_KeepsParentCascadeListsForIndividualEpisodeCleanup()
+    {
+        var policy = new CleanupPolicy(
+            [
+                Rule(MediaItemKind.Episode, SeriesDeleteKind.Episode),
+            ],
+            AllowDeleteIfPlayedBeforeAdded: false);
+
+        var context = CreateSnapshotContext(policy);
+
+        GetFlag(context, "NeedsSeasonEpisodeIds").Should().BeTrue();
+        GetFlag(context, "NeedsSeriesEpisodeIds").Should().BeTrue();
+        GetFlag(context, "NeedsSeriesSeasonIds").Should().BeTrue();
+        GetFlag(context, "NeedsEpisodeOrderIds").Should().BeFalse();
+        GetFlag(context, "NeedsSeasonOrderIds").Should().BeFalse();
+    }
+
     private static int GetEpisodeCount(int seriesIndex) =>
         EpisodeCount / ProgramCount + (seriesIndex < EpisodeCount % ProgramCount ? 1 : 0);
+
+    private static object CreateSnapshotContext(CleanupPolicy policy)
+    {
+        var type = typeof(JellyfinMediaCatalogAdapter).GetNestedType("SnapshotContext", System.Reflection.BindingFlags.NonPublic)!;
+        return Activator.CreateInstance(type, [new List<JellyfinUser>(), policy, CancellationToken.None])!;
+    }
+
+    private static bool GetFlag(object context, string propertyName) =>
+        (bool)context.GetType().GetProperty(propertyName)!.GetValue(context)!;
+
+    private static CleanupRule Rule(MediaItemKind mediaKind, SeriesDeleteKind deleteEpisodes) => new(
+        Id: $"{mediaKind}-{deleteEpisodes}",
+        Name: $"{mediaKind} {deleteEpisodes}",
+        Enabled: true,
+        Trigger: new CleanupRuleTrigger(CleanupRuleTriggerKind.Played, 10),
+        Filters: new CleanupRuleFilters(
+            MediaKinds: [mediaKind],
+            UserIds: [],
+            UsersMode: UsersListMode.Ignore,
+            FavoriteUserIds: [],
+            FavoriteUsersMode: UsersListMode.Ignore,
+            FavoriteFilter: RuleFavoriteFilterKind.Ignore,
+            Locations: [],
+            LocationsMode: LocationsListMode.Exclude,
+            EnableTagFilter: false,
+            TagFilterMode: TagMode.Exclusion,
+            Tags: [],
+            DeleteEpisodes: deleteEpisodes,
+            KeepSeriesKind: SeriesKeepKind.None),
+        Actions: new CleanupRuleActions(CleanupRuleActionKind.Delete, false));
 
     private sealed record Node(string Id);
 }

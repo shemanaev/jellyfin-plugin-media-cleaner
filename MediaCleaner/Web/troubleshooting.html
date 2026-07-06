@@ -10,18 +10,40 @@
 
             <div class="verticalSection verticalSection-extrabottompadding">
                 <div>
-                    <button id="TroubleshootingButtonCopy" is="emby-button" class="raised button-submit emby-button" style="display: none;">
+                    <button id="TroubleshootingButtonRefreshReport" is="emby-button" class="raised button-submit emby-button">
+                        <span>Refresh report</span>
+                    </button>
+                    <button id="TroubleshootingButtonCopy" is="emby-button" class="raised emby-button" style="display: none;">
                         <span>Copy GitHub issue report</span>
                     </button>
-                    <button id="TroubleshootingButtonRefreshReport" is="emby-button" class="raised emby-button">
-                        <span>Refresh report</span>
+                    <button id="TroubleshootingButtonDownloadFullReport" is="emby-button" class="raised emby-button" style="display: none;" disabled>
+                        <span>Download full report</span>
                     </button>
                 </div>
             </div>
 
             <div>
                 <div id="TroubleshootingLogViewer"></div>
-                <details class="mediaCleanerReportSource">
+                <div id="TroubleshootingItemControlsHost">
+                    <div id="TroubleshootingItemControls" class="mediaCleanerItemControls" style="display: none;">
+                        <div class="mediaCleanerItemSearch">
+                            <input id="TroubleshootingItemSearch" is="emby-input" type="text" label="Search item" />
+                            <button id="TroubleshootingButtonClearItemSearch" is="emby-button" class="raised emby-button" disabled>
+                                <span>Clear</span>
+                            </button>
+                        </div>
+                        <div id="TroubleshootingItemPager" class="mediaCleanerItemPager" style="display: none;">
+                            <button id="TroubleshootingButtonPrevItems" is="emby-button" class="raised emby-button" disabled>
+                                <span>Previous items</span>
+                            </button>
+                            <span id="TroubleshootingItemPagerLabel" class="mediaCleanerItemPagerLabel">0-0 of 0</span>
+                            <button id="TroubleshootingButtonNextItems" is="emby-button" class="raised emby-button" disabled>
+                                <span>Next items</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <details id="TroubleshootingReportSource" class="mediaCleanerReportSource">
                     <summary>GitHub issue source</summary>
                     <textarea id="TroubleshootingLog" rows="12" aria-label="GitHub issue report source" readonly></textarea>
                 </details>
@@ -50,6 +72,43 @@
                         padding: .85em;
                         border-left: 4px solid var(--jf-palette-grey-600, #757575);
                         background: var(--jf-palette-action-hover, rgba(0, 0, 0, .04));
+                    }
+
+                    .mediaCleanerItemControls {
+                        gap: .75em;
+                        margin: .35em 0 1em;
+                    }
+
+                    .mediaCleanerItemSearch,
+                    .mediaCleanerItemPager {
+                        align-items: center;
+                        display: flex;
+                        gap: .75em;
+                    }
+
+                    .mediaCleanerItemSearch {
+                        flex-wrap: nowrap;
+                        margin-bottom: .65em;
+                        max-width: 25em;
+                    }
+
+                    .mediaCleanerItemSearch .inputContainer {
+                        flex: 0 1 18em;
+                        margin: 0;
+                        max-width: 18em;
+                    }
+
+                    .mediaCleanerItemSearch button {
+                        flex: 0 0 auto;
+                    }
+
+                    .mediaCleanerItemPager {
+                        flex-wrap: wrap;
+                    }
+
+                    .mediaCleanerItemPagerLabel {
+                        color: var(--jf-palette-text-secondary, rgba(0, 0, 0, .6));
+                        font-weight: 700;
                     }
 
                     .mediaCleanerReportSource {
@@ -218,6 +277,15 @@
                     }
 
                     @media (max-width: 40em) {
+                        .mediaCleanerItemSearch {
+                            max-width: 100%;
+                        }
+
+                        .mediaCleanerItemSearch .inputContainer {
+                            flex: 1 1 auto;
+                            max-width: none;
+                        }
+
                         .mediaCleanerOutcomeLegendItem {
                             grid-template-columns: 1fr;
                             gap: .25em;

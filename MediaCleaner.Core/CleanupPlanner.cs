@@ -22,18 +22,20 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
 
         foreach (var rule in enabledRules)
         {
-            var matches = matcher.CollectRuleMatches(request, rule, auditEntries).ToList();
-            if (rule.Actions.Kind == CleanupRuleActionKind.Delete)
+            foreach (var match in matcher.CollectRuleMatches(request, rule, auditEntries))
             {
-                deleteMatches.AddRange(matches);
-            }
-            else if (rule.Actions.Kind == CleanupRuleActionKind.Protect)
-            {
-                protectMatches.AddRange(matches);
-            }
-            else
-            {
-                throw new NotSupportedException($"Unsupported rule action: {rule.Actions.Kind}");
+                if (rule.Actions.Kind == CleanupRuleActionKind.Delete)
+                {
+                    deleteMatches.Add(match);
+                }
+                else if (rule.Actions.Kind == CleanupRuleActionKind.Protect)
+                {
+                    protectMatches.Add(match);
+                }
+                else
+                {
+                    throw new NotSupportedException($"Unsupported rule action: {rule.Actions.Kind}");
+                }
             }
         }
 
@@ -51,12 +53,26 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
 
         var decisions = BuildDeleteDecisions(deleteMatches, protectedIds, auditEntries)
             .OrderBy(x => CleanupRuleKinds.Priority(x.Kind))
-            .ThenBy(x => x.Kind == ExpiredKind.Played ? x.Playback.FirstOrDefault()?.LastPlayedDate : x.Item.DateCreated)
+            .ThenBy(x => x.Kind == ExpiredKind.Played ? FirstPlaybackLastPlayedDate(x.Playback) : x.Item.DateCreated)
             .ToList();
 
         var cascadePlanner = new DeletionCascadePlanner(extraFileProbe);
-        var plannedDeletions = cascadePlanner.BuildDeletionOperations(decisions, request.Items, protectedIds, auditEntries).ToList();
-        var deletions = request.IsDryRun ? [] : plannedDeletions;
+        IReadOnlyList<DeletionOperation> deletions;
+        if (request.IsDryRun)
+        {
+            // Dry-run needs the deletion-cascade audit entries and counts, but it does not need
+            // to retain every DeletionOperation object. On large not-played libraries this avoids
+            // keeping tens of thousands of deletion records alive until the report is rendered.
+            foreach (var _ in cascadePlanner.BuildDeletionOperations(decisions, request.Items, protectedIds, auditEntries))
+            {
+            }
+
+            deletions = [];
+        }
+        else
+        {
+            deletions = cascadePlanner.BuildDeletionOperations(decisions, request.Items, protectedIds, auditEntries).ToList();
+        }
 
         return new CleanupPlan(decisions, deletions, auditEntries);
     }
@@ -73,6 +89,11 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
             false when mode == UsersListMode.Acknowledge => false,
             _ => throw new NotSupportedException($"Unsupported users list mode: {mode}"),
         });
+
+    private static DateTime? FirstPlaybackLastPlayedDate(IReadOnlyList<PlaybackState> playback)
+    {
+        return playback.Count == 0 ? null : playback[0].LastPlayedDate;
+    }
 
     private static IEnumerable<CleanupDecision> BuildDeleteDecisions(
         IEnumerable<RuleMatch> deleteMatches,

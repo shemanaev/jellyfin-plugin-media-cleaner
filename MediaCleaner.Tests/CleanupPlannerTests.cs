@@ -242,6 +242,40 @@ public class CleanupPlannerTests
         plan.Deletions.Select(x => x.ItemId).Should().ContainInOrder("e1", "e2", "s1", "show1");
     }
 
+    [Fact]
+    public void Plan_CascadesIndividualEpisodeCleanupUsingParentLists_WhenEpisodeSnapshotOmitsAggregateLists()
+    {
+        var rule = Rule(MediaItemKind.Episode, CleanupRuleTriggerKind.Played, 10) with
+        {
+            Filters = Filters(MediaItemKind.Episode) with { DeleteEpisodes = SeriesDeleteKind.Episode }
+        };
+        var e1 = Episode("e1", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
+        var e2 = Episode("e2", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
+        var season = Season("s1", "show1", ["e1", "e2"]);
+        var series = Series("show1", ["e1", "e2"]) with { SeasonIds = ["s1"] };
+
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [e1, e2, season, series], false));
+
+        plan.Decisions.Select(x => x.Item.Id).Should().BeEquivalentTo("e1", "e2");
+        plan.Deletions.Select(x => x.ItemId).Should().ContainInOrder("e1", "e2", "s1", "show1");
+    }
+
+    [Fact]
+    public void SeriesPolicy_DoesNotEnumerateCatalogItems_ForIndividualEpisodeRules()
+    {
+        var rule = Rule(MediaItemKind.Episode, CleanupRuleTriggerKind.Played, 10) with
+        {
+            Filters = Filters(MediaItemKind.Episode) with { DeleteEpisodes = SeriesDeleteKind.Episode }
+        };
+        var episode = Episode("e1", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
+        var candidate = new CandidateItem(episode, episode.Playback);
+        var auditEntries = new List<CleanupAuditEntry>();
+
+        var result = SeriesPolicyEvaluator.Apply([candidate], rule, auditEntries, new ThrowingMediaItemList()).ToList();
+
+        result.Should().ContainSingle().Which.Item.Id.Should().Be("e1");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -483,6 +517,18 @@ public class CleanupPlannerTests
 
     private static MediaItem Series(string id, IReadOnlyList<string> episodeIds) =>
         new(id, MediaItemKind.Series, id, id, Now.AddDays(-30), $"/media/{id}", $"/media/{id}", [], [], id, null, id, null, EpisodeIds: episodeIds);
+
+    private sealed class ThrowingMediaItemList : IReadOnlyList<MediaItem>
+    {
+        public int Count => throw new InvalidOperationException("Catalog items should not be evaluated for individual episode rules.");
+
+        public MediaItem this[int index] => throw new InvalidOperationException("Catalog items should not be evaluated for individual episode rules.");
+
+        public IEnumerator<MediaItem> GetEnumerator() =>
+            throw new InvalidOperationException("Catalog items should not be evaluated for individual episode rules.");
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 
     private sealed class FixedClock(DateTime utcNow) : IClock
     {
