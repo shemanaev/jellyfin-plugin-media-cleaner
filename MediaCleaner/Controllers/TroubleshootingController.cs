@@ -38,8 +38,7 @@ public class TroubleshootingController(
     private const int MaxItemPageSize = 1000;
     private const int FullReportItemGroupThreshold = 100;
     private static readonly TimeSpan ReportCacheLifetime = TimeSpan.FromMinutes(15);
-    private static readonly object ReportCacheLock = new();
-    private static CachedTroubleshootingReport? latestReport;
+    private static readonly TroubleshootingReportCache reportCache = new(ReportCacheLifetime, maxReports: 3);
 
     [HttpGet("Status")]
     [Produces(MediaTypeNames.Application.Json)]
@@ -504,28 +503,12 @@ public class TroubleshootingController(
             return false;
         }
 
-        lock (ReportCacheLock)
-        {
-            if (latestReport is null
-                || latestReport.CreatedUtc < DateTime.UtcNow - ReportCacheLifetime
-                || !string.Equals(latestReport.ReportId, reportId, StringComparison.Ordinal))
-            {
-                latestReport = null;
-                report = null!;
-                return false;
-            }
-
-            report = latestReport;
-            return true;
-        }
+        return reportCache.TryGet(reportId, DateTime.UtcNow, out report);
     }
 
     private static void SetCachedReport(CachedTroubleshootingReport report)
     {
-        lock (ReportCacheLock)
-        {
-            latestReport = report;
-        }
+        reportCache.Set(report, DateTime.UtcNow);
     }
 
     private static async Task WriteIssueMarkdownAsync(Stream stream, CachedTroubleshootingReport report)

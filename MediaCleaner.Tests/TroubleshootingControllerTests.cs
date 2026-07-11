@@ -9,6 +9,50 @@ namespace MediaCleaner.Tests;
 public class TroubleshootingControllerTests
 {
     [Fact]
+    public void ReportCache_KeepsMultipleReportsAndUnknownIdsDoNotEvictThem()
+    {
+        var cache = new TroubleshootingReportCache(TimeSpan.FromMinutes(15), maxReports: 3);
+        var now = new DateTime(2026, 07, 11, 12, 00, 00, DateTimeKind.Utc);
+        var first = CreateCachedReport("first", now);
+        var second = CreateCachedReport("second", now.AddMinutes(1));
+
+        cache.Set(first, now);
+        cache.Set(second, now.AddMinutes(1));
+
+        cache.TryGet("missing", now.AddMinutes(2), out _).Should().BeFalse();
+        cache.TryGet("first", now.AddMinutes(2), out var cachedFirst).Should().BeTrue();
+        cache.TryGet("second", now.AddMinutes(2), out var cachedSecond).Should().BeTrue();
+        cachedFirst.Should().BeSameAs(first);
+        cachedSecond.Should().BeSameAs(second);
+    }
+
+    [Fact]
+    public void ReportCache_EvictsOldestReportWhenBoundIsExceeded()
+    {
+        var cache = new TroubleshootingReportCache(TimeSpan.FromMinutes(15), maxReports: 2);
+        var now = new DateTime(2026, 07, 11, 12, 00, 00, DateTimeKind.Utc);
+
+        cache.Set(CreateCachedReport("first", now), now);
+        cache.Set(CreateCachedReport("second", now.AddMinutes(1)), now.AddMinutes(1));
+        cache.Set(CreateCachedReport("third", now.AddMinutes(2)), now.AddMinutes(2));
+
+        cache.TryGet("first", now.AddMinutes(3), out _).Should().BeFalse();
+        cache.TryGet("second", now.AddMinutes(3), out _).Should().BeTrue();
+        cache.TryGet("third", now.AddMinutes(3), out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ReportCache_ExpiresReportsByCreatedTime()
+    {
+        var cache = new TroubleshootingReportCache(TimeSpan.FromMinutes(15), maxReports: 3);
+        var created = new DateTime(2026, 07, 11, 12, 00, 00, DateTimeKind.Utc);
+        cache.Set(CreateCachedReport("first", created), created);
+
+        cache.TryGet("first", created.AddMinutes(15), out _).Should().BeTrue();
+        cache.TryGet("first", created.AddMinutes(15).AddTicks(1), out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void StatusFormatter_CalculatesNextRunFromDailyTrigger()
     {
         var now = new DateTime(2026, 06, 27, 12, 00, 00, DateTimeKind.Utc);
@@ -114,4 +158,7 @@ public class TroubleshootingControllerTests
         var method = typeof(TroubleshootingController).GetMethod("GetNextRunUtc", BindingFlags.NonPublic | BindingFlags.Static, [typeof(TaskTriggerInfo), typeof(TaskResult), typeof(DateTime)])!;
         return (DateTime?)method.Invoke(null, [trigger, lastExecutionResult, nowUtc]);
     }
+
+    private static CachedTroubleshootingReport CreateCachedReport(string reportId, DateTime createdUtc) =>
+        new(reportId, "10.11.0", "3.0.0", "<config />", CleanupPlan.Empty, [], createdUtc);
 }
