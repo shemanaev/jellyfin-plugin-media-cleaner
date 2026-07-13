@@ -20,18 +20,7 @@ internal sealed class JellyfinMutationAdapter(
 {
     public async Task ExecuteAsync(CleanupPlan plan, CleanupCatalog catalog, CancellationToken cancellationToken)
     {
-        foreach (var decision in plan.Decisions)
-        {
-            LogDecision(decision);
-            if (plan.Deletions.Count == 0)
-            {
-                continue;
-            }
-
-            var notificationDecision = WithNotificationOverview(decision, plan.AuditEntries);
-            await CreateNotification(notificationDecision, cancellationToken);
-            MarkUnplayed(decision, catalog);
-        }
+        var successfullyDeletedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var operation in plan.Deletions)
         {
@@ -45,32 +34,46 @@ internal sealed class JellyfinMutationAdapter(
             try
             {
                 JellyfinCompatibility.DeleteItem(libraryManager, item, new DeleteOptions { DeleteFileLocation = true });
+                successfullyDeletedIds.Add(operation.ItemId);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error deleting item: {Name}", operation.Name);
             }
         }
+
+        foreach (var decision in GetSuccessfullyDeletedDecisions(plan.Decisions, successfullyDeletedIds))
+        {
+            LogSuccessfulDeletion(decision);
+            var notificationDecision = WithNotificationOverview(decision, plan.AuditEntries);
+            await CreateNotification(notificationDecision, cancellationToken);
+            MarkUnplayed(decision, catalog);
+        }
     }
 
-    private void LogDecision(CleanupDecision decision)
+    internal static IEnumerable<CleanupDecision> GetSuccessfullyDeletedDecisions(
+        IEnumerable<CleanupDecision> decisions,
+        ISet<string> successfullyDeletedIds) =>
+        decisions.Where(decision => successfullyDeletedIds.Contains(decision.Item.Id));
+
+    private void LogSuccessfulDeletion(CleanupDecision decision)
     {
         if (decision.Kind == CoreExpiredKind.Played)
         {
             var users = string.Join(", ", decision.Playback.Select(x => $"{(x.UserName ?? x.UserId)} ({x.LastPlayedDate?.ToLocalTime()})"));
-            logger.LogInformation("({Type}) \"{Name}\" will be deleted because expired for: {Users}",
+            logger.LogInformation("({Type}) \"{Name}\" was deleted because expired for: {Users}",
                 decision.Item.Kind, decision.Item.FullName, users);
             return;
         }
 
         if (decision.Kind == CoreExpiredKind.NotPlayed)
         {
-            logger.LogInformation("({Type}) \"{Name}\" will be deleted because no one played it since {DateCreated}",
+            logger.LogInformation("({Type}) \"{Name}\" was deleted because no one played it since {DateCreated}",
                 decision.Item.Kind, decision.Item.FullName, decision.Item.DateCreated.ToLocalTime());
             return;
         }
 
-        logger.LogInformation("({Type}) \"{Name}\" will be deleted because it was added at {DateCreated}",
+        logger.LogInformation("({Type}) \"{Name}\" was deleted because it was added at {DateCreated}",
             decision.Item.Kind, decision.Item.FullName, decision.Item.DateCreated.ToLocalTime());
     }
 
