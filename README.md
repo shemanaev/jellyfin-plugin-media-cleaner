@@ -27,7 +27,7 @@ Each rule has:
 * optional filters for playback users, favorite state, favorite users, library locations and tags;
 * an action: delete or protect.
 
-For episode cleanup rules, the deletion scope controls whether Media Cleaner deletes matching episodes individually, complete seasons, complete series, or complete ended series. Episode and season scopes can keep the first or latest item as an exception.
+For episode cleanup rules, the deletion scope controls whether Media Cleaner deletes matching episodes individually, complete seasons, complete series, or complete ended series. Episode and season scopes can keep the first or latest item in the entire series as an exception, even when that item does not match the rule. Cleanup is blocked when the configured exception cannot be identified safely.
 
 Played cleanup can require playback by at least one user, the most recent play by any user, or every user. Not-played cleanup can ignore older playback history so old watches do not keep new imports forever.
 

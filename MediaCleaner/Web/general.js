@@ -852,10 +852,14 @@ function readPlaybackSettings(card, rule, page) {
 }
 
 function renderDeletionBehavior(rule) {
+    const exceptionDescription = rule.Filters.DeleteEpisodes === 'Season'
+        ? 'The exception is chosen from every season in the series, even when that season does not match this rule. Cleanup is blocked when it cannot be identified safely.'
+        : 'The exception is chosen from every episode in the series, even when that episode does not match this rule. Cleanup is blocked when it cannot be identified safely.'
     const episodeControls = isEpisodeOnly(rule)
         ? selectHtml('DeleteEpisodes', 'Episode deletion scope', rule.Filters.DeleteEpisodes, ['Episode', 'Season', 'Series', 'SeriesEnded'])
             + (['Episode', 'Season'].includes(rule.Filters.DeleteEpisodes)
                 ? selectHtml('KeepSeriesKind', rule.Filters.DeleteEpisodes === 'Season' ? 'Season exception' : 'Episode exception', rule.Filters.KeepSeriesKind, ['None', 'First', 'Last'])
+                    + `<div class="fieldDescription">${exceptionDescription}</div>`
                 : '')
         : ''
     const markUnplayed = rule.Trigger.Kind === 'Played'
@@ -965,8 +969,8 @@ function triggerDaysLabel(kind) {
 }
 
 function episodeScopeWithPreservedItem(summary, filters, itemKind) {
-    if (filters.KeepSeriesKind === 'First') return `${summary}, excluding the first ${itemKind}`
-    if (filters.KeepSeriesKind === 'Last') return `${summary}, excluding the latest ${itemKind}`
+    if (filters.KeepSeriesKind === 'First') return `${summary}, excluding the first ${itemKind} in the series, whether or not it matches this rule`
+    if (filters.KeepSeriesKind === 'Last') return `${summary}, excluding the latest ${itemKind} in the series, whether or not it matches this rule`
     return summary
 }
 
@@ -1143,11 +1147,11 @@ function episodeScopeSentence(filters) {
     }
 
     if (filters.KeepSeriesKind === 'First') {
-        return 'Delete matching episodes individually, except the first episode'
+        return 'Delete matching episodes individually, except the first episode in the series, whether or not it matches this rule'
     }
 
     if (filters.KeepSeriesKind === 'Last') {
-        return 'Delete matching episodes individually, except the latest episode'
+        return 'Delete matching episodes individually, except the latest episode in the series, whether or not it matches this rule'
     }
 
     return ''
@@ -1167,11 +1171,11 @@ function episodeScopeClause(filters) {
     }
 
     if (filters.KeepSeriesKind === 'First') {
-        return 'excluding the first episode in each series'
+        return 'excluding the first episode in each series, whether or not it matches this rule'
     }
 
     if (filters.KeepSeriesKind === 'Last') {
-        return 'excluding the latest episode in each series'
+        return 'excluding the latest episode in each series, whether or not it matches this rule'
     }
 
     return ''
@@ -1528,7 +1532,7 @@ function optionLabel(field, value) {
         LocationsMode: { Include: 'Only selected locations', Exclude: 'All locations except selected' },
         TagFilterMode: { Inclusion: 'Require any listed tag', Exclusion: 'Exclude any listed tag' },
         DeleteEpisodes: { Episode: 'Matching episodes individually', Season: 'Complete seasons', Series: 'Complete series', SeriesEnded: 'Complete ended series' },
-        KeepSeriesKind: { None: 'No exception', First: 'Keep the first', Last: 'Keep the latest' },
+        KeepSeriesKind: { None: 'No exception', First: 'Keep the first in the series', Last: 'Keep the latest in the series' },
     }
 
     return labels[field] && labels[field][value] ? labels[field][value] : labelFor(value)

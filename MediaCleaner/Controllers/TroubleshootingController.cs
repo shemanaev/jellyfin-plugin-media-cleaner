@@ -739,7 +739,7 @@ public class TroubleshootingController(
         CleanupAuditOutcome.Protected => "A protection rule matched this item and marked it as protected.",
         CleanupAuditOutcome.Suppressed => "A delete rule matched this item, but protection overrode that delete decision.",
         CleanupAuditOutcome.Planned => "The item is part of the final deletion plan. In dry-run mode this is only a preview.",
-        CleanupAuditOutcome.Blocked => "A deletion cascade or final operation was stopped by a safety blocker, such as a protected child or extra files.",
+        CleanupAuditOutcome.Blocked => "Deletion was stopped by a safety blocker, such as an unresolved series exception, a protected child, or extra files.",
         CleanupAuditOutcome.Skipped => "The rule or stage was not evaluated because its prerequisites were not met.",
         _ => throw new NotSupportedException($"Unsupported cleanup audit outcome: {outcome}"),
     };

@@ -224,10 +224,10 @@ internal sealed class JellyfinMediaCatalogAdapter(
             ? snapshot.GetSeriesSeasonIds(series)
             : null;
         var episodeOrderIds = kind == MediaItemKind.Episode && series is not null && snapshot.NeedsEpisodeOrderIds
-            ? snapshot.GetSeriesEpisodeIds(series)
+            ? snapshot.GetSeriesEpisodeOrderIds(series)
             : null;
         var seasonOrderIds = kind == MediaItemKind.Episode && series is not null && snapshot.NeedsSeasonOrderIds
-            ? snapshot.GetSeriesSeasonIds(series)
+            ? snapshot.GetSeriesSeasonOrderIds(series)
             : null;
 
         return new MediaItem(
@@ -425,6 +425,8 @@ internal sealed class JellyfinMediaCatalogAdapter(
         private readonly Dictionary<string, IReadOnlyList<string>> seasonEpisodeIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, IReadOnlyList<string>> seriesEpisodeIds = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, IReadOnlyList<string>> seriesSeasonIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, IReadOnlyList<string>> seriesEpisodeOrderIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, IReadOnlyList<string>> seriesSeasonOrderIds = new(StringComparer.OrdinalIgnoreCase);
 
         public SnapshotContext(
             IReadOnlyList<JellyfinUser> users,
@@ -595,6 +597,62 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 seriesSeasonIds,
                 GetItemId(series),
                 () => GetSeriesSeasons(series).Select(GetItemId).ToList());
+
+        public IReadOnlyList<string> GetSeriesEpisodeOrderIds(Series series) =>
+            GetOrAddIds(
+                seriesEpisodeOrderIds,
+                GetItemId(series),
+                () =>
+                {
+                    var items = GetSeriesEpisodes(series);
+                    var episodes = items.OfType<Episode>().ToList();
+                    if (episodes.Count == 0
+                        || episodes.Count != items.Count
+                        || episodes.Any(x => !x.ParentIndexNumber.HasValue || !x.IndexNumber.HasValue))
+                    {
+                        return [];
+                    }
+
+                    var ordered = episodes
+                        .OrderBy(x => x.ParentIndexNumber!.Value)
+                        .ThenBy(x => x.IndexNumber!.Value)
+                        .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(GetItemId, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    return HasDuplicateEpisodeNumbers(ordered)
+                        ? []
+                        : ordered.Select(GetItemId).ToList();
+                });
+
+        public IReadOnlyList<string> GetSeriesSeasonOrderIds(Series series) =>
+            GetOrAddIds(
+                seriesSeasonOrderIds,
+                GetItemId(series),
+                () =>
+                {
+                    var items = GetSeriesSeasons(series);
+                    var seasons = items.OfType<Season>().ToList();
+                    if (seasons.Count == 0
+                        || seasons.Count != items.Count
+                        || seasons.Any(x => !x.IndexNumber.HasValue))
+                    {
+                        return [];
+                    }
+
+                    var ordered = seasons
+                        .OrderBy(x => x.IndexNumber!.Value)
+                        .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(GetItemId, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    return ordered.GroupBy(x => x.IndexNumber!.Value).Any(x => x.Count() > 1)
+                        ? []
+                        : ordered.Select(GetItemId).ToList();
+                });
+
+        private static bool HasDuplicateEpisodeNumbers(IEnumerable<Episode> episodes) =>
+            episodes
+                .GroupBy(x => (Season: x.ParentIndexNumber!.Value, Episode: x.IndexNumber!.Value))
+                .Any(x => x.Count() > 1);
 
         private IReadOnlyList<string> GetOrAddIds(
             Dictionary<string, IReadOnlyList<string>> cache,

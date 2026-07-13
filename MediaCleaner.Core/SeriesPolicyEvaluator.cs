@@ -53,38 +53,80 @@ internal static class SeriesPolicyEvaluator
         CleanupRule rule,
         List<CleanupAuditEntry> auditEntries)
     {
-        foreach (var item in items)
+        if (rule.Filters.KeepSeriesKind == SeriesKeepKind.None)
         {
-            if (rule.Filters.KeepSeriesKind == SeriesKeepKind.First && item.Item.Id == item.Item.FirstEpisodeId)
+            foreach (var item in items)
             {
-                CleanupAudit.AddItem(
-                    auditEntries,
-                    item.Item,
-                    rule,
-                    CleanupAuditStage.SeriesPolicy,
-                    CleanupAuditOutcome.Rejected,
-                    "rejected by series policy because first episode is kept");
+                yield return item;
+            }
+
+            yield break;
+        }
+
+        if (rule.Filters.KeepSeriesKind is not SeriesKeepKind.First and not SeriesKeepKind.Last)
+        {
+            throw new NotSupportedException($"Unsupported series keep kind: {rule.Filters.KeepSeriesKind}");
+        }
+
+        var boundaryName = rule.Filters.KeepSeriesKind == SeriesKeepKind.First ? "first" : "latest";
+        foreach (var group in items.GroupBy(x => x.Item.SeriesId ?? x.Item.Id))
+        {
+            var groupItems = group.ToList();
+            var boundaryIds = groupItems
+                .Select(x => rule.Filters.KeepSeriesKind == SeriesKeepKind.First
+                    ? x.Item.FirstEpisodeId
+                    : x.Item.LastEpisodeId)
+                .ToList();
+            var distinctBoundaryIds = boundaryIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (boundaryIds.Any(string.IsNullOrWhiteSpace) || distinctBoundaryIds.Count != 1)
+            {
+                foreach (var item in groupItems)
+                {
+                    CleanupAudit.AddItem(
+                        auditEntries,
+                        item.Item,
+                        rule,
+                        CleanupAuditStage.SeriesPolicy,
+                        CleanupAuditOutcome.Blocked,
+                        $"delete blocked by series policy because the {boundaryName} episode in series '{group.Key}' could not be determined consistently");
+                }
+
                 continue;
             }
 
-            if (rule.Filters.KeepSeriesKind == SeriesKeepKind.Last && item.Item.Id == item.Item.LastEpisodeId)
+            var boundaryId = distinctBoundaryIds[0];
+            var keptCandidate = false;
+            foreach (var item in groupItems)
             {
-                CleanupAudit.AddItem(
+                if (string.Equals(item.Item.Id, boundaryId, StringComparison.OrdinalIgnoreCase))
+                {
+                    keptCandidate = true;
+                    CleanupAudit.AddItem(
+                        auditEntries,
+                        item.Item,
+                        rule,
+                        CleanupAuditStage.SeriesPolicy,
+                        CleanupAuditOutcome.Rejected,
+                        $"rejected by series policy because the {boundaryName} episode '{boundaryId}' is kept");
+                    continue;
+                }
+
+                yield return item;
+            }
+
+            if (!keptCandidate)
+            {
+                CleanupAudit.AddRule(
                     auditEntries,
-                    item.Item,
                     rule,
                     CleanupAuditStage.SeriesPolicy,
-                    CleanupAuditOutcome.Rejected,
-                    "rejected by series policy because last episode is kept");
-                continue;
+                    CleanupAuditOutcome.Skipped,
+                    $"series policy keeps the {boundaryName} episode '{boundaryId}' in series '{group.Key}'; that episode did not match this rule");
             }
-
-            if (rule.Filters.KeepSeriesKind is not SeriesKeepKind.None and not SeriesKeepKind.First and not SeriesKeepKind.Last)
-            {
-                throw new NotSupportedException($"Unsupported series keep kind: {rule.Filters.KeepSeriesKind}");
-            }
-
-            yield return item;
         }
     }
 
@@ -99,6 +141,11 @@ internal static class SeriesPolicyEvaluator
         List<CleanupAuditEntry> auditEntries,
         IReadOnlyDictionary<string, MediaItem> catalogById)
     {
+        if (rule.Filters.KeepSeriesKind is not SeriesKeepKind.None and not SeriesKeepKind.First and not SeriesKeepKind.Last)
+        {
+            throw new NotSupportedException($"Unsupported series keep kind: {rule.Filters.KeepSeriesKind}");
+        }
+
         foreach (var group in items.GroupBy(x => x.Item.SeasonId ?? x.Item.SeriesId ?? x.Item.Id))
         {
             var first = group.MaxBy(x => FirstPlaybackLastPlayedDate(x.Playback) ?? x.Item.DateCreated);
@@ -119,9 +166,6 @@ internal static class SeriesPolicyEvaluator
             }
 
             catalogById.TryGetValue(first.Item.SeasonId, out var catalogSeason);
-            var catalogSeries = first.Item.SeriesId is not null && catalogById.TryGetValue(first.Item.SeriesId, out var foundSeries)
-                ? foundSeries
-                : null;
             var seasonEpisodes = catalogSeason?.EpisodeIds ?? first.Item.SeasonEpisodeIds ?? first.Item.EpisodeIds ?? [];
             var allWatched = seasonEpisodes.Count > 0
                 && group.Select(x => x.Item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase).IsSupersetOf(seasonEpisodes);
@@ -137,9 +181,31 @@ internal static class SeriesPolicyEvaluator
                 continue;
             }
 
-            var firstSeasonId = catalogSeries?.SeasonIds?.FirstOrDefault() ?? first.Item.FirstSeasonId;
-            var lastSeasonId = catalogSeries?.SeasonIds?.LastOrDefault() ?? first.Item.LastSeasonId;
-            if (rule.Filters.KeepSeriesKind == SeriesKeepKind.First && first.Item.SeasonId == firstSeasonId)
+            var boundaryName = rule.Filters.KeepSeriesKind == SeriesKeepKind.First ? "first" : "latest";
+            var boundaryIds = group
+                .Select(x => rule.Filters.KeepSeriesKind == SeriesKeepKind.First
+                    ? x.Item.FirstSeasonId
+                    : x.Item.LastSeasonId)
+                .ToList();
+            var distinctBoundaryIds = boundaryIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (rule.Filters.KeepSeriesKind != SeriesKeepKind.None
+                && (boundaryIds.Any(string.IsNullOrWhiteSpace) || distinctBoundaryIds.Count != 1))
+            {
+                CleanupAudit.AddItem(
+                    auditEntries,
+                    first.Item,
+                    rule,
+                    CleanupAuditStage.SeriesPolicy,
+                    CleanupAuditOutcome.Blocked,
+                    $"delete blocked by series policy because the {boundaryName} season in series '{first.Item.SeriesId}' could not be determined consistently");
+                continue;
+            }
+
+            if (rule.Filters.KeepSeriesKind != SeriesKeepKind.None
+                && string.Equals(first.Item.SeasonId, distinctBoundaryIds[0], StringComparison.OrdinalIgnoreCase))
             {
                 CleanupAudit.AddItem(
                     auditEntries,
@@ -147,25 +213,8 @@ internal static class SeriesPolicyEvaluator
                     rule,
                     CleanupAuditStage.SeriesPolicy,
                     CleanupAuditOutcome.Rejected,
-                    "rejected by series policy because first season is kept");
+                    $"rejected by series policy because the {boundaryName} season '{distinctBoundaryIds[0]}' is kept");
                 continue;
-            }
-
-            if (rule.Filters.KeepSeriesKind == SeriesKeepKind.Last && first.Item.SeasonId == lastSeasonId)
-            {
-                CleanupAudit.AddItem(
-                    auditEntries,
-                    first.Item,
-                    rule,
-                    CleanupAuditStage.SeriesPolicy,
-                    CleanupAuditOutcome.Rejected,
-                    "rejected by series policy because last season is kept");
-                continue;
-            }
-
-            if (rule.Filters.KeepSeriesKind is not SeriesKeepKind.None and not SeriesKeepKind.First and not SeriesKeepKind.Last)
-            {
-                throw new NotSupportedException($"Unsupported series keep kind: {rule.Filters.KeepSeriesKind}");
             }
 
             var seasonItem = catalogSeason ?? first.Item;

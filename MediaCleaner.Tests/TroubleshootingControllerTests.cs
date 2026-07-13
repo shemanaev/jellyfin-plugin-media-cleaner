@@ -130,7 +130,7 @@ public class TroubleshootingControllerTests
         html.Should().Contain("<details class=\"mediaCleanerDecisionGroup\">");
         html.Should().Contain("mediaCleanerDecisionBadge-suppressed");
         html.Should().Contain("A delete rule matched this item, but protection overrode that delete decision.");
-        html.Should().Contain("A deletion cascade or final operation was stopped by a safety blocker");
+        html.Should().Contain("Deletion was stopped by a safety blocker, such as an unresolved series exception");
         html.Should().Contain("The Show | S01E02 | Pilot");
         html.Should().Contain("played rule");
         html.Should().Contain("delete suppressed");

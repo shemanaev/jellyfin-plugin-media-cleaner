@@ -63,6 +63,63 @@ public class JellyfinMediaCatalogAdapterLoadTests
     }
 
     [Fact]
+    public void Create_OrdersEpisodeExceptionAnchorsByEpisodeMetadata()
+    {
+        var user = CreateUser(0);
+        var libraryManager = new Mock<ILibraryManager>();
+        var library = TestLibrary.Create(libraryManager.Object, programCount: 1, episodeCount: 3);
+        var userData = new CountingUserDataManager([user], library.AllItems);
+        SetupUsers(libraryManager, [user]);
+        SetupLibrary(
+            libraryManager,
+            library,
+            new Dictionary<(BaseItemKind Kind, string UserId, ItemSortBy SortBy), int>());
+        var adapter = new JellyfinMediaCatalogAdapter(
+            NullLogger<JellyfinMediaCatalogAdapter>.Instance,
+            CreateUserManager([user]),
+            libraryManager.Object,
+            userData.Manager,
+            new CountingTvHierarchyProvider(library, reverseResults: true));
+
+        var catalog = adapter.Create(new CleanupPolicy(
+            [EpisodeRule("keep-latest", CleanupRuleTriggerKind.Played, 10, SeriesKeepKind.Last)],
+            AllowDeleteIfPlayedBeforeAdded: false), CancellationToken.None);
+
+        var expectedFirstId = library.Episodes.MinBy(x => x.IndexNumber)!.Id.ToString("N");
+        var expectedLastId = library.Episodes.MaxBy(x => x.IndexNumber)!.Id.ToString("N");
+        catalog.Items.Where(x => x.Kind == MediaItemKind.Episode).Should().OnlyContain(x =>
+            x.FirstEpisodeId == expectedFirstId && x.LastEpisodeId == expectedLastId);
+    }
+
+    [Fact]
+    public void Create_LeavesEpisodeExceptionAnchorsEmpty_WhenEpisodeOrderIsAmbiguous()
+    {
+        var user = CreateUser(0);
+        var libraryManager = new Mock<ILibraryManager>();
+        var library = TestLibrary.Create(libraryManager.Object, programCount: 1, episodeCount: 2);
+        library.Episodes[1].IndexNumber = null;
+        var userData = new CountingUserDataManager([user], library.AllItems);
+        SetupUsers(libraryManager, [user]);
+        SetupLibrary(
+            libraryManager,
+            library,
+            new Dictionary<(BaseItemKind Kind, string UserId, ItemSortBy SortBy), int>());
+        var adapter = new JellyfinMediaCatalogAdapter(
+            NullLogger<JellyfinMediaCatalogAdapter>.Instance,
+            CreateUserManager([user]),
+            libraryManager.Object,
+            userData.Manager,
+            new CountingTvHierarchyProvider(library));
+
+        var catalog = adapter.Create(new CleanupPolicy(
+            [EpisodeRule("keep-latest", CleanupRuleTriggerKind.Played, 10, SeriesKeepKind.Last)],
+            AllowDeleteIfPlayedBeforeAdded: false), CancellationToken.None);
+
+        catalog.Items.Where(x => x.Kind == MediaItemKind.Episode).Should().OnlyContain(x =>
+            x.FirstEpisodeId == null && x.LastEpisodeId == null);
+    }
+
+    [Fact]
     public void Create_OverlappingPlayedRules_KeepUnionOfRuleCandidateWindows()
     {
         var user = CreateUser(0);
@@ -347,7 +404,7 @@ public class JellyfinMediaCatalogAdapterLoadTests
             (user.Id.ToString("N"), item.Id.ToString("N"));
     }
 
-    private sealed class CountingTvHierarchyProvider(TestLibrary library) : IJellyfinTvHierarchyProvider
+    private sealed class CountingTvHierarchyProvider(TestLibrary library, bool reverseResults = false) : IJellyfinTvHierarchyProvider
     {
         public Dictionary<string, int> SeasonEpisodeCalls { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -366,14 +423,16 @@ public class JellyfinMediaCatalogAdapterLoadTests
         {
             var key = series.Id.ToString("N");
             SeriesEpisodeCalls[key] = SeriesEpisodeCalls.GetValueOrDefault(key) + 1;
-            return library.EpisodesBySeriesId.GetValueOrDefault(series.Id) ?? [];
+            var items = library.EpisodesBySeriesId.GetValueOrDefault(series.Id) ?? [];
+            return reverseResults ? items.Reverse().ToList() : items;
         }
 
         public IReadOnlyList<BaseItem> GetSeriesSeasons(Series series)
         {
             var key = series.Id.ToString("N");
             SeriesSeasonCalls[key] = SeriesSeasonCalls.GetValueOrDefault(key) + 1;
-            return library.SeasonsBySeriesId.GetValueOrDefault(series.Id) ?? [];
+            var items = library.SeasonsBySeriesId.GetValueOrDefault(series.Id) ?? [];
+            return reverseResults ? items.Reverse().ToList() : items;
         }
     }
 
