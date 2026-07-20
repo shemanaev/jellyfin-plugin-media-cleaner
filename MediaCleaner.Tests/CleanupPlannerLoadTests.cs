@@ -119,6 +119,121 @@ public class CleanupPlannerLoadTests
             $"normal planning allocated {normalBytes:N0} bytes while dry-run allocated {dryRunBytes:N0} bytes");
     }
 
+    [Fact]
+    public void Matcher_NormalRunEvaluatesTriggerOnlyAfterCheapFiltersPass()
+    {
+        var user = new MediaUser("u1", "one");
+        var items = Enumerable.Range(0, 100)
+            .Select(index => Item($"movie-{index}", MediaItemKind.Movie, [user]) with
+            {
+                Tags = index < 5 ? ["cleanup"] : ["keep"],
+            })
+            .ToList();
+        items.Add(Item("recent-movie", MediaItemKind.Movie, [user]) with
+        {
+            DateCreated = Now.AddDays(-1),
+            Tags = ["cleanup"],
+        });
+        var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.AddedAge, 10) with
+        {
+            Filters = Filters(MediaItemKind.Movie) with
+            {
+                EnableTagFilter = true,
+                TagFilterMode = TagMode.Inclusion,
+                Tags = ["cleanup"],
+            },
+        };
+        var matcher = new CleanupRuleMatcher(Now, new TestPathMatcher(), new CleanupPolicy([rule], false));
+        var audit = new CleanupAuditCollector(false);
+        var context = matcher.CreateContext([user], rule, audit)!;
+
+        var matches = matcher.CollectRuleMatches(CleanupCatalogIndex.Create(items), context, audit).ToList();
+
+        matches.Should().HaveCount(5);
+        matcher.TriggerEvaluationCount.Should().Be(6);
+    }
+
+    [Fact]
+    public void Cascade_ThousandEpisodeSeriesUpdatesParentCountersLinearly()
+    {
+        const int episodeCount = 1_024;
+        var episodeIds = Enumerable.Range(0, episodeCount).Select(index => $"e-{index}").ToList();
+        var series = new MediaItem(
+            "series", MediaItemKind.Series, "series", "series", Now, "/series", "/series", [], [],
+            SeriesId: "series", EpisodeIds: episodeIds);
+        var season = new MediaItem(
+            "season", MediaItemKind.Season, "season", "season", Now, "/series/season", "/series/season", [], [],
+            SeriesId: "series", SeasonId: "season", EpisodeIds: episodeIds);
+        var episodes = episodeIds.Select(id => new MediaItem(
+            id, MediaItemKind.Episode, id, id, Now, $"/series/season/{id}.mkv", "/series", [], [],
+            SeriesId: "series", SeasonId: "season")).ToList();
+        var byId = episodes.Append(season).Append(series).ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
+        var decisions = episodes.Select(item => CleanupDecisionFactory.Create(
+            item, ExpiredKind.AddedAge, [], [], ["rule"])).ToList();
+        var planner = new DeletionCascadePlanner(new NoExtraFileProbe());
+
+        var operations = planner.BuildDeletionOperations(
+            decisions,
+            byId,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new CleanupAuditCollector(false)).ToList();
+
+        operations.Select(operation => operation.ItemId)
+            .Should().ContainInOrder(episodeIds.Concat(["season", "series"]));
+        planner.EpisodeCounterUpdateCount.Should().Be(episodeCount * 2);
+    }
+
+    [Fact]
+    public void DecisionAccumulatorKeepsLatestPlaybackWithoutChangingFirstSeenOrder()
+    {
+        var item = Item("movie", MediaItemKind.Movie, []);
+        var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 10) with
+        {
+            Actions = new CleanupRuleActions(CleanupRuleActionKind.Delete, MarkAsUnplayed: true),
+        };
+        var accumulator = new DeleteDecisionAccumulator();
+        accumulator.Add(new RuleMatch(rule, item, ExpiredKind.Played,
+            [new PlaybackState("u1", Now.AddDays(-20), true, false, false)]));
+        accumulator.Add(new RuleMatch(rule, item, ExpiredKind.Played,
+            [new PlaybackState("u1", Now.AddDays(-10), true, false, false)]));
+        accumulator.Add(new RuleMatch(rule, item, ExpiredKind.Played,
+            [new PlaybackState("u1", Now.AddDays(-30), true, false, false)]));
+
+        var decision = accumulator.BuildDecisions(new HashSet<string>(StringComparer.OrdinalIgnoreCase)).Single();
+
+        decision.Playback.Should().ContainSingle(x => x.LastPlayedDate == Now.AddDays(-10));
+        decision.MarkUnplayedUserIds.Should().Equal("u1");
+        decision.MatchedRules.Should().Equal(rule.Name);
+    }
+
+    [Fact]
+    public void CascadeMetricsStartAtZero_AndProtectedSeasonBlocksSeriesPromotion()
+    {
+        var episode = new MediaItem(
+            "episode", MediaItemKind.Episode, "episode", "episode", Now, "/episode", "/", [], [],
+            SeriesId: "series", SeasonId: "season");
+        var season = new MediaItem(
+            "season", MediaItemKind.Season, "season", "season", Now, "/season", "/", [], [],
+            SeriesId: "series", SeasonId: "season", EpisodeIds: ["episode"]);
+        var series = new MediaItem(
+            "series", MediaItemKind.Series, "series", "series", Now, "/series", "/", [], [],
+            SeriesId: "series", EpisodeIds: ["episode"], SeasonIds: ["season"]);
+        var byId = new[] { episode, season, series }.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
+        var decision = CleanupDecisionFactory.Create(episode, ExpiredKind.AddedAge, [], [], ["rule"]);
+        var planner = new DeletionCascadePlanner(new NoExtraFileProbe());
+        planner.EpisodeCounterUpdateCount.Should().Be(0);
+
+        var operations = planner.BuildDeletionOperations(
+            [decision],
+            byId,
+            new HashSet<string>(["season"], StringComparer.OrdinalIgnoreCase),
+            new CleanupAuditCollector(false)).ToList();
+
+        operations.Should().ContainSingle(x => x.ItemId == "episode");
+        operations.Should().NotContain(x => x.ItemId == "series");
+        planner.EpisodeCounterUpdateCount.Should().Be(2);
+    }
+
     private static long MeasureMedianAllocatedBytes(CleanupRequest request)
     {
         var measurements = new long[5];

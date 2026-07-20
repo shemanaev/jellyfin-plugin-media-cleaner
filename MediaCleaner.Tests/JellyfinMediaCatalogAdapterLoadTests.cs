@@ -56,6 +56,9 @@ public class JellyfinMediaCatalogAdapterLoadTests
         catalog.Items.Count(x => x.Kind == MediaItemKind.Season).Should().Be(ProgramCount);
         catalog.Items.Count(x => x.Kind == MediaItemKind.Series).Should().Be(ProgramCount);
         itemQueries.Values.Sum().Should().Be(users.Count * 2, "DatePlayed and DateCreated are each loaded once per user");
+        adapter.SourceItemInspectionCount.Should().Be(
+            users.Count * EpisodeCount * 2,
+            "overlapping rules should inspect each DatePlayed and DateCreated source only once");
         hierarchy.SeasonEpisodeCalls.Values.Sum().Should().Be(ProgramCount);
         hierarchy.SeriesEpisodeCalls.Values.Sum().Should().Be(ProgramCount);
         hierarchy.SeriesSeasonCalls.Values.Sum().Should().Be(ProgramCount);
@@ -154,6 +157,107 @@ public class JellyfinMediaCatalogAdapterLoadTests
             AllowDeleteIfPlayedBeforeAdded: false), CancellationToken.None);
 
         catalog.Items.Should().ContainSingle(x => x.Id == movie.Id.ToString("N"));
+        adapter.SourceItemInspectionCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Create_ThirtyTwoPlayedRules_InspectSharedSourceOnce_AndHonorUnboundedWindow()
+    {
+        var user = CreateUser(0);
+        var movie = new Movie
+        {
+            Id = GuidFrom(11),
+            Name = "Old movie",
+            Path = "/media/old-movie.mkv",
+            DateCreated = Now.AddDays(-1000),
+        };
+        var libraryManager = new Mock<ILibraryManager>();
+        var userData = new CountingUserDataManager([user], [movie]);
+        userData.Set(user, movie, PlayedData(DateTime.UtcNow.AddDays(-365)));
+        SetupUsers(libraryManager, [user]);
+        SetupLibrary(
+            libraryManager,
+            [movie],
+            new Dictionary<(BaseItemKind Kind, string UserId, ItemSortBy SortBy), int>());
+        var adapter = new JellyfinMediaCatalogAdapter(
+            NullLogger<JellyfinMediaCatalogAdapter>.Instance,
+            CreateUserManager([user]),
+            libraryManager.Object,
+            userData.Manager,
+            new CountingTvHierarchyProvider(TestLibrary.Empty));
+        var rules = Enumerable.Range(0, 32)
+            .Select(index => Rule(
+                $"played-{index}",
+                MediaItemKind.Movie,
+                CleanupRuleTriggerKind.Played,
+                countAsNotPlayedAfter: index == 31 ? -1 : index + 1))
+            .ToList();
+
+        var catalog = adapter.Create(new CleanupPolicy(rules, false), CancellationToken.None);
+
+        catalog.Items.Should().ContainSingle(x => x.Id == movie.Id.ToString("N"));
+        adapter.SourceItemInspectionCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Create_GroupedPlayedSources_PreserveFirstMatchingSourceOrder()
+    {
+        var firstUser = CreateUser(0);
+        var secondUser = CreateUser(1);
+        var firstMovie = new Movie
+        {
+            Id = GuidFrom(12),
+            Name = "First emitted",
+            Path = "/media/first.mkv",
+            DateCreated = Now.AddDays(-100),
+        };
+        var secondMovie = new Movie
+        {
+            Id = GuidFrom(13),
+            Name = "Second emitted",
+            Path = "/media/second.mkv",
+            DateCreated = Now.AddDays(-100),
+        };
+        var users = new[] { firstUser, secondUser };
+        var queryOrder = new BaseItem[] { secondMovie, firstMovie };
+        var libraryManager = new Mock<ILibraryManager>();
+        var userData = new CountingUserDataManager(users, queryOrder);
+        userData.Set(firstUser, firstMovie, PlayedData(DateTime.UtcNow.AddDays(-3)));
+        userData.Set(firstUser, secondMovie, PlayedData(DateTime.UtcNow.AddDays(-20)));
+        userData.Set(secondUser, firstMovie, PlayedData(DateTime.UtcNow.AddDays(-20)));
+        userData.Set(secondUser, secondMovie, PlayedData(DateTime.UtcNow.AddDays(-3)));
+        SetupUsers(libraryManager, users);
+        SetupLibrary(
+            libraryManager,
+            queryOrder,
+            new Dictionary<(BaseItemKind Kind, string UserId, ItemSortBy SortBy), int>());
+        var adapter = new JellyfinMediaCatalogAdapter(
+            NullLogger<JellyfinMediaCatalogAdapter>.Instance,
+            CreateUserManager(users),
+            libraryManager.Object,
+            userData.Manager,
+            new CountingTvHierarchyProvider(TestLibrary.Empty));
+        var firstUserId = firstUser.Id.ToString("N");
+        var secondUserId = secondUser.Id.ToString("N");
+        var firstNarrow = Rule("first-narrow", MediaItemKind.Movie, CleanupRuleTriggerKind.Played, countAsNotPlayedAfter: 5) with
+        {
+            Filters = Filters(MediaItemKind.Movie) with { UserIds = [firstUserId], UsersMode = UsersListMode.Acknowledge },
+        };
+        var secondNarrow = Rule("second-narrow", MediaItemKind.Movie, CleanupRuleTriggerKind.Played, countAsNotPlayedAfter: 5) with
+        {
+            Filters = Filters(MediaItemKind.Movie) with { UserIds = [secondUserId], UsersMode = UsersListMode.Acknowledge },
+        };
+        var firstWide = Rule("first-wide", MediaItemKind.Movie, CleanupRuleTriggerKind.Played, countAsNotPlayedAfter: 30) with
+        {
+            Filters = Filters(MediaItemKind.Movie) with { UserIds = [firstUserId], UsersMode = UsersListMode.Acknowledge },
+        };
+
+        var catalog = adapter.Create(new CleanupPolicy([firstNarrow, secondNarrow, firstWide], false), CancellationToken.None);
+
+        catalog.Items.Select(item => item.Id).Should().Equal(
+            firstMovie.Id.ToString("N"),
+            secondMovie.Id.ToString("N"));
+        adapter.SourceItemInspectionCount.Should().Be(4, "two distinct user sources should each be inspected once");
     }
 
     [Fact]

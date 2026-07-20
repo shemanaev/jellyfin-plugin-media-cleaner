@@ -18,8 +18,10 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
         var audit = new CleanupAuditCollector(request.IsDryRun);
         var catalog = CleanupCatalogIndex.Create(request.Items);
         var matcher = new CleanupRuleMatcher(now, pathMatcher, request.Policy);
-        var deleteMatches = new List<RuleMatch>();
-        var protectMatches = new List<RuleMatch>();
+        var deleteMatches = request.IsDryRun ? new List<RuleMatch>() : null;
+        var protectMatches = request.IsDryRun ? new List<RuleMatch>() : null;
+        var decisionAccumulator = request.IsDryRun ? null : new DeleteDecisionAccumulator();
+        var protectedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var rule in enabledRules)
         {
@@ -33,11 +35,22 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
             {
                 if (rule.Actions.Kind == CleanupRuleActionKind.Delete)
                 {
-                    deleteMatches.Add(match);
+                    if (request.IsDryRun)
+                    {
+                        deleteMatches!.Add(match);
+                    }
+                    else
+                    {
+                        decisionAccumulator!.Add(match);
+                    }
                 }
                 else if (rule.Actions.Kind == CleanupRuleActionKind.Protect)
                 {
-                    protectMatches.Add(match);
+                    protectedIds.Add(match.Item.Id);
+                    if (request.IsDryRun)
+                    {
+                        protectMatches!.Add(match);
+                    }
                 }
                 else
                 {
@@ -46,8 +59,7 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
             }
         }
 
-        var protectedIds = protectMatches.Select(x => x.Item.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var protectedMatch in protectMatches)
+        foreach (var protectedMatch in protectMatches ?? [])
         {
             CleanupAudit.AddItem(
                 audit,
@@ -58,7 +70,9 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
                 $"protected by rule '{protectedMatch.Rule.Name}'");
         }
 
-        var decisions = BuildDeleteDecisions(deleteMatches, protectedIds, audit)
+        var decisions = (request.IsDryRun
+                ? BuildDeleteDecisions(deleteMatches!, protectedIds, audit)
+                : decisionAccumulator!.BuildDecisions(protectedIds))
             .OrderBy(x => CleanupRuleKinds.Priority(x.Kind))
             .ThenBy(x => x.Kind == ExpiredKind.Played ? FirstPlaybackLastPlayedDate(x.Playback) : x.Item.DateCreated)
             .ToList();
