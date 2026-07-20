@@ -45,7 +45,7 @@ internal sealed class JellyfinMutationAdapter(
         foreach (var decision in GetSuccessfullyDeletedDecisions(plan.Decisions, successfullyDeletedIds))
         {
             LogSuccessfulDeletion(decision);
-            var notificationDecision = WithNotificationOverview(decision, plan.AuditEntries);
+            var notificationDecision = WithNotificationOverview(decision);
             await CreateNotification(notificationDecision, cancellationToken);
             MarkUnplayed(decision, catalog);
         }
@@ -89,37 +89,37 @@ internal sealed class JellyfinMutationAdapter(
                 decision.Notification.Overview));
     }
 
-    internal static CleanupDecision WithNotificationOverview(CleanupDecision decision, IReadOnlyList<CleanupAuditEntry> auditEntries)
+    internal static CleanupDecision WithNotificationOverview(CleanupDecision decision)
     {
         return decision with
         {
             Notification = decision.Notification with
             {
-                Overview = BuildNotificationOverview(decision, auditEntries),
+                Overview = BuildNotificationOverview(decision),
             },
         };
     }
 
-    internal static string BuildNotificationOverview(CleanupDecision decision, IReadOnlyList<CleanupAuditEntry> auditEntries)
+    internal static string BuildNotificationOverview(CleanupDecision decision)
     {
         var builder = new StringBuilder();
         builder.AppendLine("Path:");
         builder.AppendLine(string.IsNullOrWhiteSpace(decision.Item.Path) ? "(no path)" : decision.Item.Path);
         builder.AppendLine();
-        builder.AppendLine("Decision log:");
-
-        var itemEntries = CleanupAuditFormatter.GetItemEntries(auditEntries, decision.Item.Id);
-        if (itemEntries.Count == 0)
+        builder.AppendLine("Decision:");
+        builder.Append("Reason: ");
+        builder.AppendLine(decision.Reason);
+        builder.Append("Matched rules: ");
+        if (decision.MatchedRules.Count == 0)
         {
-            builder.AppendLine("- No item-level audit entries were produced.");
-            return builder.ToString().TrimEnd();
+            builder.AppendLine("(none)");
+        }
+        else
+        {
+            builder.AppendLine(string.Join(", ", decision.MatchedRules));
         }
 
-        foreach (var entry in itemEntries)
-        {
-            builder.Append("- ");
-            builder.AppendLine(CleanupAuditFormatter.FormatPlainTextEntry(entry, includeAction: true));
-        }
+        builder.AppendLine("Result: successfully deleted");
 
         return builder.ToString().TrimEnd();
     }

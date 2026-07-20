@@ -8,16 +8,15 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
 {
     public IEnumerable<DeletionOperation> BuildDeletionOperations(
         IReadOnlyList<CleanupDecision> decisions,
-        IReadOnlyList<MediaItem> items,
+        IReadOnlyDictionary<string, MediaItem> byId,
         ISet<string> protectedIds,
-        List<CleanupAuditEntry> auditEntries)
+        CleanupAuditCollector audit)
     {
-        var byId = items.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
         var deleted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var decision in decisions)
         {
-            foreach (var operation in BuildDeletionOperations(decision.Item, byId, deleted, protectedIds, auditEntries))
+            foreach (var operation in BuildDeletionOperations(decision.Item, byId, deleted, protectedIds, audit))
             {
                 yield return operation;
             }
@@ -29,12 +28,13 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
         IReadOnlyDictionary<string, MediaItem> byId,
         HashSet<string> deleted,
         ISet<string> protectedIds,
-        List<CleanupAuditEntry> auditEntries)
+        CleanupAuditCollector audit)
     {
         var catalogItem = byId.TryGetValue(item.Id, out var foundItem) ? foundItem : item;
         if (item.Kind == MediaItemKind.Series && TryGetProtectedDescendant(catalogItem, byId, protectedIds, out var protectedChild))
         {
-            CleanupAudit.AddCascadeBlocked(auditEntries, item, $"delete blocked because series contains protected item '{protectedChild.Name}'");
+            CleanupAudit.AddCascadeBlocked(audit, item, $"delete blocked because series contains protected item '{protectedChild.Name}'");
+
             yield break;
         }
 
@@ -42,7 +42,8 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
         {
             if (TryGetProtectedDescendant(catalogItem, byId, protectedIds, out protectedChild))
             {
-                CleanupAudit.AddCascadeBlocked(auditEntries, item, $"delete blocked because season contains protected item '{protectedChild.Name}'");
+                CleanupAudit.AddCascadeBlocked(audit, item, $"delete blocked because season contains protected item '{protectedChild.Name}'");
+
                 yield break;
             }
 
@@ -50,7 +51,7 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
             {
                 if (byId.TryGetValue(episodeId, out var episode))
                 {
-                    foreach (var op in AddDeletion(episode, deleted, protectedIds, auditEntries))
+                    foreach (var op in AddDeletion(episode, deleted, protectedIds, audit))
                     {
                         yield return op;
                     }
@@ -58,7 +59,7 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
             }
         }
 
-        foreach (var op in AddDeletion(item, deleted, protectedIds, auditEntries))
+        foreach (var op in AddDeletion(item, deleted, protectedIds, audit))
         {
             yield return op;
         }
@@ -70,11 +71,11 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
             {
                 if (TryGetProtectedDescendant(season, byId, protectedIds, out var protectedSeasonChild))
                 {
-                    CleanupAudit.AddCascadeBlocked(auditEntries, season, $"delete blocked because season contains protected item '{protectedSeasonChild.Name}'");
+                    CleanupAudit.AddCascadeBlocked(audit, season, $"delete blocked because season contains protected item '{protectedSeasonChild.Name}'");
                 }
                 else
                 {
-                    foreach (var op in AddDeletion(season, deleted, protectedIds, auditEntries))
+                    foreach (var op in AddDeletion(season, deleted, protectedIds, audit))
                     {
                         yield return op;
                     }
@@ -90,15 +91,15 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
             {
                 if (extraFileProbe.HasBlockingExtraFiles(series))
                 {
-                    CleanupAudit.AddCascadeBlocked(auditEntries, series, "delete blocked because series has extra files outside planned episode deletions");
+                    CleanupAudit.AddCascadeBlocked(audit, series, $"delete blocked because series has extra files outside planned episode deletions");
                 }
                 else if (TryGetProtectedDescendant(series, byId, protectedIds, out var protectedSeriesChild))
                 {
-                    CleanupAudit.AddCascadeBlocked(auditEntries, series, $"delete blocked because series contains protected item '{protectedSeriesChild.Name}'");
+                    CleanupAudit.AddCascadeBlocked(audit, series, $"delete blocked because series contains protected item '{protectedSeriesChild.Name}'");
                 }
                 else
                 {
-                    foreach (var op in AddDeletion(series, deleted, protectedIds, auditEntries))
+                    foreach (var op in AddDeletion(series, deleted, protectedIds, audit))
                     {
                         yield return op;
                     }
@@ -149,24 +150,26 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
         MediaItem item,
         HashSet<string> deleted,
         ISet<string> protectedIds,
-        List<CleanupAuditEntry> auditEntries)
+        CleanupAuditCollector audit)
     {
         if (protectedIds.Contains(item.Id))
         {
-            CleanupAudit.AddCascadeBlocked(auditEntries, item, "delete blocked because item is protected");
+            CleanupAudit.AddCascadeBlocked(audit, item, $"delete blocked because item is protected");
+
             yield break;
         }
 
         if (deleted.Add(item.Id))
         {
             CleanupAudit.AddItem(
-                auditEntries,
+                audit,
                 item,
                 null,
                 CleanupAuditStage.DeletionCascade,
                 CleanupAuditOutcome.Planned,
-                $"planned deletion for {item.Kind.ToString().ToLowerInvariant()} '{CleanupAudit.GetItemDisplayName(item)}'",
+                $"planned deletion for {item.Kind} '{CleanupAudit.GetItemDisplayName(item)}'",
                 CleanupRuleActionKind.Delete);
+
             yield return new DeletionOperation(item.Id, item.Kind, item.Name);
         }
     }

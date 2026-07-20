@@ -15,14 +15,21 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
         }
 
         var now = clock.UtcNow;
-        var auditEntries = new List<CleanupAuditEntry>();
+        var audit = new CleanupAuditCollector(request.IsDryRun);
+        var catalog = CleanupCatalogIndex.Create(request.Items);
         var matcher = new CleanupRuleMatcher(now, pathMatcher, request.Policy);
         var deleteMatches = new List<RuleMatch>();
         var protectMatches = new List<RuleMatch>();
 
         foreach (var rule in enabledRules)
         {
-            foreach (var match in matcher.CollectRuleMatches(request, rule, auditEntries))
+            var context = matcher.CreateContext(request.Users, rule, audit);
+            if (context is null)
+            {
+                continue;
+            }
+
+            foreach (var match in matcher.CollectRuleMatches(catalog, context, audit))
             {
                 if (rule.Actions.Kind == CleanupRuleActionKind.Delete)
                 {
@@ -43,7 +50,7 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
         foreach (var protectedMatch in protectMatches)
         {
             CleanupAudit.AddItem(
-                auditEntries,
+                audit,
                 protectedMatch.Item,
                 protectedMatch.Rule,
                 CleanupAuditStage.Protection,
@@ -51,7 +58,7 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
                 $"protected by rule '{protectedMatch.Rule.Name}'");
         }
 
-        var decisions = BuildDeleteDecisions(deleteMatches, protectedIds, auditEntries)
+        var decisions = BuildDeleteDecisions(deleteMatches, protectedIds, audit)
             .OrderBy(x => CleanupRuleKinds.Priority(x.Kind))
             .ThenBy(x => x.Kind == ExpiredKind.Played ? FirstPlaybackLastPlayedDate(x.Playback) : x.Item.DateCreated)
             .ToList();
@@ -63,7 +70,7 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
             // Dry-run needs the deletion-cascade audit entries and counts, but it does not need
             // to retain every DeletionOperation object. On large not-played libraries this avoids
             // keeping tens of thousands of deletion records alive until the report is rendered.
-            foreach (var _ in cascadePlanner.BuildDeletionOperations(decisions, request.Items, protectedIds, auditEntries))
+            foreach (var _ in cascadePlanner.BuildDeletionOperations(decisions, catalog.ItemsById, protectedIds, audit))
             {
             }
 
@@ -71,10 +78,10 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
         }
         else
         {
-            deletions = cascadePlanner.BuildDeletionOperations(decisions, request.Items, protectedIds, auditEntries).ToList();
+            deletions = cascadePlanner.BuildDeletionOperations(decisions, catalog.ItemsById, protectedIds, audit).ToList();
         }
 
-        return new CleanupPlan(decisions, deletions, auditEntries);
+        return new CleanupPlan(decisions, deletions, audit.Entries);
     }
 
     public static IEnumerable<MediaUser> FilterUsers(
@@ -92,13 +99,13 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
 
     private static DateTime? FirstPlaybackLastPlayedDate(IReadOnlyList<PlaybackState> playback)
     {
-        return playback.Count == 0 ? null : playback[0].LastPlayedDate;
+        return playback[0].LastPlayedDate;
     }
 
     private static IEnumerable<CleanupDecision> BuildDeleteDecisions(
         IEnumerable<RuleMatch> deleteMatches,
         ISet<string> protectedIds,
-        List<CleanupAuditEntry> auditEntries)
+        CleanupAuditCollector audit)
     {
         foreach (var group in deleteMatches.GroupBy(x => x.Item.Id, StringComparer.OrdinalIgnoreCase))
         {
@@ -108,12 +115,12 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
                 foreach (var match in group)
                 {
                     CleanupAudit.AddItem(
-                        auditEntries,
+                        audit,
                         match.Item,
                         match.Rule,
                         CleanupAuditStage.Protection,
                         CleanupAuditOutcome.Suppressed,
-                        "delete suppressed because item is protected");
+                        $"delete suppressed because item is protected");
                 }
 
                 continue;

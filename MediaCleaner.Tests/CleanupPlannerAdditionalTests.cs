@@ -23,7 +23,10 @@ public class CleanupPlannerAdditionalTests
 
         blocked.Decisions.Should().HaveCount(2);
         blocked.Deletions.Select(x => x.ItemId).Should().NotContain("show1");
-        blocked.AuditEntries.Should().Contain(x =>
+        blocked.AuditEntries.Should().BeEmpty();
+
+        var dryRun = Planner(new BlockingExtraFileProbe()).Plan(new CleanupRequest(Policy(rule), [User("u1")], [episode, e2, series], true));
+        dryRun.AuditEntries.Should().Contain(x =>
             x.ItemId == "show1" &&
             x.Stage == CleanupAuditStage.DeletionCascade &&
             x.Outcome == CleanupAuditOutcome.Blocked &&
@@ -106,6 +109,101 @@ public class CleanupPlannerAdditionalTests
         plan.Decisions[0].Notification.ShortOverview.Should().Contain("nis");
     }
 
+    [Fact]
+    public void CatalogIndex_SingleKindUsesOnlyItsBucketAndSharedIdLookup()
+    {
+        var movie = Movie("m1");
+        var episode = Episode("e1", "s1", "show1");
+        var source = new IndexOnlyMediaItemList([movie, episode]);
+
+        var catalog = CleanupCatalogIndex.Create(source);
+        var result = catalog.GetRuleItems(new HashSet<MediaItemKind> { MediaItemKind.Movie }).ToList();
+
+        result.Should().ContainSingle().Which.Should().BeSameAs(movie);
+        catalog.GetRuleItems(new HashSet<MediaItemKind> { MediaItemKind.Audio }).Should().BeEmpty();
+        catalog.ItemsById["E1"].Should().BeSameAs(episode);
+        source.IndexReads.Should().Be(2);
+        source.EnumeratorCalls.Should().Be(0, "single-kind rules should use the indexed bucket");
+    }
+
+    [Fact]
+    public void CatalogIndex_MultiKindPreservesOriginalItemOrder()
+    {
+        var firstMovie = Movie("m1");
+        var episode = Episode("e1", "s1", "show1");
+        var secondMovie = Movie("m2");
+        var catalog = CleanupCatalogIndex.Create([firstMovie, episode, secondMovie]);
+
+        var result = catalog.GetRuleItems(new HashSet<MediaItemKind>
+        {
+            MediaItemKind.Movie,
+            MediaItemKind.Episode,
+        });
+
+        result.Select(x => x.Id).Should().Equal("m1", "e1", "m2");
+    }
+
+    [Fact]
+    public void Plan_SingleKindRuleDoesNotReenumerateSourceAfterIndexing()
+    {
+        var rule = Rule(MediaItemKind.Episode, CleanupRuleTriggerKind.Played, 10) with
+        {
+            Filters = Filters(MediaItemKind.Episode) with { DeleteEpisodes = SeriesDeleteKind.Season },
+        };
+        var e1 = Episode("e1", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
+        var e2 = Episode("e2", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
+        var season = new MediaItem(
+            "s1",
+            MediaItemKind.Season,
+            "s1",
+            "s1",
+            Now.AddDays(-30),
+            "/media/s1",
+            "/media/s1",
+            [],
+            [],
+            SeriesId: "show1",
+            SeasonId: "s1",
+            EpisodeIds: ["e1", "e2"]);
+        var source = new IndexOnlyMediaItemList([e1, e2, season]);
+
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], source, false));
+
+        plan.Decisions.Should().ContainSingle(x => x.Item.Id == "s1");
+        source.IndexReads.Should().Be(3);
+        source.EnumeratorCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public void AuditAndDecisionFactory_CoverFallbackInputs()
+    {
+        var item = Movie("m1");
+        var audit = new CleanupAuditCollector(enabled: true);
+
+        CleanupAudit.AddItem(
+            audit,
+            item,
+            null,
+            CleanupAuditStage.DeletionCascade,
+            CleanupAuditOutcome.Planned,
+            $"fallback audit");
+
+        audit.Entries.Should().ContainSingle(x => x.RuleId == null && x.Action == null);
+        FluentActions.Invoking(() => CleanupDecisionFactory.Create(item, (ExpiredKind)999, [], [], []))
+            .Should().Throw<NotSupportedException>();
+    }
+
+    [Fact]
+    public void Plan_AddedAgeWithoutSelectedUsersKeepsPlaybackContext()
+    {
+        var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.AddedAge, 10);
+        var playback = Playback("u1", Now.AddDays(-20), true);
+
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [], [Movie("m1", playback)], false));
+
+        plan.Decisions.Should().ContainSingle().Which.Playback.Should().ContainSingle().Which.Should().Be(playback);
+    }
+
     private static CleanupPlanner Planner(IExtraFileProbe? extraFileProbe = null) =>
         new(new FixedClock(Now), new TestPathMatcher(), extraFileProbe ?? new NoExtraFileProbe());
 
@@ -162,5 +260,31 @@ public class CleanupPlannerAdditionalTests
     private sealed class BlockingExtraFileProbe : IExtraFileProbe
     {
         public bool HasBlockingExtraFiles(MediaItem item) => item.Kind == MediaItemKind.Series;
+    }
+
+    private sealed class IndexOnlyMediaItemList(IReadOnlyList<MediaItem> items) : IReadOnlyList<MediaItem>
+    {
+        public int IndexReads { get; private set; }
+
+        public int EnumeratorCalls { get; private set; }
+
+        public int Count => items.Count;
+
+        public MediaItem this[int index]
+        {
+            get
+            {
+                IndexReads++;
+                return items[index];
+            }
+        }
+
+        public IEnumerator<MediaItem> GetEnumerator()
+        {
+            EnumeratorCalls++;
+            return items.GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

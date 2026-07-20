@@ -1,17 +1,84 @@
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace MediaCleaner.Core;
+
+internal sealed class CleanupAuditCollector(bool enabled)
+{
+    private readonly List<CleanupAuditEntry> _entries = [];
+
+    public bool Enabled { get; } = enabled;
+
+    public IReadOnlyList<CleanupAuditEntry> Entries => _entries;
+
+    public void Add(CleanupAuditEntry entry)
+    {
+        if (Enabled)
+        {
+            _entries.Add(entry);
+        }
+    }
+}
+
+[InterpolatedStringHandler]
+internal ref struct AuditReasonInterpolatedStringHandler
+{
+    private readonly bool _enabled;
+    private DefaultInterpolatedStringHandler _handler;
+
+    public AuditReasonInterpolatedStringHandler(
+        int literalLength,
+        int formattedCount,
+        CleanupAuditCollector audit)
+    {
+        _enabled = audit.Enabled;
+        _handler = _enabled
+            ? new DefaultInterpolatedStringHandler(literalLength, formattedCount)
+            : default;
+    }
+
+    public void AppendLiteral(string value)
+    {
+        if (_enabled)
+        {
+            _handler.AppendLiteral(value);
+        }
+    }
+
+    public void AppendFormatted<T>(T value)
+    {
+        if (_enabled)
+        {
+            _handler.AppendFormatted(value);
+        }
+    }
+
+    public void AppendFormatted(MediaItemKind value)
+    {
+        if (_enabled)
+        {
+            _handler.AppendFormatted(value.ToString().ToLowerInvariant());
+        }
+    }
+
+    public string GetFormattedText() => _handler.ToStringAndClear();
+}
 
 internal static class CleanupAudit
 {
     public static void AddRule(
-        List<CleanupAuditEntry> auditEntries,
+        CleanupAuditCollector audit,
         CleanupRule rule,
         CleanupAuditStage stage,
         CleanupAuditOutcome outcome,
-        string reason)
+        [InterpolatedStringHandlerArgument("audit")] ref AuditReasonInterpolatedStringHandler reason)
     {
-        auditEntries.Add(new CleanupAuditEntry(
+        if (!audit.Enabled)
+        {
+            return;
+        }
+
+        audit.Add(new CleanupAuditEntry(
             null,
             null,
             null,
@@ -20,19 +87,24 @@ internal static class CleanupAudit
             rule.Actions.Kind,
             stage,
             outcome,
-            reason));
+            reason.GetFormattedText()));
     }
 
     public static void AddItem(
-        List<CleanupAuditEntry> auditEntries,
+        CleanupAuditCollector audit,
         MediaItem item,
         CleanupRule? rule,
         CleanupAuditStage stage,
         CleanupAuditOutcome outcome,
-        string reason,
+        [InterpolatedStringHandlerArgument("audit")] ref AuditReasonInterpolatedStringHandler reason,
         CleanupRuleActionKind? action = null)
     {
-        auditEntries.Add(new CleanupAuditEntry(
+        if (!audit.Enabled)
+        {
+            return;
+        }
+
+        audit.Add(new CleanupAuditEntry(
             item.Id,
             GetItemDisplayName(item),
             item.Kind,
@@ -41,18 +113,30 @@ internal static class CleanupAudit
             action ?? rule?.Actions.Kind,
             stage,
             outcome,
-            reason));
+            reason.GetFormattedText()));
     }
 
-    public static void AddCascadeBlocked(List<CleanupAuditEntry> auditEntries, MediaItem item, string reason) =>
-        AddItem(
-            auditEntries,
-            item,
+    public static void AddCascadeBlocked(
+        CleanupAuditCollector audit,
+        MediaItem item,
+        [InterpolatedStringHandlerArgument("audit")] ref AuditReasonInterpolatedStringHandler reason)
+    {
+        if (!audit.Enabled)
+        {
+            return;
+        }
+
+        audit.Add(new CleanupAuditEntry(
+            item.Id,
+            GetItemDisplayName(item),
+            item.Kind,
             null,
+            null,
+            CleanupRuleActionKind.Delete,
             CleanupAuditStage.DeletionCascade,
             CleanupAuditOutcome.Blocked,
-            reason,
-            CleanupRuleActionKind.Delete);
+            reason.GetFormattedText()));
+    }
 
     public static string GetItemDisplayName(MediaItem item) =>
         string.IsNullOrWhiteSpace(item.FullName) ? item.Name : item.FullName;

@@ -132,7 +132,7 @@ public class JellyfinMediaCatalogAdapterLoadTests
         };
         var libraryManager = new Mock<ILibraryManager>();
         var userData = new CountingUserDataManager([user], [movie]);
-        userData.Set(user, movie, PlayedData(Now.AddDays(-20)));
+        userData.Set(user, movie, PlayedData(DateTime.UtcNow.AddDays(-20)));
         SetupUsers(libraryManager, [user]);
         SetupLibrary(
             libraryManager,

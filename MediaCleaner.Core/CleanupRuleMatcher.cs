@@ -6,40 +6,61 @@ namespace MediaCleaner.Core;
 
 internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher, CleanupPolicy policy)
 {
-    public IEnumerable<RuleMatch> CollectRuleMatches(
-        CleanupRequest request,
+    public RuleEvaluationContext? CreateContext(
+        IReadOnlyList<MediaUser> requestUsers,
         CleanupRule rule,
-        List<CleanupAuditEntry> auditEntries)
+        CleanupAuditCollector audit)
     {
         if (rule.Trigger.Days < 0)
         {
             CleanupAudit.AddRule(
-                auditEntries,
+                audit,
                 rule,
                 CleanupAuditStage.RuleEligibility,
                 CleanupAuditOutcome.Skipped,
                 $"rule '{rule.Name}' skipped because days is negative");
-            yield break;
+
+            return null;
         }
 
-        var users = CleanupPlanner.FilterUsers(request.Users, rule.Filters.UserIds, rule.Filters.UsersMode).ToList();
+        var users = CleanupPlanner.FilterUsers(requestUsers, rule.Filters.UserIds, rule.Filters.UsersMode).ToList();
         if (rule.Trigger.Kind is CleanupRuleTriggerKind.Played or CleanupRuleTriggerKind.NotPlayed && users.Count == 0)
         {
             CleanupAudit.AddRule(
-                auditEntries,
+                audit,
                 rule,
                 CleanupAuditStage.RuleEligibility,
                 CleanupAuditOutcome.Skipped,
                 $"rule '{rule.Name}' skipped because no users matched its user filter");
-            yield break;
+
+            return null;
         }
 
-        var favoriteUsers = CleanupPlanner.FilterUsers(request.Users, rule.Filters.FavoriteUserIds, rule.Filters.FavoriteUsersMode).ToList();
+        var favoriteUsers = CleanupPlanner.FilterUsers(requestUsers, rule.Filters.FavoriteUserIds, rule.Filters.FavoriteUsersMode).ToList();
+        var startDate = rule.Trigger.CountAsNotPlayedAfter >= 0
+            ? now.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
+            : (DateTime?)null;
+        return new RuleEvaluationContext(
+            rule,
+            users,
+            users.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase),
+            favoriteUsers,
+            rule.Filters.MediaKinds.ToHashSet(),
+            startDate);
+    }
+
+    public IEnumerable<RuleMatch> CollectRuleMatches(
+        CleanupCatalogIndex catalog,
+        RuleEvaluationContext context,
+        CleanupAuditCollector audit)
+    {
+        var rule = context.Rule;
+        var items = catalog.GetRuleItems(context.MediaKinds);
         var candidates = rule.Trigger.Kind switch
         {
-            CleanupRuleTriggerKind.Played => CollectPlayed(request.Items, users, rule, auditEntries),
-            CleanupRuleTriggerKind.NotPlayed => CollectNotPlayed(request.Items, users, rule, auditEntries),
-            CleanupRuleTriggerKind.AddedAge => CollectAddedAge(request.Items, users, rule),
+            CleanupRuleTriggerKind.Played => CollectPlayed(items, context, audit),
+            CleanupRuleTriggerKind.NotPlayed => CollectNotPlayed(items, context, audit),
+            CleanupRuleTriggerKind.AddedAge => CollectAddedAge(items, context),
             _ => throw new NotSupportedException($"Unsupported rule trigger: {rule.Trigger.Kind}"),
         };
 
@@ -47,53 +68,56 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
         foreach (var candidate in candidates)
         {
             CleanupAudit.AddItem(
-                auditEntries,
+                audit,
                 candidate.Item,
                 rule,
                 CleanupAuditStage.Trigger,
                 CleanupAuditOutcome.Matched,
                 $"matched {rule.Trigger.Kind} rule '{rule.Name}'");
 
-            if (!IsAllowedByFavorites(candidate.Item, favoriteUsers, rule.Filters.FavoriteFilter))
+            if (!IsAllowedByFavorites(candidate.Item, context.FavoriteUsers, rule.Filters.FavoriteFilter))
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     candidate.Item,
                     rule,
                     CleanupAuditStage.FavoriteFilter,
                     CleanupAuditOutcome.Rejected,
                     $"rejected by favorite filter '{rule.Filters.FavoriteFilter}'");
+
                 continue;
             }
 
             if (!IsAllowedByLocation(candidate.Item, rule.Filters))
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     candidate.Item,
                     rule,
                     CleanupAuditStage.LocationFilter,
                     CleanupAuditOutcome.Rejected,
                     $"rejected by location filter '{rule.Filters.LocationsMode}'");
+
                 continue;
             }
 
             if (!IsAllowedByTag(candidate.Item, rule.Filters))
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     candidate.Item,
                     rule,
                     CleanupAuditStage.TagFilter,
                     CleanupAuditOutcome.Rejected,
                     $"rejected by tag filter '{rule.Filters.TagFilterMode}'");
+
                 continue;
             }
 
             filtered.Add(candidate);
         }
 
-        foreach (var item in SeriesPolicyEvaluator.Apply(filtered, rule, auditEntries, request.Items))
+        foreach (var item in SeriesPolicyEvaluator.Apply(filtered, rule, audit, catalog.ItemsById))
         {
             yield return new RuleMatch(rule, item.Item, CleanupRuleKinds.ToExpiredKind(rule.Trigger.Kind), item.Playback);
         }
@@ -101,23 +125,19 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
 
     private IEnumerable<CandidateItem> CollectPlayed(
         IEnumerable<MediaItem> items,
-        IReadOnlyList<MediaUser> users,
-        CleanupRule rule,
-        List<CleanupAuditEntry> auditEntries)
+        RuleEvaluationContext context,
+        CleanupAuditCollector audit)
     {
-        var userIds = users.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var startDate = rule.Trigger.CountAsNotPlayedAfter >= 0
-            ? now.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
-            : (DateTime?)null;
+        var rule = context.Rule;
 
-        foreach (var item in items.Where(x => rule.Filters.MediaKinds.Contains(x.Kind)))
+        foreach (var item in items)
         {
             var playback = item.Playback
-                .Where(x => userIds.Contains(x.UserId))
+                .Where(x => context.UserIds.Contains(x.UserId))
                 .Where(x => x.HasUserData)
                 .Where(x => x.IsPlayed || x.IsWatching)
                 .Where(x => x.LastPlayedDate.HasValue)
-                .Where(x => startDate is null || x.LastPlayedDate >= startDate)
+                .Where(x => context.PlaybackStartDate is null || x.LastPlayedDate >= context.PlaybackStartDate)
                 .Where(x =>
                 {
                     if (policy.AllowDeleteIfPlayedBeforeAdded || x.LastPlayedDate >= item.DateCreated)
@@ -125,13 +145,13 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
                         return true;
                     }
 
-                    AddPlayedBeforeAddedAudit(auditEntries, item, rule, x, "ignored playback");
+                    AddPlayedBeforeAddedAudit(audit, item, rule, x, "ignored playback");
                     return false;
                 })
                 .OrderByDescending(x => x.LastPlayedDate)
                 .ToList();
             var candidate = new CandidateItem(item, playback);
-            if (candidate.Playback.Count > 0 && IsPlayedExpired(candidate.Playback, users.Count, rule.Trigger))
+            if (candidate.Playback.Count > 0 && IsPlayedExpired(candidate.Playback, context.Users.Count, rule.Trigger))
             {
                 yield return candidate;
             }
@@ -140,20 +160,16 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
 
     private IEnumerable<CandidateItem> CollectNotPlayed(
         IEnumerable<MediaItem> items,
-        IReadOnlyList<MediaUser> users,
-        CleanupRule rule,
-        List<CleanupAuditEntry> auditEntries)
+        RuleEvaluationContext context,
+        CleanupAuditCollector audit)
     {
-        var userIds = users.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var startDate = rule.Trigger.CountAsNotPlayedAfter >= 0
-            ? now.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
-            : (DateTime?)null;
+        var rule = context.Rule;
 
-        foreach (var item in items.Where(x => rule.Filters.MediaKinds.Contains(x.Kind)))
+        foreach (var item in items)
         {
             var hasPlayedBeforeAdded = false;
             var notPlayed = item.Playback
-                .Where(x => userIds.Contains(x.UserId))
+                .Where(x => context.UserIds.Contains(x.UserId))
                 .Where(x => x.HasUserData)
                 .Where(x =>
                 {
@@ -161,16 +177,16 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
                         && x.IsPlayed
                         && x.LastPlayedDate.HasValue
                         && x.LastPlayedDate < item.DateCreated
-                        && (startDate is null || x.LastPlayedDate >= startDate);
+                        && (context.PlaybackStartDate is null || x.LastPlayedDate >= context.PlaybackStartDate);
                     if (isPlayedBeforeAdded)
                     {
                         hasPlayedBeforeAdded = true;
-                        AddPlayedBeforeAddedAudit(auditEntries, item, rule, x, "blocked not-played match");
+                        AddPlayedBeforeAddedAudit(audit, item, rule, x, "blocked not-played match");
                     }
 
                     var isPlayedAfterCreated = policy.AllowDeleteIfPlayedBeforeAdded || x.LastPlayedDate >= item.DateCreated;
                     var shouldSkip = (x.IsPlayed && isPlayedAfterCreated) || x.IsWatching;
-                    return startDate is null ? !shouldSkip : !(shouldSkip && x.LastPlayedDate >= startDate);
+                    return context.PlaybackStartDate is null ? !shouldSkip : !(shouldSkip && x.LastPlayedDate >= context.PlaybackStartDate);
                 })
                 .ToList();
             if (hasPlayedBeforeAdded)
@@ -179,7 +195,7 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
             }
 
             var candidate = new CandidateItem(item, notPlayed);
-            if (candidate.Playback.Count == users.Count && now >= candidate.Item.DateCreated.AddDays(rule.Trigger.Days))
+            if (candidate.Playback.Count == context.Users.Count && now >= candidate.Item.DateCreated.AddDays(rule.Trigger.Days))
             {
                 yield return candidate;
             }
@@ -188,16 +204,14 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
 
     private IEnumerable<CandidateItem> CollectAddedAge(
         IEnumerable<MediaItem> items,
-        IReadOnlyList<MediaUser> users,
-        CleanupRule rule)
+        RuleEvaluationContext context)
     {
-        var userIds = users.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rule = context.Rule;
         return items
-            .Where(x => rule.Filters.MediaKinds.Contains(x.Kind))
             .Where(x => now >= x.DateCreated.AddDays(rule.Trigger.Days))
             .Select(item => new CandidateItem(
                 item,
-                item.Playback.Where(x => userIds.Count == 0 || userIds.Contains(x.UserId)).ToList()));
+                item.Playback.Where(x => context.UserIds.Count == 0 || context.UserIds.Contains(x.UserId)).ToList()));
     }
 
     private bool IsPlayedExpired(IReadOnlyList<PlaybackState> playback, int usersCount, CleanupRuleTrigger trigger)
@@ -214,7 +228,7 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
     }
 
     private static void AddPlayedBeforeAddedAudit(
-        List<CleanupAuditEntry> auditEntries,
+        CleanupAuditCollector audit,
         MediaItem item,
         CleanupRule rule,
         PlaybackState playback,
@@ -222,7 +236,7 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
     {
         var user = string.IsNullOrWhiteSpace(playback.UserName) ? playback.UserId : playback.UserName;
         CleanupAudit.AddItem(
-            auditEntries,
+            audit,
             item,
             rule,
             CleanupAuditStage.Trigger,

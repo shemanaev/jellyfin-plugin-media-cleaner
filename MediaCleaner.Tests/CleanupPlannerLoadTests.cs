@@ -54,7 +54,83 @@ public class CleanupPlannerLoadTests
         plan.Decisions.Select(x => x.Item.Kind)
             .Should()
             .Contain(Enum.GetValues<MediaItemKind>(), "the load scenario should exercise every media kind");
-        plan.AuditEntries.Should().NotBeEmpty();
+        plan.AuditEntries.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(8, false)]
+    [InlineData(32, false)]
+    [InlineData(1, true)]
+    [InlineData(8, true)]
+    [InlineData(32, true)]
+    public void Plan_RuleCountAndMediaScopeMatrix_CompletesWithinBudget(int ruleCount, bool allMedia)
+    {
+        var users = new[] { new MediaUser("u1", "one") };
+        var items = BuildLibrary(users).ToList();
+        var mediaKinds = allMedia ? Enum.GetValues<MediaItemKind>() : [MediaItemKind.Movie];
+        var rules = Enumerable.Range(0, ruleCount)
+            .Select(index => Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.AddedAge, 10) with
+            {
+                Id = $"rule-{index}",
+                Name = $"rule {index}",
+                Filters = Filters(MediaItemKind.Movie) with { MediaKinds = mediaKinds },
+            })
+            .ToList();
+        var request = new CleanupRequest(new CleanupPolicy(rules, false), users, items, IsDryRun: false);
+
+        var stopwatch = Stopwatch.StartNew();
+        var plan = Planner().Plan(request);
+        stopwatch.Stop();
+
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(3));
+        plan.Decisions.Should().NotBeEmpty();
+        plan.AuditEntries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Plan_NormalRunAllocatesLessThanSixtyPercentOfAuditHeavyDryRun()
+    {
+        var users = new[] { new MediaUser("u1", "one") };
+        var items = Enumerable.Range(0, 2_000)
+            .Select(index => Item($"movie-{index}", MediaItemKind.Movie, users))
+            .ToList();
+        var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.AddedAge, 10) with
+        {
+            Filters = Filters(MediaItemKind.Movie) with
+            {
+                EnableTagFilter = true,
+                TagFilterMode = TagMode.Inclusion,
+                Tags = ["missing"],
+            },
+        };
+        var policy = new CleanupPolicy([rule], false);
+        var normalRequest = new CleanupRequest(policy, users, items, IsDryRun: false);
+        var dryRunRequest = normalRequest with { IsDryRun = true };
+
+        _ = Planner().Plan(normalRequest);
+        _ = Planner().Plan(dryRunRequest);
+
+        var normalBytes = MeasureMedianAllocatedBytes(normalRequest);
+        var dryRunBytes = MeasureMedianAllocatedBytes(dryRunRequest);
+
+        normalBytes.Should().BeLessThan(
+            (long)(dryRunBytes * 0.60),
+            $"normal planning allocated {normalBytes:N0} bytes while dry-run allocated {dryRunBytes:N0} bytes");
+    }
+
+    private static long MeasureMedianAllocatedBytes(CleanupRequest request)
+    {
+        var measurements = new long[5];
+        for (var index = 0; index < measurements.Length; index++)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            _ = Planner().Plan(request);
+            measurements[index] = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+
+        Array.Sort(measurements);
+        return measurements[measurements.Length / 2];
     }
 
     private static IEnumerable<MediaItem> BuildLibrary(IReadOnlyList<MediaUser> users)

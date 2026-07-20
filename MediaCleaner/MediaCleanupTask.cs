@@ -88,7 +88,7 @@ public class MediaCleanupTask : IScheduledTask
 
         var request = new CleanupRequest(policy, catalog.Users, catalog.Items, IsDryRun);
         var plan = _planner.Plan(request);
-        LastPlan = plan;
+        LastPlan = IsDryRun ? plan : null;
         progress.Report(75);
 
         if (plan.Decisions.Count == 0)

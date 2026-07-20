@@ -17,7 +17,7 @@ namespace MediaCleaner.Tests;
 public class MediaCleanupTaskTests
 {
     [Fact]
-    public async Task ExecuteAsync_SkipsMutation_WhenMigratedRulesNeedReview()
+    public async Task ExecuteAsync_SkipsMutationAndDoesNotRetainPlan_WhenMigratedRulesNeedReview()
     {
         var mutation = new RecordingMutationAdapter();
         var task = CreateTask(requiresMigrationReview: true, mutation);
@@ -25,8 +25,7 @@ public class MediaCleanupTaskTests
         await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
         mutation.ExecuteCount.Should().Be(0);
-        task.LastPlan.Should().NotBeNull();
-        task.LastPlan!.Decisions.Should().ContainSingle();
+        task.LastPlan.Should().BeNull();
     }
 
     [Fact]
@@ -38,6 +37,21 @@ public class MediaCleanupTaskTests
         await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
         mutation.ExecuteCount.Should().Be(1);
+        task.LastPlan.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RetainsPlanOnlyForDryRun()
+    {
+        var mutation = new RecordingMutationAdapter();
+        var task = CreateTask(requiresMigrationReview: false, mutation, isDryRun: true);
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        mutation.ExecuteCount.Should().Be(1);
+        task.LastPlan.Should().NotBeNull();
+        task.LastPlan!.Decisions.Should().ContainSingle();
+        task.LastPlan.AuditEntries.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -47,14 +61,16 @@ public class MediaCleanupTaskTests
         var plan = new CleanupPlanner(new FixedClock(), new OrdinalPathMatcher(), new NoExtraFileProbe())
             .Plan(new CleanupRequest(CreatePolicy(), [new MediaUser("user", "User")], [item], false));
 
-        var notificationDecision = JellyfinMutationAdapter.WithNotificationOverview(plan.Decisions.Single(), plan.AuditEntries);
+        plan.AuditEntries.Should().BeEmpty();
+        var notificationDecision = JellyfinMutationAdapter.WithNotificationOverview(plan.Decisions.Single());
         var overview = notificationDecision.Notification.Overview;
 
         overview.Should().Contain("Path:");
         overview.Should().Contain(@"C:\Media\Movie.mkv");
-        overview.Should().Contain("Decision log:");
-        overview.Should().Contain("Trigger -> Matched [rule] (Delete):");
-        overview.Should().Contain("DeletionCascade -> Planned (Delete): planned deletion");
+        overview.Should().Contain("Decision:");
+        overview.Should().Contain("Reason: expired for User");
+        overview.Should().Contain("Matched rules: rule");
+        overview.Should().Contain("Result: successfully deleted");
     }
 
     [Fact]
@@ -122,14 +138,17 @@ public class MediaCleanupTaskTests
         CleanupAudit.GetItemDisplayName(item).Should().Be("Fallback name");
     }
 
-    private static MediaCleanupTask CreateTask(bool requiresMigrationReview, RecordingMutationAdapter mutation) =>
+    private static MediaCleanupTask CreateTask(bool requiresMigrationReview, RecordingMutationAdapter mutation, bool isDryRun = false) =>
         new(
             Mock.Of<ILogger<MediaCleanupTask>>(),
             Mock.Of<ILocalizationManager>(),
             new TestPolicyProvider(CreatePolicy(), requiresMigrationReview),
             new TestCatalogAdapter(CreateItem()),
             new CleanupPlanner(new FixedClock(), new OrdinalPathMatcher(), new NoExtraFileProbe()),
-            mutation);
+            mutation)
+        {
+            IsDryRun = isDryRun,
+        };
 
     private static CleanupPolicy CreatePolicy() =>
         new(
