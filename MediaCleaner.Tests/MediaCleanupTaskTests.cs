@@ -55,6 +55,64 @@ public class MediaCleanupTaskTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_DiagnosticRun_LogsPhasesWithOneCorrelationId()
+    {
+        const string diagnosticRunId = "report-123";
+        var logger = new Mock<ILogger<MediaCleanupTask>>();
+        var mutation = new RecordingMutationAdapter();
+        var task = CreateTask(
+            requiresMigrationReview: false,
+            mutation,
+            isDryRun: true,
+            logger,
+            diagnosticRunId);
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        var messages = logger.Messages()
+            .Where(message => message.Contains("diagnostic run", StringComparison.Ordinal))
+            .ToList();
+        messages.Should().NotBeEmpty();
+        messages.Should().OnlyContain(message => message.Contains(diagnosticRunId, StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("policy loading started", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("policy loading completed", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("catalog snapshot started", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("catalog snapshot completed", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("planner started", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("planner completed", StringComparison.Ordinal));
+        messages.Should().Contain(message => message.Contains("task completed", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DiagnosticRun_LogsCancellationWithLastStage()
+    {
+        const string diagnosticRunId = "report-canceled";
+        var logger = new Mock<ILogger<MediaCleanupTask>>();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var task = new MediaCleanupTask(
+            logger.Object,
+            Mock.Of<ILocalizationManager>(),
+            new TestPolicyProvider(CreatePolicy(), requiresMigrationReview: false),
+            new CancelingCatalogAdapter(),
+            new CleanupPlanner(new FixedClock(), new OrdinalPathMatcher(), new NoExtraFileProbe()),
+            new RecordingMutationAdapter(),
+            diagnosticRunId)
+        {
+            IsDryRun = true,
+        };
+
+        var action = () => task.ExecuteAsync(new Progress<double>(), cancellation.Token);
+
+        await action.Should().ThrowAsync<OperationCanceledException>();
+        task.DiagnosticStage.Should().Be("catalog snapshot");
+        logger.Messages().Should().Contain(message =>
+            message.Contains(diagnosticRunId, StringComparison.Ordinal)
+            && message.Contains("canceled", StringComparison.Ordinal)
+            && message.Contains("catalog snapshot", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void NotificationOverview_IncludesPathAndItemDecisionLog()
     {
         var item = CreateItem();
@@ -138,14 +196,20 @@ public class MediaCleanupTaskTests
         CleanupAudit.GetItemDisplayName(item).Should().Be("Fallback name");
     }
 
-    private static MediaCleanupTask CreateTask(bool requiresMigrationReview, RecordingMutationAdapter mutation, bool isDryRun = false) =>
+    private static MediaCleanupTask CreateTask(
+        bool requiresMigrationReview,
+        RecordingMutationAdapter mutation,
+        bool isDryRun = false,
+        Mock<ILogger<MediaCleanupTask>>? logger = null,
+        string? diagnosticRunId = null) =>
         new(
-            Mock.Of<ILogger<MediaCleanupTask>>(),
+            logger?.Object ?? Mock.Of<ILogger<MediaCleanupTask>>(),
             Mock.Of<ILocalizationManager>(),
             new TestPolicyProvider(CreatePolicy(), requiresMigrationReview),
             new TestCatalogAdapter(CreateItem()),
             new CleanupPlanner(new FixedClock(), new OrdinalPathMatcher(), new NoExtraFileProbe()),
-            mutation)
+            mutation,
+            diagnosticRunId)
         {
             IsDryRun = isDryRun,
         };
@@ -217,6 +281,15 @@ public class MediaCleanupTaskTests
                 [item],
                 new Dictionary<string, BaseItem>(),
                 new Dictionary<string, JellyfinUser>());
+    }
+
+    private sealed class CancelingCatalogAdapter : IMediaCatalogAdapter
+    {
+        public CleanupCatalog Create(CleanupPolicy policy, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new InvalidOperationException("Expected a canceled token.");
+        }
     }
 
     private sealed class RecordingMutationAdapter : IMediaMutationAdapter

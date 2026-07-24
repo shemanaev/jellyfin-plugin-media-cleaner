@@ -37,12 +37,14 @@ public class JellyfinMediaCatalogAdapterLoadTests
         SetupUsers(libraryManager, users);
         SetupLibrary(libraryManager, library, itemQueries);
 
+        var diagnosticLogger = new RecordingLogger<JellyfinMediaCatalogAdapter>();
         var adapter = new JellyfinMediaCatalogAdapter(
-            NullLogger<JellyfinMediaCatalogAdapter>.Instance,
+            diagnosticLogger,
             CreateUserManager(users),
             libraryManager.Object,
             userData.Manager,
-            hierarchy);
+            hierarchy,
+            diagnosticRunId: "load-report");
 
         var catalog = await Task.Run(() => adapter.Create(new CleanupPolicy(
                 [
@@ -63,6 +65,15 @@ public class JellyfinMediaCatalogAdapterLoadTests
         hierarchy.SeriesEpisodeCalls.Values.Sum().Should().Be(ProgramCount);
         hierarchy.SeriesSeasonCalls.Values.Sum().Should().Be(ProgramCount);
         userData.TotalCalls.Should().Be(users.Count * catalog.Items.Count, "candidate checks and playback snapshots should share user-data cache entries");
+        var diagnosticMessages = diagnosticLogger.Messages;
+        diagnosticMessages.Should().Contain(message =>
+            message.Contains("catalog snapshot completed", StringComparison.Ordinal)
+            && message.Contains($"user-data-misses={userData.TotalCalls}", StringComparison.Ordinal));
+        diagnosticMessages.Should().NotContain(message =>
+            message.Contains("GetUserData started", StringComparison.Ordinal));
+        diagnosticMessages.Count.Should().BeLessThan(
+            adapter.SourceItemInspectionCount / 10,
+            "diagnostics should log cache misses and summaries rather than individual item inspections");
     }
 
     [Fact]
