@@ -43,8 +43,11 @@ public class CleanupPlannerTests
         plan.Decisions[0].MarkUnplayedUserIds.Should().Equal("u1");
         plan.Decisions[0].MatchedRules.Should().Equal(rule.Name);
         plan.Deletions.Should().ContainSingle(x => x.ItemId == "m1");
-        plan.AuditEntries.Should().Contain(x => x.ItemId == "m1" && x.Stage == CleanupAuditStage.Trigger && x.Outcome == CleanupAuditOutcome.Matched);
-        plan.AuditEntries.Should().Contain(x => x.ItemId == "m1" && x.Stage == CleanupAuditStage.DeletionCascade && x.Outcome == CleanupAuditOutcome.Planned);
+        plan.AuditEntries.Should().BeEmpty();
+
+        var dryRunPlan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [movie], true));
+        dryRunPlan.AuditEntries.Should().Contain(x => x.ItemId == "m1" && x.Stage == CleanupAuditStage.Trigger && x.Outcome == CleanupAuditOutcome.Matched);
+        dryRunPlan.AuditEntries.Should().Contain(x => x.ItemId == "m1" && x.Stage == CleanupAuditStage.DeletionCascade && x.Outcome == CleanupAuditOutcome.Planned);
     }
 
     [Fact]
@@ -59,6 +62,24 @@ public class CleanupPlannerTests
             Playback("u2", Now.AddDays(-1), isPlayed: false, isWatching: true));
 
         Planner().Plan(new CleanupRequest(Policy(rule), [User("u1"), User("u2")], [movie], false)).Decisions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Plan_PreservesPlaybackOrder_WhenLastPlayedDatesAreEqual()
+    {
+        var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 10);
+        var timestamp = Now.AddDays(-20);
+        var movie = Movie(
+            "m1",
+            Playback("u2", timestamp, isPlayed: true),
+            Playback("u1", timestamp, isPlayed: true));
+        var request = new CleanupRequest(Policy(rule), [User("u1"), User("u2")], [movie], false);
+
+        var normal = Planner().Plan(request);
+        var dry = Planner().Plan(request with { IsDryRun = true });
+
+        normal.Decisions.Single().Playback.Select(x => x.UserId).Should().Equal("u2", "u1");
+        dry.Decisions.Single().Playback.Select(x => x.UserId).Should().Equal("u2", "u1");
     }
 
     [Fact]
@@ -93,7 +114,7 @@ public class CleanupPlannerTests
         var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 10);
         var movie = Movie("m1", Playback("u1", Now.AddDays(-12), isPlayed: true)) with { DateCreated = Now.AddDays(-1) };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [movie], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [movie], true));
 
         plan.Decisions.Should().BeEmpty();
         var audit = plan.AuditEntries.Should().ContainSingle(x =>
@@ -111,7 +132,7 @@ public class CleanupPlannerTests
         var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.NotPlayed, 10);
         var movie = Movie("m1", Playback("u1", Now.AddDays(-40), isPlayed: true)) with { DateCreated = Now.AddDays(-30) };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [movie], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [movie], true));
 
         plan.Decisions.Should().BeEmpty();
         plan.Deletions.Should().BeEmpty();
@@ -132,7 +153,7 @@ public class CleanupPlannerTests
         };
         var movie = Movie("m1", Playback("u1", Now.AddDays(-40), isPlayed: true)) with { DateCreated = Now.AddDays(-30) };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [movie], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [movie], true));
 
         plan.Decisions.Should().BeEmpty();
         plan.AuditEntries.Should().Contain(x =>
@@ -176,7 +197,7 @@ public class CleanupPlannerTests
         var outside = Movie("v1", Playback("u1", Now.AddDays(-20), true)) with { Kind = MediaItemKind.Video, LocationPath = @"E:\media\v1.mkv" };
         var tagged = Movie("a1", Playback("u1", Now.AddDays(-20), true)) with { Kind = MediaItemKind.Audio, Tags = ["delete"] };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(favoriteRule, locationRule, tagRule), [User("u1")], [favorite, outside, tagged], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(favoriteRule, locationRule, tagRule), [User("u1")], [favorite, outside, tagged], true));
 
         plan.Decisions.Should().ContainSingle(x => x.Item.Id == "a1");
         plan.AuditEntries.Should().Contain(x => x.ItemId == "m1" && x.Stage == CleanupAuditStage.FavoriteFilter && x.Outcome == CleanupAuditOutcome.Rejected);
@@ -198,7 +219,7 @@ public class CleanupPlannerTests
             FullName = "The Show | S01E02 | The Episode"
         };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [first, second], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [first, second], true));
 
         plan.Decisions.Should().ContainSingle(x => x.Item.Id == "e2");
         plan.AuditEntries.Should().Contain(x => x.ItemId == "e1" && x.Stage == CleanupAuditStage.SeriesPolicy && x.Outcome == CleanupAuditOutcome.Rejected);
@@ -215,7 +236,7 @@ public class CleanupPlannerTests
         var e1 = Episode("e1", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
         var e2 = Episode("e2", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [e1, e2], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [e1, e2], true));
 
         plan.Decisions.Should().BeEmpty();
         plan.Deletions.Should().BeEmpty();
@@ -240,7 +261,7 @@ public class CleanupPlannerTests
         var played = Episode("e1", "s1", "show1", Playback("u1", Now.AddDays(-20), true)) with { LastEpisodeId = "e2" };
         var unplayed = Episode("e2", "s1", "show1", Playback("u1", null, false)) with { LastEpisodeId = "e2" };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [played, unplayed], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [played, unplayed], true));
 
         plan.Decisions.Should().ContainSingle(x => x.Item.Id == "e1");
         plan.AuditEntries.Should().Contain(x =>
@@ -264,7 +285,7 @@ public class CleanupPlannerTests
         var season = Season("s1", "show1", ["e1", "e2"]);
         var series = Series("show1", ["e1", "e2"]) with { SeasonIds = ["s1"] };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [e1, e2, season, series], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [e1, e2, season, series], true));
 
         plan.Decisions.Should().BeEmpty();
         plan.Deletions.Should().BeEmpty();
@@ -290,7 +311,10 @@ public class CleanupPlannerTests
 
         plan.Decisions.Should().ContainSingle(x => x.Item.Kind == MediaItemKind.Season);
         plan.Deletions.Select(x => x.ItemId).Should().ContainInOrder("e1", "e2", "s1", "show1");
-        plan.AuditEntries.Should().Contain(x => x.ItemId == "s1" && x.Stage == CleanupAuditStage.SeriesPolicy && x.Outcome == CleanupAuditOutcome.Matched);
+        plan.AuditEntries.Should().BeEmpty();
+
+        var dryRunPlan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [e1, e2, season, series], true));
+        dryRunPlan.AuditEntries.Should().Contain(x => x.ItemId == "s1" && x.Stage == CleanupAuditStage.SeriesPolicy && x.Outcome == CleanupAuditOutcome.Matched);
     }
 
     [Fact]
@@ -338,9 +362,13 @@ public class CleanupPlannerTests
         };
         var episode = Episode("e1", "s1", "show1", Playback("u1", Now.AddDays(-20), true));
         var candidate = new CandidateItem(episode, episode.Playback);
-        var auditEntries = new List<CleanupAuditEntry>();
+        var audit = new CleanupAuditCollector(enabled: true);
 
-        var result = SeriesPolicyEvaluator.Apply([candidate], rule, auditEntries, new ThrowingMediaItemList()).ToList();
+        var result = SeriesPolicyEvaluator.Apply(
+            [candidate],
+            rule,
+            audit,
+            new Dictionary<string, MediaItem>(StringComparer.OrdinalIgnoreCase)).ToList();
 
         result.Should().ContainSingle().Which.Item.Id.Should().Be("e1");
     }
@@ -360,7 +388,7 @@ public class CleanupPlannerTests
         var rules = protectFirst ? new[] { protectRule, deleteRule } : new[] { deleteRule, protectRule };
         var movie = Movie("m1", Playback("u1", Now.AddDays(-20), true));
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rules), [User("u1")], [movie], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rules), [User("u1")], [movie], true));
 
         plan.Decisions.Should().BeEmpty();
         plan.Deletions.Should().BeEmpty();
@@ -393,7 +421,7 @@ public class CleanupPlannerTests
         var season = Season("s1", "show1", ["e1", "e2"]);
         var series = Series("show1", ["e1", "e2"]);
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(deleteRule, protectRule), [User("u1")], [e1, e2, season, series], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(deleteRule, protectRule), [User("u1")], [e1, e2, season, series], true));
 
         plan.Decisions.Should().ContainSingle(x => x.Item.Kind == MediaItemKind.Season);
         plan.Deletions.Should().BeEmpty();
@@ -424,7 +452,7 @@ public class CleanupPlannerTests
         var e2 = Episode("e2", "s1", "show1", Playback("u1", Now.AddDays(-20), true)) with { Tags = ["keep"], SeriesEpisodeIds = ["e1", "e2"] };
         var series = Series("show1", ["e1", "e2"]);
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(deleteRule, protectRule), [User("u1")], [e1, e2, series], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(deleteRule, protectRule), [User("u1")], [e1, e2, series], true));
 
         plan.Decisions.Should().ContainSingle(x => x.Item.Kind == MediaItemKind.Series);
         plan.Deletions.Should().BeEmpty();
@@ -449,7 +477,7 @@ public class CleanupPlannerTests
         var season = Season("s1", "show1", ["e1", "e2"]);
         var series = Series("show1", ["e1", "e2"]) with { SeasonIds = ["s1"] };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(deleteRule, protectRule), [User("u1")], [e1, e2, season, series], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(deleteRule, protectRule), [User("u1")], [e1, e2, season, series], true));
 
         plan.Decisions.Should().ContainSingle(x => x.Item.Kind == MediaItemKind.Series);
         plan.Deletions.Should().BeEmpty();
@@ -523,6 +551,50 @@ public class CleanupPlannerTests
     }
 
     [Fact]
+    public void Plan_NormalAndDryRunProduceEquivalentDecisions()
+    {
+        var played = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 10) with
+        {
+            Id = "played",
+            Name = "played",
+            Actions = new(CleanupRuleActionKind.Delete, MarkAsUnplayed: true),
+        };
+        var added = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.AddedAge, 10) with
+        {
+            Id = "added",
+            Name = "added",
+        };
+        var protect = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.AddedAge, 10) with
+        {
+            Id = "protect",
+            Name = "protect",
+            Actions = new(CleanupRuleActionKind.Protect, false),
+            Filters = Filters(MediaItemKind.Movie) with
+            {
+                EnableTagFilter = true,
+                TagFilterMode = TagMode.Inclusion,
+                Tags = ["keep"],
+            },
+        };
+        var items = new[]
+        {
+            Movie("delete", Playback("u1", Now.AddDays(-20), true)),
+            Movie("protected", Playback("u1", Now.AddDays(-20), true)) with { Tags = ["keep"] },
+        };
+        var request = new CleanupRequest(Policy(added, protect, played), [User("u1")], items, false);
+
+        var normal = Planner().Plan(request);
+        var dry = Planner().Plan(request with { IsDryRun = true });
+
+        normal.Decisions.Select(DecisionShape).Should().BeEquivalentTo(
+            dry.Decisions.Select(DecisionShape),
+            options => options.WithStrictOrdering());
+        normal.Decisions.Should().ContainSingle(x => x.Item.Id == "delete");
+        normal.AuditEntries.Should().BeEmpty();
+        dry.AuditEntries.Should().Contain(x => x.ItemId == "protected" && x.Outcome == CleanupAuditOutcome.Suppressed);
+    }
+
+    [Fact]
     public void Plan_WritesRuleLevelAudit_WhenPlayedRuleHasNoMatchedUsers()
     {
         var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 10) with
@@ -530,7 +602,7 @@ public class CleanupPlannerTests
             Filters = Filters(MediaItemKind.Movie) with { UserIds = ["missing"], UsersMode = UsersListMode.Acknowledge }
         };
 
-        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [Movie("m1", Playback("u1", Now.AddDays(-20), true))], false));
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [User("u1")], [Movie("m1", Playback("u1", Now.AddDays(-20), true))], true));
 
         plan.Decisions.Should().BeEmpty();
         plan.AuditEntries.Should().ContainSingle(x =>
@@ -542,6 +614,15 @@ public class CleanupPlannerTests
 
     private static CleanupPlanner Planner(IExtraFileProbe? extraFileProbe = null) =>
         new(new FixedClock(Now), new TestPathMatcher(), extraFileProbe ?? new NoExtraFileProbe());
+
+    private static object DecisionShape(CleanupDecision decision) => new
+    {
+        decision.Item.Id,
+        decision.Kind,
+        Playback = decision.Playback.ToList(),
+        MarkUnplayed = decision.MarkUnplayedUserIds.ToList(),
+        Rules = decision.MatchedRules.ToList(),
+    };
 
     private static CleanupPolicy Policy(params CleanupRule[] rules) => new(rules, false);
 
@@ -586,18 +667,6 @@ public class CleanupPlannerTests
 
     private static MediaItem Series(string id, IReadOnlyList<string> episodeIds) =>
         new(id, MediaItemKind.Series, id, id, Now.AddDays(-30), $"/media/{id}", $"/media/{id}", [], [], id, null, id, null, EpisodeIds: episodeIds);
-
-    private sealed class ThrowingMediaItemList : IReadOnlyList<MediaItem>
-    {
-        public int Count => throw new InvalidOperationException("Catalog items should not be evaluated for individual episode rules.");
-
-        public MediaItem this[int index] => throw new InvalidOperationException("Catalog items should not be evaluated for individual episode rules.");
-
-        public IEnumerator<MediaItem> GetEnumerator() =>
-            throw new InvalidOperationException("Catalog items should not be evaluated for individual episode rules.");
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
-    }
 
     private sealed class FixedClock(DateTime utcNow) : IClock
     {

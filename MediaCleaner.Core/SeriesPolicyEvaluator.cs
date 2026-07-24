@@ -9,8 +9,8 @@ internal static class SeriesPolicyEvaluator
     public static IEnumerable<CandidateItem> Apply(
         IEnumerable<CandidateItem> candidates,
         CleanupRule rule,
-        List<CleanupAuditEntry> auditEntries,
-        IReadOnlyList<MediaItem> catalogItems)
+        CleanupAuditCollector audit,
+        IReadOnlyDictionary<string, MediaItem> catalogById)
     {
         var episodes = new List<CandidateItem>();
         foreach (var item in candidates)
@@ -30,15 +30,12 @@ internal static class SeriesPolicyEvaluator
             yield break;
         }
 
-        IReadOnlyDictionary<string, MediaItem>? catalogById = null;
-        IReadOnlyDictionary<string, MediaItem> GetCatalogById() =>
-            catalogById ??= catalogItems.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
         var seriesItems = rule.Filters.DeleteEpisodes switch
         {
-            SeriesDeleteKind.Episode => KeepEpisodes(episodes, rule, auditEntries),
-            SeriesDeleteKind.Season => BuildSeasonCandidates(episodes, rule, auditEntries, GetCatalogById()),
-            SeriesDeleteKind.Series => BuildSeriesCandidates(episodes, rule, auditEntries, GetCatalogById(), requireEnded: false),
-            SeriesDeleteKind.SeriesEnded => BuildSeriesCandidates(episodes, rule, auditEntries, GetCatalogById(), requireEnded: true),
+            SeriesDeleteKind.Episode => KeepEpisodes(episodes, rule, audit),
+            SeriesDeleteKind.Season => BuildSeasonCandidates(episodes, rule, audit, catalogById),
+            SeriesDeleteKind.Series => BuildSeriesCandidates(episodes, rule, audit, catalogById, requireEnded: false),
+            SeriesDeleteKind.SeriesEnded => BuildSeriesCandidates(episodes, rule, audit, catalogById, requireEnded: true),
             _ => throw new NotSupportedException($"Unsupported series delete kind: {rule.Filters.DeleteEpisodes}"),
         };
 
@@ -51,7 +48,7 @@ internal static class SeriesPolicyEvaluator
     private static IEnumerable<CandidateItem> KeepEpisodes(
         IEnumerable<CandidateItem> items,
         CleanupRule rule,
-        List<CleanupAuditEntry> auditEntries)
+        CleanupAuditCollector audit)
     {
         if (rule.Filters.KeepSeriesKind == SeriesKeepKind.None)
         {
@@ -87,7 +84,7 @@ internal static class SeriesPolicyEvaluator
                 foreach (var item in groupItems)
                 {
                     CleanupAudit.AddItem(
-                        auditEntries,
+                        audit,
                         item.Item,
                         rule,
                         CleanupAuditStage.SeriesPolicy,
@@ -106,12 +103,13 @@ internal static class SeriesPolicyEvaluator
                 {
                     keptCandidate = true;
                     CleanupAudit.AddItem(
-                        auditEntries,
+                        audit,
                         item.Item,
                         rule,
                         CleanupAuditStage.SeriesPolicy,
                         CleanupAuditOutcome.Rejected,
                         $"rejected by series policy because the {boundaryName} episode '{boundaryId}' is kept");
+
                     continue;
                 }
 
@@ -121,7 +119,7 @@ internal static class SeriesPolicyEvaluator
             if (!keptCandidate)
             {
                 CleanupAudit.AddRule(
-                    auditEntries,
+                    audit,
                     rule,
                     CleanupAuditStage.SeriesPolicy,
                     CleanupAuditOutcome.Skipped,
@@ -138,7 +136,7 @@ internal static class SeriesPolicyEvaluator
     private static IEnumerable<CandidateItem> BuildSeasonCandidates(
         IEnumerable<CandidateItem> items,
         CleanupRule rule,
-        List<CleanupAuditEntry> auditEntries,
+        CleanupAuditCollector audit,
         IReadOnlyDictionary<string, MediaItem> catalogById)
     {
         if (rule.Filters.KeepSeriesKind is not SeriesKeepKind.None and not SeriesKeepKind.First and not SeriesKeepKind.Last)
@@ -154,12 +152,12 @@ internal static class SeriesPolicyEvaluator
                 if (first is not null)
                 {
                     CleanupAudit.AddItem(
-                        auditEntries,
+                        audit,
                         first.Item,
                         rule,
                         CleanupAuditStage.SeriesPolicy,
                         CleanupAuditOutcome.Rejected,
-                        "rejected by series policy because season id is missing");
+                        $"rejected by series policy because season id is missing");
                 }
 
                 continue;
@@ -172,12 +170,13 @@ internal static class SeriesPolicyEvaluator
             if (!allWatched)
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     first.Item,
                     rule,
                     CleanupAuditStage.SeriesPolicy,
                     CleanupAuditOutcome.Rejected,
-                    "rejected by series policy because not every season episode matched");
+                    $"rejected by series policy because not every season episode matched");
+
                 continue;
             }
 
@@ -195,12 +194,13 @@ internal static class SeriesPolicyEvaluator
                 && (boundaryIds.Any(string.IsNullOrWhiteSpace) || distinctBoundaryIds.Count != 1))
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     first.Item,
                     rule,
                     CleanupAuditStage.SeriesPolicy,
                     CleanupAuditOutcome.Blocked,
                     $"delete blocked by series policy because the {boundaryName} season in series '{first.Item.SeriesId}' could not be determined consistently");
+
                 continue;
             }
 
@@ -208,12 +208,13 @@ internal static class SeriesPolicyEvaluator
                 && string.Equals(first.Item.SeasonId, distinctBoundaryIds[0], StringComparison.OrdinalIgnoreCase))
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     first.Item,
                     rule,
                     CleanupAuditStage.SeriesPolicy,
                     CleanupAuditOutcome.Rejected,
                     $"rejected by series policy because the {boundaryName} season '{distinctBoundaryIds[0]}' is kept");
+
                 continue;
             }
 
@@ -231,12 +232,13 @@ internal static class SeriesPolicyEvaluator
                 first.Playback);
 
             CleanupAudit.AddItem(
-                auditEntries,
+                audit,
                 candidate.Item,
                 rule,
                 CleanupAuditStage.SeriesPolicy,
                 CleanupAuditOutcome.Matched,
-                "matched season series policy because every season episode matched");
+                $"matched season series policy because every season episode matched");
+
             yield return candidate;
         }
     }
@@ -244,7 +246,7 @@ internal static class SeriesPolicyEvaluator
     private static IEnumerable<CandidateItem> BuildSeriesCandidates(
         IEnumerable<CandidateItem> items,
         CleanupRule rule,
-        List<CleanupAuditEntry> auditEntries,
+        CleanupAuditCollector audit,
         IReadOnlyDictionary<string, MediaItem> catalogById,
         bool requireEnded)
     {
@@ -256,12 +258,12 @@ internal static class SeriesPolicyEvaluator
                 if (first is not null)
                 {
                     CleanupAudit.AddItem(
-                        auditEntries,
+                        audit,
                         first.Item,
                         rule,
                         CleanupAuditStage.SeriesPolicy,
                         CleanupAuditOutcome.Rejected,
-                        "rejected by series policy because series id is missing");
+                        $"rejected by series policy because series id is missing");
                 }
 
                 continue;
@@ -274,24 +276,26 @@ internal static class SeriesPolicyEvaluator
             if (!allWatched)
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     first.Item,
                     rule,
                     CleanupAuditStage.SeriesPolicy,
                     CleanupAuditOutcome.Rejected,
-                    "rejected by series policy because not every series episode matched");
+                    $"rejected by series policy because not every series episode matched");
+
                 continue;
             }
 
             if (requireEnded && first.Item.SeriesStatus is not MediaSeriesStatus.Ended and not MediaSeriesStatus.Unknown)
             {
                 CleanupAudit.AddItem(
-                    auditEntries,
+                    audit,
                     first.Item,
                     rule,
                     CleanupAuditStage.SeriesPolicy,
                     CleanupAuditOutcome.Rejected,
-                    "rejected by series policy because series is continuing");
+                    $"rejected by series policy because series is continuing");
+
                 continue;
             }
 
@@ -308,12 +312,13 @@ internal static class SeriesPolicyEvaluator
                 first.Playback);
 
             CleanupAudit.AddItem(
-                auditEntries,
+                audit,
                 candidate.Item,
                 rule,
                 CleanupAuditStage.SeriesPolicy,
                 CleanupAuditOutcome.Matched,
-                "matched series policy because every series episode matched");
+                $"matched series policy because every series episode matched");
+
             yield return candidate;
         }
     }

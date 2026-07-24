@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -64,6 +65,8 @@ public class TroubleshootingController(
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<TroubleshootingReportResponse> GetReport()
     {
+        var reportId = Guid.NewGuid().ToString("N");
+        var totalStopwatch = Stopwatch.StartNew();
         using var scope = scopeFactory.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<IUserManager>();
         var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
@@ -71,40 +74,111 @@ public class TroubleshootingController(
         var activityManager = scope.ServiceProvider.GetRequiredService<IActivityManager>();
         var localization = scope.ServiceProvider.GetRequiredService<ILocalizationManager>();
         var fileSystem = scope.ServiceProvider.GetRequiredService<IFileSystem>();
+        var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+        var logger = loggerFactory.CreateLogger<TroubleshootingController>();
         var progress = new Progress<double>();
 
-        using var loggerFactory = LoggerFactory.Create(_ => { });
-
-        var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem)
+        logger.LogInformation(
+            "Media Cleaner troubleshooting report {ReportId} started",
+            reportId);
+        var task = new MediaCleanupTask(
+            userManager,
+            loggerFactory,
+            libraryManager,
+            userDataManager,
+            activityManager,
+            localization,
+            fileSystem,
+            reportId)
         {
             IsDryRun = true
         };
-        await task.ExecuteAsync(progress, HttpContext.RequestAborted);
 
-        var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
-        var plan = task.LastPlan ?? CleanupPlan.Empty;
-        var reportId = Guid.NewGuid().ToString("N");
-        var jellyfinVersion = applicationHost.ApplicationVersionString;
-        var pluginVersion = Plugin.Instance.Version.ToString();
-        var itemGroups = BuildItemDecisionGroups(plan);
-        var report = new CachedTroubleshootingReport(
+        try
+        {
+            await task.ExecuteAsync(progress, HttpContext.RequestAborted);
+
+            var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
+            var plan = task.LastPlan ?? CleanupPlan.Empty;
+            var jellyfinVersion = applicationHost.ApplicationVersionString;
+            var pluginVersion = Plugin.Instance.Version.ToString();
+
+            var phaseStopwatch = LogReportPhaseStarted(logger, reportId, "report grouping");
+            var itemGroups = BuildItemDecisionGroups(plan);
+            LogReportPhaseCompleted(
+                logger,
+                reportId,
+                "report grouping",
+                phaseStopwatch,
+                "with {ItemGroupCount} item groups",
+                itemGroups.Count);
+
+            phaseStopwatch = LogReportPhaseStarted(logger, reportId, "report cache");
+            var report = new CachedTroubleshootingReport(
+                reportId,
+                jellyfinVersion,
+                pluginVersion,
+                pluginConfig,
+                plan,
+                itemGroups,
+                DateTime.UtcNow);
+            SetCachedReport(report);
+            LogReportPhaseCompleted(logger, reportId, "report cache", phaseStopwatch);
+
+            phaseStopwatch = LogReportPhaseStarted(logger, reportId, "HTML response");
+            var response = new TroubleshootingReportResponse(
+                reportId,
+                BuildFormattedHtmlPage(jellyfinVersion, pluginVersion, pluginConfig, plan, itemGroups, 0, DefaultItemPageSize),
+                string.Empty,
+                itemGroups.Count,
+                itemGroups.Count,
+                DefaultItemPageSize);
+            LogReportPhaseCompleted(logger, reportId, "HTML response", phaseStopwatch);
+            logger.LogInformation(
+                "Media Cleaner troubleshooting report {ReportId} completed in {ElapsedMilliseconds} ms",
+                reportId,
+                totalStopwatch.ElapsedMilliseconds);
+            return response;
+        }
+        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                "Media Cleaner troubleshooting report {ReportId} canceled after {ElapsedMilliseconds} ms during {Stage}",
+                reportId,
+                totalStopwatch.ElapsedMilliseconds,
+                task.DiagnosticStage);
+            throw;
+        }
+    }
+
+    private static Stopwatch LogReportPhaseStarted(
+        ILogger logger,
+        string reportId,
+        string stage)
+    {
+        logger.LogInformation(
+            "Media Cleaner troubleshooting report {ReportId}: {Stage} started",
             reportId,
-            jellyfinVersion,
-            pluginVersion,
-            pluginConfig,
-            plan,
-            itemGroups,
-            DateTime.UtcNow);
+            stage);
+        return Stopwatch.StartNew();
+    }
 
-        SetCachedReport(report);
-
-        return new TroubleshootingReportResponse(
-            reportId,
-            BuildFormattedHtmlPage(jellyfinVersion, pluginVersion, pluginConfig, plan, itemGroups, 0, DefaultItemPageSize),
-            string.Empty,
-            itemGroups.Count,
-            itemGroups.Count,
-            DefaultItemPageSize);
+    private static void LogReportPhaseCompleted(
+        ILogger logger,
+        string reportId,
+        string stage,
+        Stopwatch stopwatch,
+        string detailTemplate = "",
+        params object?[] detailArguments)
+    {
+        var suffix = string.IsNullOrEmpty(detailTemplate) ? string.Empty : $" {detailTemplate}";
+        var message = $"Media Cleaner troubleshooting report {{ReportId}}: {{Stage}} completed in {{ElapsedMilliseconds}} ms{suffix}";
+        var arguments = new object?[3 + detailArguments.Length];
+        arguments[0] = reportId;
+        arguments[1] = stage;
+        arguments[2] = stopwatch.ElapsedMilliseconds;
+        detailArguments.CopyTo(arguments, 3);
+        logger.LogInformation(message, arguments);
     }
 
     [HttpGet("ReportItems")]

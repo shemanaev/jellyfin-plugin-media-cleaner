@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Jellyfin.Data.Enums;
@@ -19,101 +20,214 @@ internal sealed class JellyfinMediaCatalogAdapter(
     IUserManager userManager,
     ILibraryManager libraryManager,
     IUserDataManager userDataManager,
-    IJellyfinTvHierarchyProvider? tvHierarchyProvider = null) : IMediaCatalogAdapter
+    IJellyfinTvHierarchyProvider? tvHierarchyProvider = null,
+    string? diagnosticRunId = null) : IMediaCatalogAdapter
 {
     private readonly IJellyfinTvHierarchyProvider tvHierarchyProvider = tvHierarchyProvider ?? new JellyfinTvHierarchyProvider();
 
+    internal int SourceItemInspectionCount { get; private set; }
+
+    internal int SelectedItemCount { get; private set; }
+
     public CleanupCatalog Create(CleanupPolicy policy, CancellationToken cancellationToken)
     {
-        var jellyfinUsers = JellyfinCompatibility.GetUsers(userManager);
-        var users = jellyfinUsers
-            .Select(x => new MediaUser(GetUserId(x), x.Username))
-            .ToList();
-        var usersById = jellyfinUsers.ToDictionary(GetUserId, StringComparer.OrdinalIgnoreCase);
-
-        var snapshot = new SnapshotContext(
-            jellyfinUsers,
-            policy,
-            libraryManager,
-            userDataManager,
-            tvHierarchyProvider,
-            cancellationToken);
-        var itemsById = new Dictionary<string, BaseItem>(StringComparer.OrdinalIgnoreCase);
-        var mediaItems = new Dictionary<string, MediaItem>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var source in CollectItems(policy, jellyfinUsers, snapshot, cancellationToken))
+        SourceItemInspectionCount = 0;
+        SelectedItemCount = 0;
+        var diagnostics = diagnosticRunId is null
+            ? null
+            : new CatalogSnapshotDiagnostics(logger, diagnosticRunId);
+        var materializedItemCount = 0;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            AddItem(source.Item, source.Kind, snapshot, itemsById, mediaItems);
+            var nowUtc = DateTime.UtcNow;
+            var jellyfinUsers = JellyfinCompatibility.GetUsers(userManager);
+            var users = jellyfinUsers
+                .Select(x => new MediaUser(GetUserId(x), x.Username))
+                .ToList();
+            var usersById = jellyfinUsers.ToDictionary(GetUserId, StringComparer.OrdinalIgnoreCase);
 
-            if (source.Item is Episode episode)
+            var snapshot = new SnapshotContext(
+                jellyfinUsers,
+                policy,
+                libraryManager,
+                userDataManager,
+                tvHierarchyProvider,
+                cancellationToken,
+                diagnostics);
+            var itemsById = new Dictionary<string, BaseItem>(StringComparer.OrdinalIgnoreCase);
+            var mediaItems = new Dictionary<string, MediaItem>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var source in CollectItems(policy, jellyfinUsers, snapshot, nowUtc, cancellationToken))
             {
-                var season = snapshot.GetEpisodeSeason(episode);
-                if (season is not null)
+                cancellationToken.ThrowIfCancellationRequested();
+                AddItem(source.Item, source.Kind, snapshot, itemsById, mediaItems);
+
+                if (source.Item is Episode episode)
                 {
-                    AddItem(season, MediaItemKind.Season, snapshot, itemsById, mediaItems);
+                    var season = snapshot.GetEpisodeSeason(episode);
+                    if (season is not null)
+                    {
+                        AddItem(season, MediaItemKind.Season, snapshot, itemsById, mediaItems);
+                    }
+
+                    var series = snapshot.GetEpisodeSeries(episode);
+                    if (series is not null)
+                    {
+                        AddItem(series, MediaItemKind.Series, snapshot, itemsById, mediaItems);
+                    }
                 }
 
-                var series = snapshot.GetEpisodeSeries(episode);
-                if (series is not null)
+                if (source.Item is Season sourceSeason && snapshot.GetSeasonSeries(sourceSeason) is { } sourceSeries)
                 {
-                    AddItem(series, MediaItemKind.Series, snapshot, itemsById, mediaItems);
+                    AddItem(sourceSeries, MediaItemKind.Series, snapshot, itemsById, mediaItems);
                 }
+
+                materializedItemCount = mediaItems.Count;
+                diagnostics?.ReportProgress(SourceItemInspectionCount, SelectedItemCount, materializedItemCount);
             }
 
-            if (source.Item is Season sourceSeason && snapshot.GetSeasonSeries(sourceSeason) is { } sourceSeries)
-            {
-                AddItem(sourceSeries, MediaItemKind.Series, snapshot, itemsById, mediaItems);
-            }
+            logger.LogDebug("Built cleanup snapshot with {UsersCount} users and {ItemsCount} items", users.Count, mediaItems.Count);
+            diagnostics?.LogSummary("completed", SourceItemInspectionCount, SelectedItemCount, mediaItems.Count);
+            return new CleanupCatalog(users, mediaItems.Values.ToList(), itemsById, usersById);
         }
-
-        logger.LogDebug("Built cleanup snapshot with {UsersCount} users and {ItemsCount} items", users.Count, mediaItems.Count);
-        return new CleanupCatalog(users, mediaItems.Values.ToList(), itemsById, usersById);
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            diagnostics?.LogSummary("canceled", SourceItemInspectionCount, SelectedItemCount, materializedItemCount);
+            throw;
+        }
+        catch
+        {
+            diagnostics?.LogSummary("failed", SourceItemInspectionCount, SelectedItemCount, materializedItemCount);
+            throw;
+        }
     }
 
     private IEnumerable<CollectedItem> CollectItems(
         CleanupPolicy policy,
         IReadOnlyList<JellyfinUser> users,
         SnapshotContext snapshot,
+        DateTime nowUtc,
         CancellationToken cancellationToken)
     {
+        var sources = BuildSourcePlans(policy, users, nowUtc, out var occurrenceCount);
+        var selectedItems = new Dictionary<Guid, SelectedCollectedItem>();
+        foreach (var source in sources)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var itemIndex = 0;
+            foreach (var item in snapshot.GetUserItems(source.BaseKind, source.User, source.SortBy))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                SourceItemInspectionCount++;
+                snapshot.ReportProgress(SourceItemInspectionCount, selectedItems.Count, materializedItemCount: 0);
+
+                DateTime? lastPlayedDate = null;
+                if (source.SortBy == ItemSortBy.DatePlayed)
+                {
+                    if (!TryGetPlayedCandidate(item, source.User, source.PlaybackStartDate, snapshot, out var playedDate))
+                    {
+                        itemIndex++;
+                        continue;
+                    }
+
+                    lastPlayedDate = playedDate;
+                }
+
+                if (source.SortBy == ItemSortBy.DateCreated && logger.IsEnabled(LogLevel.Trace))
+                {
+                    foreach (var rule in source.NotPlayedRules)
+                    {
+                        LogNotPlayedCandidate(item, source.User, policy, rule, snapshot, nowUtc);
+                    }
+                }
+
+                var occurrence = source.FindFirstMatchingOccurrence(lastPlayedDate);
+                if (occurrence >= 0)
+                {
+                    var selected = new SelectedCollectedItem(item, source.CoreKind, occurrence, itemIndex);
+                    if (!selectedItems.TryGetValue(item.Id, out var existing)
+                        || selected.Occurrence < existing.Occurrence
+                        || (selected.Occurrence == existing.Occurrence && selected.ItemIndex < existing.ItemIndex))
+                    {
+                        selectedItems[item.Id] = selected;
+                        SelectedItemCount = selectedItems.Count;
+                    }
+                }
+
+                itemIndex++;
+            }
+        }
+
+        var itemsByOccurrence = new List<SelectedCollectedItem>?[occurrenceCount];
+        foreach (var selected in selectedItems.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            (itemsByOccurrence[selected.Occurrence] ??= []).Add(selected);
+        }
+
+        foreach (var occurrenceItems in itemsByOccurrence)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (occurrenceItems is null)
+            {
+                continue;
+            }
+
+            occurrenceItems.Sort(static (left, right) => left.ItemIndex.CompareTo(right.ItemIndex));
+            foreach (var selected in occurrenceItems)
+            {
+                yield return new CollectedItem(selected.Item, selected.Kind);
+            }
+        }
+    }
+
+    private IReadOnlyList<SnapshotSourcePlan> BuildSourcePlans(
+        CleanupPolicy policy,
+        IReadOnlyList<JellyfinUser> users,
+        DateTime nowUtc,
+        out int occurrenceCount)
+    {
+        var plansByKey = new Dictionary<SnapshotSourceKey, SnapshotSourcePlan>();
+        var plans = new List<SnapshotSourcePlan>();
+        occurrenceCount = 0;
         foreach (var source in GetEnabledKinds(policy))
         {
             var sourceUsers = source.Rule.Trigger.Kind is CleanupRuleTriggerKind.Played or CleanupRuleTriggerKind.NotPlayed
                 ? FilterUsersForRule(users, source.Rule)
                 : users.Take(1).ToList();
+            var sortBy = source.Rule.Trigger.Kind == CleanupRuleTriggerKind.Played
+                ? ItemSortBy.DatePlayed
+                : ItemSortBy.DateCreated;
 
             foreach (var user in sourceUsers)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                var key = new SnapshotSourceKey(source.BaseKind, source.CoreKind, user.Id, sortBy);
+                if (!plansByKey.TryGetValue(key, out var plan))
+                {
+                    plan = new SnapshotSourcePlan(source.BaseKind, source.CoreKind, user, sortBy);
+                    plansByKey.Add(key, plan);
+                    plans.Add(plan);
+                }
 
                 if (source.Rule.Trigger.Kind == CleanupRuleTriggerKind.Played)
                 {
-                    foreach (var item in snapshot.GetUserItems(source.BaseKind, user, ItemSortBy.DatePlayed))
-                    {
-                        if (!IsPlayedCandidate(item, user, source.Rule, snapshot))
-                        {
-                            continue;
-                        }
-
-                        yield return new CollectedItem(item, source.CoreKind);
-                    }
+                    plan.IncludePlayedOccurrence(source.Rule.Trigger.CountAsNotPlayedAfter, nowUtc, occurrenceCount);
                 }
                 else
                 {
-                    foreach (var item in snapshot.GetUserItems(source.BaseKind, user, ItemSortBy.DateCreated))
+                    plan.IncludeDateCreatedOccurrence(occurrenceCount);
+                    if (source.Rule.Trigger.Kind == CleanupRuleTriggerKind.NotPlayed && logger.IsEnabled(LogLevel.Trace))
                     {
-                        if (source.Rule.Trigger.Kind == CleanupRuleTriggerKind.NotPlayed
-                            && logger.IsEnabled(LogLevel.Trace))
-                        {
-                            LogNotPlayedCandidate(item, user, policy, source.Rule, snapshot);
-                        }
-
-                        yield return new CollectedItem(item, source.CoreKind);
+                        plan.IncludeNotPlayedRule(source.Rule);
                     }
                 }
+
+                occurrenceCount++;
             }
         }
+
+        return plans;
     }
 
     private static IReadOnlyList<JellyfinUser> FilterUsersForRule(
@@ -133,24 +247,33 @@ internal sealed class JellyfinMediaCatalogAdapter(
             .ToList();
     }
 
-    private bool IsPlayedCandidate(BaseItem item, JellyfinUser user, CleanupRule rule, SnapshotContext snapshot)
+    private bool TryGetPlayedCandidate(
+        BaseItem item,
+        JellyfinUser user,
+        DateTime? startDate,
+        SnapshotContext snapshot,
+        out DateTime lastPlayedDate)
     {
         var data = snapshot.GetUserData(user, item);
         var isWatching = data?.PlaybackPositionTicks != 0;
         if (data is null || (!data.Played && !isWatching) || !data.LastPlayedDate.HasValue)
         {
+            lastPlayedDate = default;
             return false;
         }
 
-        var startDate = rule.Trigger.CountAsNotPlayedAfter >= 0
-            ? DateTime.UtcNow.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
-            : (DateTime?)null;
         if (startDate is not null && data.LastPlayedDate < startDate)
         {
+            lastPlayedDate = default;
             return false;
         }
 
-        logger.LogDebug("\"{Name}\" played by \"{Username}\" ({LastPlayedDate})", GetFullName(item), user.Username, data.LastPlayedDate.Value);
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("\"{Name}\" played by \"{Username}\" ({LastPlayedDate})", GetFullName(item), user.Username, data.LastPlayedDate.Value);
+        }
+
+        lastPlayedDate = data.LastPlayedDate.Value;
         return true;
     }
 
@@ -197,10 +320,10 @@ internal sealed class JellyfinMediaCatalogAdapter(
         }
 
         itemsById[id] = item;
-        mediaItems[id] = CreateMediaItem(item, kind, snapshot);
+        mediaItems[id] = CreateMediaItem(id, item, kind, snapshot);
     }
 
-    private MediaItem CreateMediaItem(BaseItem item, MediaItemKind kind, SnapshotContext snapshot)
+    private MediaItem CreateMediaItem(string id, BaseItem item, MediaItemKind kind, SnapshotContext snapshot)
     {
         var tags = snapshot.NeedsTags ? GetTags(item, snapshot) : Array.Empty<string>();
         var playback = snapshot.Users.Select(user => CreatePlaybackState(user, item, snapshot)).ToArray();
@@ -231,7 +354,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
             : null;
 
         return new MediaItem(
-            Id: GetItemId(item),
+            Id: id,
             Kind: kind,
             Name: item.Name,
             FullName: fullName,
@@ -279,7 +402,8 @@ internal sealed class JellyfinMediaCatalogAdapter(
         JellyfinUser user,
         CleanupPolicy policy,
         CleanupRule rule,
-        SnapshotContext snapshot)
+        SnapshotContext snapshot,
+        DateTime nowUtc)
     {
         var data = snapshot.GetUserData(user, item);
         if (data is null)
@@ -291,7 +415,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
         var isPlayedAfterItemCreated = policy.AllowDeleteIfPlayedBeforeAdded || data.LastPlayedDate >= item.DateCreated;
         var shouldSkip = (data.Played && isPlayedAfterItemCreated) || isWatching;
         var startDate = rule.Trigger.CountAsNotPlayedAfter >= 0
-            ? DateTime.UtcNow.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
+            ? nowUtc.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
             : (DateTime?)null;
 
         if (startDate is not null)
@@ -406,15 +530,101 @@ internal sealed class JellyfinMediaCatalogAdapter(
 
     private static string GetUserId(JellyfinUser user) => user.Id.ToString("N");
 
-    private sealed record EnabledKind(BaseItemKind BaseKind, MediaItemKind CoreKind, CleanupRule Rule);
+    private readonly record struct EnabledKind(BaseItemKind BaseKind, MediaItemKind CoreKind, CleanupRule Rule);
 
-    private sealed record CollectedItem(BaseItem Item, MediaItemKind Kind);
+    private readonly record struct CollectedItem(BaseItem Item, MediaItemKind Kind);
+
+    private readonly record struct SelectedCollectedItem(
+        BaseItem Item,
+        MediaItemKind Kind,
+        int Occurrence,
+        int ItemIndex);
+
+    private readonly record struct SnapshotSourceKey(
+        BaseItemKind BaseKind,
+        MediaItemKind CoreKind,
+        Guid UserId,
+        ItemSortBy SortBy);
+
+    private sealed class SnapshotSourcePlan(
+        BaseItemKind baseKind,
+        MediaItemKind coreKind,
+        JellyfinUser user,
+        ItemSortBy sortBy)
+    {
+        private int _widestPlayedWindow = -1;
+        private bool _hasUnboundedPlayedWindow;
+        private List<CleanupRule>? _notPlayedRules;
+        private readonly List<SnapshotSourceOccurrence> _occurrences = [];
+
+        public BaseItemKind BaseKind { get; } = baseKind;
+
+        public MediaItemKind CoreKind { get; } = coreKind;
+
+        public JellyfinUser User { get; } = user;
+
+        public ItemSortBy SortBy { get; } = sortBy;
+
+        public DateTime? PlaybackStartDate { get; private set; }
+
+        public IReadOnlyList<CleanupRule> NotPlayedRules => _notPlayedRules ?? [];
+
+        public void IncludeNotPlayedRule(CleanupRule rule)
+        {
+            _notPlayedRules ??= [];
+            _notPlayedRules.Add(rule);
+        }
+
+        public void IncludePlayedOccurrence(int days, DateTime nowUtc, int ordinal)
+        {
+            var startDate = days >= 0 ? nowUtc.AddDays(-days) : (DateTime?)null;
+            _occurrences.Add(new SnapshotSourceOccurrence(ordinal, startDate));
+            if (days < 0)
+            {
+                _hasUnboundedPlayedWindow = true;
+                PlaybackStartDate = null;
+                return;
+            }
+
+            if (_hasUnboundedPlayedWindow || days <= _widestPlayedWindow)
+            {
+                return;
+            }
+
+            _widestPlayedWindow = days;
+            PlaybackStartDate = nowUtc.AddDays(-days);
+        }
+
+        public void IncludeDateCreatedOccurrence(int ordinal) =>
+            _occurrences.Add(new SnapshotSourceOccurrence(ordinal, null));
+
+        public int FindFirstMatchingOccurrence(DateTime? lastPlayedDate)
+        {
+            if (SortBy == ItemSortBy.DateCreated)
+            {
+                return _occurrences[0].Ordinal;
+            }
+
+            foreach (var occurrence in _occurrences)
+            {
+                if (occurrence.PlaybackStartDate is null || lastPlayedDate >= occurrence.PlaybackStartDate)
+                {
+                    return occurrence.Ordinal;
+                }
+            }
+
+            return -1;
+        }
+    }
+
+    private readonly record struct SnapshotSourceOccurrence(int Ordinal, DateTime? PlaybackStartDate);
 
     private sealed class SnapshotContext
     {
         private readonly ILibraryManager libraryManager;
         private readonly IUserDataManager userDataManager;
         private readonly IJellyfinTvHierarchyProvider tvHierarchyProvider;
+        private readonly CatalogSnapshotDiagnostics? diagnostics;
         private readonly Dictionary<ItemQueryKey, IReadOnlyList<BaseItem>> itemQueries = [];
         private readonly Dictionary<UserDataKey, UserItemData?> userData = [];
         private readonly Dictionary<Guid, Season?> seasonsById = [];
@@ -434,13 +644,15 @@ internal sealed class JellyfinMediaCatalogAdapter(
             ILibraryManager libraryManager,
             IUserDataManager userDataManager,
             IJellyfinTvHierarchyProvider tvHierarchyProvider,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            CatalogSnapshotDiagnostics? diagnostics)
         {
             Users = users;
             this.libraryManager = libraryManager;
             this.userDataManager = userDataManager;
             this.tvHierarchyProvider = tvHierarchyProvider;
             this.cancellationToken = cancellationToken;
+            this.diagnostics = diagnostics;
             seasonEpisodes = new SnapshotListCache<BaseItem>(GetItemId, cancellationToken);
             seriesEpisodes = new SnapshotListCache<BaseItem>(GetItemId, cancellationToken);
             seriesSeasons = new SnapshotListCache<BaseItem>(GetItemId, cancellationToken);
@@ -484,17 +696,28 @@ internal sealed class JellyfinMediaCatalogAdapter(
 
         public bool NeedsTags { get; }
 
+        public void ReportProgress(int inspectedItemCount, int selectedItemCount, int materializedItemCount) =>
+            diagnostics?.ReportProgress(inspectedItemCount, selectedItemCount, materializedItemCount);
+
         public IReadOnlyList<BaseItem> GetUserItems(BaseItemKind kind, JellyfinUser user, ItemSortBy sortBy)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var key = new ItemQueryKey(kind, GetUserId(user), sortBy);
+            var key = new ItemQueryKey(kind, user.Id, sortBy);
             if (itemQueries.TryGetValue(key, out var cached))
             {
                 return cached;
             }
 
+            var queryStopwatch = diagnostics?.LogExternalCallStarted(
+                "GetUserItemList",
+                $"kind={kind}, sort={sortBy}, user={user.Id:N}");
             var items = JellyfinCompatibility.GetUserItemList(libraryManager, kind, user, sortBy);
+            diagnostics?.LogExternalCallCompleted(
+                "GetUserItemList",
+                $"kind={kind}, sort={sortBy}, user={user.Id:N}",
+                queryStopwatch,
+                items.Count);
             itemQueries[key] = items;
             return items;
         }
@@ -503,12 +726,13 @@ internal sealed class JellyfinMediaCatalogAdapter(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var key = new UserDataKey(GetUserId(user), GetItemId(item));
+            var key = new UserDataKey(user.Id, item.Id);
             if (userData.TryGetValue(key, out var cached))
             {
                 return cached;
             }
 
+            diagnostics?.RecordUserDataMiss();
             var data = userDataManager.GetUserData(user, item);
             userData[key] = data;
             return data;
@@ -535,6 +759,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 return cached;
             }
 
+            diagnostics?.RecordParentLookup();
             var season = libraryManager.GetItemById<Season>(id);
             seasonsById[id] = season;
             return season;
@@ -552,6 +777,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 return cached;
             }
 
+            diagnostics?.RecordParentLookup();
             var series = libraryManager.GetItemById<Series>(id);
             seriesById[id] = series;
             return series;
@@ -560,25 +786,34 @@ internal sealed class JellyfinMediaCatalogAdapter(
         public IReadOnlyList<BaseItem> GetSeasonEpisodes(Season season) =>
             seasonEpisodes.GetOrAdd(
                 season,
-                () => tvHierarchyProvider.GetSeasonEpisodes(season)
-                    .Where(x => !x.IsVirtualItem)
-                    .Cast<BaseItem>()
-                    .ToList());
+                () => LoadHierarchy(
+                    "GetSeasonEpisodes",
+                    GetItemId(season),
+                    () => tvHierarchyProvider.GetSeasonEpisodes(season)
+                        .Where(x => !x.IsVirtualItem)
+                        .Cast<BaseItem>()
+                        .ToList()));
 
         public IReadOnlyList<BaseItem> GetSeriesEpisodes(Series series) =>
             seriesEpisodes.GetOrAdd(
                 series,
-                () => tvHierarchyProvider.GetSeriesEpisodes(series)
-                    .Where(x => !x.IsVirtualItem)
-                    .Cast<BaseItem>()
-                    .ToList());
+                () => LoadHierarchy(
+                    "GetSeriesEpisodes",
+                    GetItemId(series),
+                    () => tvHierarchyProvider.GetSeriesEpisodes(series)
+                        .Where(x => !x.IsVirtualItem)
+                        .Cast<BaseItem>()
+                        .ToList()));
 
         public IReadOnlyList<BaseItem> GetSeriesSeasons(Series series) =>
             seriesSeasons.GetOrAdd(
                 series,
-                () => tvHierarchyProvider.GetSeriesSeasons(series)
-                    .Cast<BaseItem>()
-                    .ToList());
+                () => LoadHierarchy(
+                    "GetSeriesSeasons",
+                    GetItemId(series),
+                    () => tvHierarchyProvider.GetSeriesSeasons(series)
+                        .Cast<BaseItem>()
+                        .ToList()));
 
         public IReadOnlyList<string> GetSeasonEpisodeIds(Season season) =>
             GetOrAddIds(
@@ -654,6 +889,17 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 .GroupBy(x => (Season: x.ParentIndexNumber!.Value, Episode: x.IndexNumber!.Value))
                 .Any(x => x.Count() > 1);
 
+        private IReadOnlyList<BaseItem> LoadHierarchy(
+            string operation,
+            string ownerId,
+            Func<IReadOnlyList<BaseItem>> load)
+        {
+            var hierarchyStopwatch = diagnostics?.LogExternalCallStarted(operation, $"owner={ownerId}");
+            var items = load();
+            diagnostics?.LogExternalCallCompleted(operation, $"owner={ownerId}", hierarchyStopwatch, items.Count);
+            return items;
+        }
+
         private IReadOnlyList<string> GetOrAddIds(
             Dictionary<string, IReadOnlyList<string>> cache,
             string key,
@@ -671,9 +917,106 @@ internal sealed class JellyfinMediaCatalogAdapter(
             return value;
         }
 
-        private readonly record struct ItemQueryKey(BaseItemKind Kind, string UserId, ItemSortBy SortBy);
+        private readonly record struct ItemQueryKey(BaseItemKind Kind, Guid UserId, ItemSortBy SortBy);
 
-        private readonly record struct UserDataKey(string UserId, string ItemId);
+        private readonly record struct UserDataKey(Guid UserId, Guid ItemId);
+    }
+
+    private sealed class CatalogSnapshotDiagnostics(
+        ILogger<JellyfinMediaCatalogAdapter> logger,
+        string runId)
+    {
+        private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(10);
+        private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+        private TimeSpan nextProgressLog = ProgressInterval;
+        private int userItemQueryMisses;
+        private int userDataMisses;
+        private int parentLookupMisses;
+        private int hierarchyMisses;
+        private int inspectedItemCount;
+        private int selectedItemCount;
+        private int materializedItemCount;
+
+        public Stopwatch LogExternalCallStarted(string operation, string callDetail)
+        {
+            if (operation == "GetUserItemList")
+            {
+                userItemQueryMisses++;
+            }
+            else
+            {
+                hierarchyMisses++;
+            }
+
+            logger.LogInformation(
+                "Media Cleaner diagnostic run {DiagnosticRunId}: {Operation} started ({CallDetail})",
+                runId,
+                operation,
+                callDetail);
+            return Stopwatch.StartNew();
+        }
+
+        public void LogExternalCallCompleted(
+            string operation,
+            string callDetail,
+            Stopwatch? callStopwatch,
+            int resultCount)
+        {
+            logger.LogInformation(
+                "Media Cleaner diagnostic run {DiagnosticRunId}: {Operation} completed in {ElapsedMilliseconds} ms with {ResultCount} items ({CallDetail})",
+                runId,
+                operation,
+                callStopwatch?.ElapsedMilliseconds ?? -1,
+                resultCount,
+                callDetail);
+        }
+
+        public void RecordUserDataMiss() => userDataMisses++;
+
+        public void RecordParentLookup() => parentLookupMisses++;
+
+        public void ReportProgress(int inspected, int selected, int materialized)
+        {
+            inspectedItemCount = inspected;
+            selectedItemCount = selected;
+            materializedItemCount = materialized;
+            if (stopwatch.Elapsed < nextProgressLog)
+            {
+                return;
+            }
+
+            nextProgressLog = stopwatch.Elapsed + ProgressInterval;
+            logger.LogInformation(
+                "Media Cleaner diagnostic run {DiagnosticRunId}: catalog snapshot progress after {ElapsedMilliseconds} ms: inspected={InspectedItemCount}, selected={SelectedItemCount}, materialized={MaterializedItemCount}, user-item-queries={UserItemQueryMissCount}, user-data-misses={UserDataMissCount}, parent-lookups={ParentLookupMissCount}, hierarchy-calls={HierarchyMissCount}",
+                runId,
+                stopwatch.ElapsedMilliseconds,
+                inspectedItemCount,
+                selectedItemCount,
+                materializedItemCount,
+                userItemQueryMisses,
+                userDataMisses,
+                parentLookupMisses,
+                hierarchyMisses);
+        }
+
+        public void LogSummary(string outcome, int inspected, int selected, int materialized)
+        {
+            inspectedItemCount = inspected;
+            selectedItemCount = selected;
+            materializedItemCount = materialized;
+            logger.LogInformation(
+                "Media Cleaner diagnostic run {DiagnosticRunId}: catalog snapshot {Outcome} after {ElapsedMilliseconds} ms: inspected={InspectedItemCount}, selected={SelectedItemCount}, materialized={MaterializedItemCount}, user-item-queries={UserItemQueryMissCount}, user-data-misses={UserDataMissCount}, parent-lookups={ParentLookupMissCount}, hierarchy-calls={HierarchyMissCount}",
+                runId,
+                outcome,
+                stopwatch.ElapsedMilliseconds,
+                inspectedItemCount,
+                selectedItemCount,
+                materializedItemCount,
+                userItemQueryMisses,
+                userDataMisses,
+                parentLookupMisses,
+                hierarchyMisses);
+        }
     }
 }
 

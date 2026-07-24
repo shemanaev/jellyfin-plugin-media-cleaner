@@ -26,7 +26,10 @@ public class JellyfinMutationAdapterTests
         var blockedItem = Item("blocked-season", MediaItemKind.Season, "Protected season");
         var deletedItem = Item("deleted-movie", MediaItemKind.Movie, "Deleted movie");
         var blockedDecision = Decision(blockedItem, markUnplayedUserIds: ["user"]);
-        var deletedDecision = Decision(deletedItem, markUnplayedUserIds: ["user"]);
+        var deletedDecision = Decision(
+            deletedItem,
+            markUnplayedUserIds: ["user"],
+            matchedRules: ["first rule", "second rule"]);
         var events = new List<string>();
         var blockedEntity = new RecordingMovie { Id = Guid.NewGuid(), Name = blockedItem.Name };
         var deletedEntity = new RecordingMovie
@@ -68,6 +71,11 @@ public class JellyfinMutationAdapterTests
         events.Should().Equal("delete", "activity", "mark-unplayed");
         activities.Should().ContainSingle();
         activities[0].Name.Should().Be(deletedDecision.Notification.Title);
+        activities[0].Overview.Should().Contain("Path:");
+        activities[0].Overview.Should().Contain(deletedItem.Path);
+        activities[0].Overview.Should().Contain("Reason: test reason");
+        activities[0].Overview.Should().Contain("Matched rules: first rule, second rule");
+        activities[0].Overview.Should().Contain("Result: successfully deleted");
         activities.Should().NotContain(activity => activity.Name == blockedDecision.Notification.Title);
         libraryManager.Verify(x => x.DeleteItem(blockedEntity, It.IsAny<DeleteOptions>(), true), Times.Never);
         blockedEntity.MarkUnplayedCount.Should().Be(0);
@@ -131,7 +139,10 @@ public class JellyfinMutationAdapterTests
             items.ToDictionary(x => x.Id, x => x.Item, StringComparer.OrdinalIgnoreCase),
             users);
 
-    private static CleanupDecision Decision(MediaItem item, IReadOnlyList<string>? markUnplayedUserIds = null) =>
+    private static CleanupDecision Decision(
+        MediaItem item,
+        IReadOnlyList<string>? markUnplayedUserIds = null,
+        IReadOnlyList<string>? matchedRules = null) =>
         new(
             item,
             ExpiredKind.Played,
@@ -139,7 +150,7 @@ public class JellyfinMutationAdapterTests
             "test reason",
             new ActivityNotification($"{item.Name} was deleted", "test", item.Path ?? string.Empty),
             markUnplayedUserIds ?? [],
-            ["test rule"]);
+            matchedRules ?? ["test rule"]);
 
     private static MediaItem Item(string id, MediaItemKind kind, string name) =>
         new(

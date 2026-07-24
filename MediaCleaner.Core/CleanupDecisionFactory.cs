@@ -17,9 +17,9 @@ internal static class CleanupDecisionFactory
         var notification = CreateBaseNotification(item, kind, playback);
         var reason = kind switch
         {
-            ExpiredKind.Played => $"expired for {string.Join(", ", playback.Select(DisplayUser))}; matched {string.Join(", ", matchedRules)}",
-            ExpiredKind.NotPlayed => $"not played since {item.DateCreated.ToLocalTime().ToString(CultureInfo.CurrentCulture)}; matched {string.Join(", ", matchedRules)}",
-            ExpiredKind.AddedAge => $"added at {item.DateCreated.ToLocalTime().ToString(CultureInfo.CurrentCulture)}; matched {string.Join(", ", matchedRules)}",
+            ExpiredKind.Played => $"expired for {string.Join(", ", playback.Select(DisplayUser))}",
+            ExpiredKind.NotPlayed => $"not played since {item.DateCreated.ToLocalTime().ToString(CultureInfo.CurrentCulture)}",
+            ExpiredKind.AddedAge => $"added at {item.DateCreated.ToLocalTime().ToString(CultureInfo.CurrentCulture)}",
             _ => throw new NotSupportedException($"Unsupported expired kind: {kind}"),
         };
 

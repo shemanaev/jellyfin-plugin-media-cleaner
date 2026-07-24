@@ -92,6 +92,7 @@ public class SnapshotListCacheTests
                 Mock.Of<IUserDataManager>(),
                 new EmptyTvHierarchyProvider(),
                 CancellationToken.None,
+                null,
             ])!;
     }
 
