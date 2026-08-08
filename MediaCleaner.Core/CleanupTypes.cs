@@ -113,6 +113,14 @@ public enum CleanupAuditOutcome
     Skipped,
 }
 
+public enum FavoriteSourceKind
+{
+    None,
+    Item,
+    Season,
+    Series,
+}
+
 public enum RuleFavoriteFilterKind
 {
     Ignore,
@@ -168,7 +176,14 @@ public readonly record struct PlaybackState(
     bool IsWatching,
     bool IsFavorite,
     string? UserName = null,
-    bool HasUserData = true);
+    bool HasUserData = true,
+    FavoriteSourceKind FavoriteSource = FavoriteSourceKind.None);
+
+public sealed record CleanupAuditEvidence(
+    DateTime DateCreatedUtc,
+    DateTime ExpirationCutoffUtc,
+    DateTime? PlaybackHistoryStartUtc,
+    IReadOnlyList<PlaybackState> RelevantPlayback);
 
 public readonly record struct SeriesPlaybackAnchor(
     string EpisodeId,
@@ -227,7 +242,8 @@ public readonly record struct CleanupAuditEntry(
     CleanupRuleActionKind? Action,
     CleanupAuditStage Stage,
     CleanupAuditOutcome Outcome,
-    string Reason);
+    string Reason,
+    CleanupAuditEvidence? Evidence = null);
 
 public readonly record struct DeletionOperation(string ItemId, MediaItemKind Kind, string Name);
 

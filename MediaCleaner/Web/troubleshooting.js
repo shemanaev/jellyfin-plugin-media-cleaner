@@ -45,6 +45,7 @@ function onViewShow(commons) {
         page.querySelector('#TroubleshootingItemSearch').addEventListener('input', troubleshootingItemSearchInput)
         page.querySelector('#TroubleshootingButtonClearItemSearch').addEventListener('click', troubleshootingButtonClearItemSearchClick)
         page.querySelector('#TroubleshootingReportSource').addEventListener('toggle', troubleshootingReportSourceToggle)
+        page.querySelector(logViewerSelector).addEventListener('click', troubleshootingReportClick)
     }
 
     getReport(page)
@@ -74,6 +75,7 @@ function getReport(page) {
         log.value = issueMarkdown
         page.querySelector('#TroubleshootingItemSearch').value = ''
         viewer.innerHTML = report.formattedHtml || report.FormattedHtml || ''
+        initializeDecisionReport(viewer)
         attachItemControls(page)
         updateItemControls(page)
         if (page.querySelector('#TroubleshootingReportSource').open) {
@@ -110,6 +112,7 @@ function getItemPage(page, start) {
         if (itemSection) {
             itemSection.outerHTML = getItemSectionHtml(result)
         }
+        initializeDecisionReport(page.querySelector(logViewerSelector))
 
         itemPageStart = Number(result.start || result.Start || start)
         itemPageSize = Number(result.limit || result.Limit || itemPageSize)
@@ -124,6 +127,27 @@ function getItemPage(page, start) {
         Dashboard.hideLoadingMsg()
         Dashboard.alert('Could not load troubleshooting report page')
     })
+}
+
+function initializeDecisionReport(host) {
+    if (!host) return
+    host.querySelectorAll('time[data-media-cleaner-utc]').forEach(element => {
+        const value = element.dataset.mediaCleanerUtc
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) return
+        element.dateTime = date.toISOString()
+        element.title = `${date.toISOString()} (UTC)`
+        element.textContent = date.toLocaleString()
+    })
+}
+
+function troubleshootingReportClick(event) {
+    const button = event.target.closest('[data-view-rule-id]')
+    if (!button) return
+    event.preventDefault()
+    const ruleId = button.dataset.viewRuleId
+    window.sessionStorage.setItem('mediaCleanerRequestedRuleId', ruleId)
+    Dashboard.navigate(`/configurationpage?name=MediaCleaner&ruleId=${encodeURIComponent(ruleId)}`, false)
 }
 
 function getItemSectionHtml(result) {

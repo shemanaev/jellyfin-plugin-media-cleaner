@@ -25,7 +25,13 @@ public class MediaCleanupTask : IScheduledTask
 
     public bool IsDryRun { get; init; }
 
+    internal CleanupPolicy? PolicyOverride { get; init; }
+
+    internal bool PolicyOverrideRequiresMigrationReview { get; init; }
+
     internal CleanupPlan? LastPlan { get; private set; }
+
+    internal IReadOnlyList<MediaUser> LastUsers { get; private set; } = [];
 
     public string Name => "Media Cleaner cleanup";
 
@@ -80,10 +86,11 @@ public class MediaCleanupTask : IScheduledTask
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var policy = _policyProvider.GetPolicy();
+        var policy = PolicyOverride ?? _policyProvider.GetPolicy();
         _logger.LogDebug("Loaded {RuleCount} cleanup rules", policy.Rules.Count);
 
         var catalog = _catalogAdapter.Create(policy, cancellationToken);
+        LastUsers = IsDryRun ? catalog.Users : [];
         progress.Report(25);
 
         var request = new CleanupRequest(policy, catalog.Users, catalog.Items, IsDryRun);
@@ -98,7 +105,10 @@ public class MediaCleanupTask : IScheduledTask
             return;
         }
 
-        if (_policyProvider.RequiresMigrationReview)
+        var requiresMigrationReview = PolicyOverride is null
+            ? _policyProvider.RequiresMigrationReview
+            : PolicyOverrideRequiresMigrationReview;
+        if (requiresMigrationReview)
         {
             _logger.LogWarning(
                 "Cleanup is paused because legacy settings were migrated to rules and must be reviewed and saved before deletion can run.");

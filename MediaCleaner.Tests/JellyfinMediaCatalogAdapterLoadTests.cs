@@ -376,9 +376,56 @@ public class JellyfinMediaCatalogAdapterLoadTests
             ],
             AllowDeleteIfPlayedBeforeAdded: false), CancellationToken.None);
 
-        catalog.Items.Single(x => x.Kind == MediaItemKind.Episode)
-            .Playback.Single()
-            .IsFavorite.Should().BeTrue();
+        var playback = catalog.Items.Single(x => x.Kind == MediaItemKind.Episode).Playback.Single();
+        playback.IsFavorite.Should().BeTrue();
+        playback.FavoriteSource.Should().Be(FavoriteSourceKind.Series);
+    }
+
+    [Fact]
+    public void Create_FavoriteFilter_ReportsItemAndSeasonFavoriteSources()
+    {
+        var itemUser = CreateUser(0);
+        var seasonUser = CreateUser(1);
+        var users = new[] { itemUser, seasonUser };
+        var libraryManager = new Mock<ILibraryManager>();
+        var library = TestLibrary.Create(libraryManager.Object, programCount: 1, episodeCount: 1);
+        var userData = new CountingUserDataManager(users, library.AllItems);
+        var episode = library.Episodes.Single();
+        var season = library.Seasons.Single();
+        var itemData = PlayedData(Now.AddDays(-30));
+        itemData.IsFavorite = true;
+        userData.Set(itemUser, episode, itemData);
+        userData.Set(seasonUser, episode, PlayedData(Now.AddDays(-30)));
+        userData.Set(seasonUser, season, new UserItemData { Key = season.Id.ToString("N"), IsFavorite = true });
+        SetupUsers(libraryManager, users);
+        SetupLibrary(
+            libraryManager,
+            library,
+            new Dictionary<(BaseItemKind Kind, string UserId, ItemSortBy SortBy), int>());
+
+        var adapter = new JellyfinMediaCatalogAdapter(
+            NullLogger<JellyfinMediaCatalogAdapter>.Instance,
+            CreateUserManager(users),
+            libraryManager.Object,
+            userData.Manager,
+            new CountingTvHierarchyProvider(library));
+
+        var catalog = adapter.Create(new CleanupPolicy(
+            [
+                EpisodeRule("favorite", CleanupRuleTriggerKind.Played, 10, SeriesKeepKind.None) with
+                {
+                    Filters = Filters(MediaItemKind.Episode) with
+                    {
+                        FavoriteFilter = RuleFavoriteFilterKind.FavoriteByAllUsers,
+                    },
+                },
+            ],
+            false), CancellationToken.None);
+
+        catalog.Items.Single(x => x.Kind == MediaItemKind.Episode).Playback
+            .Select(x => x.FavoriteSource)
+            .Should().BeEquivalentTo([FavoriteSourceKind.Item, FavoriteSourceKind.Season]);
+        userData.TotalCalls.Should().Be(users.Length * 3, "each user's episode, season, and series data should remain cached across source tracking");
     }
 
     [Fact]

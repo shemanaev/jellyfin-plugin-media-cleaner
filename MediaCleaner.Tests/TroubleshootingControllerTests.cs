@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 using FluentAssertions;
 using MediaCleaner.Controllers;
 using MediaCleaner.Core;
@@ -93,6 +94,11 @@ public class TroubleshootingControllerTests
     [Fact]
     public void TroubleshootingReportFormatters_CreateUiHtmlAndGitHubMarkdown()
     {
+        var evidence = new CleanupAuditEvidence(
+            new DateTime(2026, 07, 20, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 07, 18, 12, 0, 0, DateTimeKind.Utc),
+            null,
+            [new PlaybackState("alice", new DateTime(2026, 07, 14, 12, 0, 0, DateTimeKind.Utc), true, false, false, "Alice")]);
         var plan = new CleanupPlan(
             [],
             [],
@@ -112,8 +118,19 @@ public class TroubleshootingControllerTests
                     "The Show | S01E02 | Pilot",
                     MediaItemKind.Episode,
                     "rule-2",
-                    "protect rule",
-                    CleanupRuleActionKind.Protect,
+                    "cleanup rule",
+                    CleanupRuleActionKind.Delete,
+                    CleanupAuditStage.Trigger,
+                    CleanupAuditOutcome.Matched,
+                    "trigger matched",
+                    evidence),
+                new CleanupAuditEntry(
+                    "m1",
+                    "The Show | S01E02 | Pilot",
+                    MediaItemKind.Episode,
+                    "rule-2",
+                    "cleanup rule",
+                    CleanupRuleActionKind.Delete,
                     CleanupAuditStage.Protection,
                     CleanupAuditOutcome.Suppressed,
                     "delete suppressed"),
@@ -127,13 +144,16 @@ public class TroubleshootingControllerTests
         html.Should().Contain("Item-level decisions");
         html.Should().Contain("Outcome legend");
         html.Should().Contain("<details class=\"mediaCleanerDecisionGroup\" open>");
-        html.Should().Contain("<details class=\"mediaCleanerDecisionGroup\">");
-        html.Should().Contain("mediaCleanerDecisionBadge-suppressed");
+        html.Should().Contain("mediaCleanerItemDecisionGroup");
+        html.Should().Contain("mediaCleanerResultBadge-suppressed");
         html.Should().Contain("A delete rule matched this item, but protection overrode that delete decision.");
         html.Should().Contain("Deletion was stopped by a safety blocker, such as an unresolved series exception");
         html.Should().Contain("The Show | S01E02 | Pilot");
         html.Should().Contain("played rule");
-        html.Should().Contain("delete suppressed");
+        html.Should().Contain("Deletion was stopped by a safety blocker");
+        html.Should().Contain("View current rule");
+        html.Should().Contain("Alice");
+        html.Should().Contain("data-media-cleaner-utc");
         html.Should().NotContain("[Inf]");
 
         var markdownMethod = typeof(TroubleshootingController).GetMethod("BuildIssueMarkdown", BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -147,11 +167,124 @@ public class TroubleshootingControllerTests
         markdown.Should().Contain("### Rule-level decisions");
         markdown.Should().Contain("### Item-level decisions");
         markdown.Should().Contain("Episode: The Show | S01E02 | Pilot (m1) - Suppressed");
-        markdown.Should().Contain("- Protection -> Suppressed [protect rule]: delete suppressed");
+        markdown.Should().Contain("User 1: played");
+        markdown.Should().Contain("2026-07-14T12:00:00.0000000Z");
+        markdown.Should().NotContain("Alice");
         markdown.Should().NotContain("Outcome legend");
         markdown.Should().NotContain("mediaCleaner");
         markdown.Should().NotContain("mediaCleanerDecisionBadge");
     }
+
+    [Fact]
+    public void TroubleshootingDecisionFormatter_UsesUserFacingIssue116Outcomes()
+    {
+        var entries = new[]
+        {
+            Entry("arcane", "protect", CleanupRuleActionKind.Protect, CleanupAuditStage.Trigger, CleanupAuditOutcome.Matched),
+            Entry("arcane", "protect", CleanupRuleActionKind.Protect, CleanupAuditStage.FavoriteFilter, CleanupAuditOutcome.Rejected),
+            Entry("blue", "protect", CleanupRuleActionKind.Protect, CleanupAuditStage.Trigger, CleanupAuditOutcome.Matched),
+            Entry("blue", "protect", CleanupRuleActionKind.Protect, CleanupAuditStage.Protection, CleanupAuditOutcome.Protected),
+            Entry("new-world", "cleanup", CleanupRuleActionKind.Delete, CleanupAuditStage.Trigger, CleanupAuditOutcome.Matched),
+            Entry("new-world", "protect", CleanupRuleActionKind.Protect, CleanupAuditStage.Trigger, CleanupAuditOutcome.Matched),
+            Entry("new-world", "protect", CleanupRuleActionKind.Protect, CleanupAuditStage.Protection, CleanupAuditOutcome.Protected),
+            Entry("new-world", "cleanup", CleanupRuleActionKind.Delete, CleanupAuditStage.Protection, CleanupAuditOutcome.Suppressed),
+        };
+
+        var groups = TroubleshootingDecisionFormatter.BuildItemGroups(new CleanupPlan([], [], entries));
+
+        groups.Single(x => x.ItemId == "arcane").FinalOutcome.Should().Be(ItemReportOutcome.NoAction);
+        groups.Single(x => x.ItemId == "arcane").RuleGroups.Single().Matched.Should().BeFalse();
+        groups.Single(x => x.ItemId == "blue").FinalOutcome.Should().Be(ItemReportOutcome.NoAction);
+        groups.Single(x => x.ItemId == "blue").RuleGroups.Single().Matched.Should().BeTrue();
+        groups.Single(x => x.ItemId == "new-world").FinalOutcome.Should().Be(ItemReportOutcome.Suppressed);
+    }
+
+    [Fact]
+    public void TroubleshootingDecisionFormatter_RendersRuleSnapshotEvidenceAndPrivateMarkdown()
+    {
+        var rule = new CleanupRule(
+            "cleanup",
+            "Movies played 14d ago",
+            true,
+            new CleanupRuleTrigger(CleanupRuleTriggerKind.Played, 14),
+            new CleanupRuleFilters(
+                [MediaItemKind.Movie],
+                ["alice"],
+                UsersListMode.Acknowledge,
+                ["bob"],
+                UsersListMode.Acknowledge,
+                RuleFavoriteFilterKind.FavoriteByAnyUser,
+                [],
+                LocationsListMode.Exclude,
+                false,
+                TagMode.Exclusion,
+                [],
+                SeriesDeleteKind.Episode,
+                SeriesKeepKind.None),
+            new CleanupRuleActions(CleanupRuleActionKind.Delete, false));
+        var evidence = new CleanupAuditEvidence(
+            new DateTime(2026, 07, 1, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 07, 25, 12, 0, 0, DateTimeKind.Utc),
+            null,
+            [
+                new PlaybackState("alice", new DateTime(2026, 07, 20, 12, 0, 0, DateTimeKind.Utc), true, false, false, "Alice"),
+                new PlaybackState("bob", null, false, false, true, "Bob", FavoriteSource: FavoriteSourceKind.Season),
+            ]);
+        var entry = new CleanupAuditEntry(
+            "movie",
+            "Movie",
+            MediaItemKind.Movie,
+            rule.Id,
+            rule.Name,
+            CleanupRuleActionKind.Delete,
+            CleanupAuditStage.Trigger,
+            CleanupAuditOutcome.Matched,
+            "trigger matched",
+            evidence);
+        var groups = TroubleshootingDecisionFormatter.BuildItemGroups(
+            new CleanupPlan([], [], [entry]),
+            new CleanupPolicy([rule], false));
+        var group = groups.Single();
+
+        var html = new StringBuilder();
+        TroubleshootingDecisionFormatter.AppendItemHtml(
+            html,
+            group,
+            new Dictionary<string, string> { ["alice"] = "Alice", ["bob"] = "Bob" });
+        html.ToString().Should().Contain("Movies played 14d ago");
+        html.ToString().Should().Contain("Filters (AND)");
+        html.ToString().Should().Contain("episodes inherit favorite from season or series");
+        html.ToString().Should().Contain("data-view-rule-id=\"cleanup\"");
+        html.ToString().Should().Contain("favorite via season");
+
+        var markdown = new StringBuilder();
+        TroubleshootingDecisionFormatter.AppendItemMarkdown(
+            markdown,
+            group,
+            new Dictionary<string, string> { ["alice"] = "User 1", ["bob"] = "User 2" });
+        markdown.ToString().Should().Contain("User 1");
+        markdown.ToString().Should().Contain("User 2");
+        markdown.ToString().Should().NotContain("Alice");
+        markdown.ToString().Should().NotContain("Bob");
+        markdown.ToString().Should().Contain("past");
+    }
+
+    private static CleanupAuditEntry Entry(
+        string itemId,
+        string ruleId,
+        CleanupRuleActionKind action,
+        CleanupAuditStage stage,
+        CleanupAuditOutcome outcome) =>
+        new(
+            itemId,
+            itemId,
+            MediaItemKind.Movie,
+            ruleId,
+            ruleId,
+            action,
+            stage,
+            outcome,
+            $"{stage} {outcome}");
 
     private static DateTime? GetNextRunUtc(TaskTriggerInfo trigger, TaskResult? lastExecutionResult, DateTime nowUtc)
     {
@@ -160,5 +293,15 @@ public class TroubleshootingControllerTests
     }
 
     private static CachedTroubleshootingReport CreateCachedReport(string reportId, DateTime createdUtc) =>
-        new(reportId, "10.11.0", "3.0.0", "<config />", CleanupPlan.Empty, [], createdUtc);
+        new(
+            reportId,
+            "10.11.0",
+            "3.0.0",
+            "<config />",
+            new CleanupPolicy([], false),
+            [],
+            new Dictionary<string, string>(),
+            CleanupPlan.Empty,
+            [],
+            createdUtc);
 }

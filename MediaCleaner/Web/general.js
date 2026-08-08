@@ -65,6 +65,7 @@ const conditionRegistry = [
 
 export default function (view, params) {
     const commonsUrl = ApiClient.getUrl('web/ConfigurationPage', { name: 'MediaCleaner_commons_js' })
+    view._mediaCleanerRequestedRuleId = params && params.ruleId ? String(params.ruleId) : ''
 
     view.addEventListener('viewshow', function (e) {
         import(commonsUrl).then(onViewShow.bind(this))
@@ -90,6 +91,10 @@ export default function (view, params) {
 
 function onViewShow(commons) {
     const page = this
+    const storedRuleId = window.sessionStorage.getItem('mediaCleanerRequestedRuleId') || ''
+    if (storedRuleId) window.sessionStorage.removeItem('mediaCleanerRequestedRuleId')
+    const requestedRuleId = page._mediaCleanerRequestedRuleId || storedRuleId
+    page._mediaCleanerRequestedRuleId = ''
     commons.setTabs('MediaCleaner', commons.TabGeneral, commons.getTabs)
     Dashboard.showLoadingMsg()
 
@@ -118,11 +123,15 @@ function onViewShow(commons) {
         page._mediaCleanerRules = normalizeRules(config)
         page._mediaCleanerStatus = status
         page._mediaCleanerMigrationReviewRequired = Number(config.ConfigVersion) < 2 && page._mediaCleanerRules.length > 0
-        page._expandedRuleId = null
+        page._expandedRuleId = requestedRuleId && page._mediaCleanerRules.some(rule => rule.Id === requestedRuleId)
+            ? requestedRuleId
+            : null
+        page._missingRequestedRuleId = requestedRuleId && !page._expandedRuleId ? requestedRuleId : ''
         page._savedRulesSnapshot = rulesSnapshot(page._mediaCleanerRules)
         updateMigrationReview(page)
         renderRules(page)
         renderOverview(page)
+        scrollToRuleCard(page, page._expandedRuleId)
         Dashboard.hideLoadingMsg()
     })
 }
@@ -165,6 +174,9 @@ function onFormSubmit(commons) {
 function renderRules(page) {
     const list = page.querySelector('#RulesList')
     list.innerHTML = [
+        page._missingRequestedRuleId
+            ? `<div class="mediaCleanerMissingRule" role="status"><span class="material-icons info" aria-hidden="true"></span><span>The rule from the troubleshooting report no longer exists in the current configuration. The report still contains the evaluated snapshot.</span></div>`
+            : '',
         renderRuleSection(page, 'Cleanup rules', 'Delete media after it meets the rule conditions.', 'Delete', 'No cleanup rules.'),
         renderRuleSection(page, 'Protection rules', 'Exclude matching media from deletion by any cleanup rule.', 'Protect', 'No protection rules.'),
     ].join('')
@@ -401,7 +413,7 @@ function renderRuleSection(page, title, description, actionKind, emptyText) {
             <div class="paperList mediaCleanerRuleCard${normalized.Enabled === false ? ' mediaCleanerRuleCard-disabled' : ''}" data-index="${index}" data-rule-id="${escapeAttribute(normalized.Id)}">
                 ${normalized.Id === page._expandedRuleId
                     ? renderRuleEditor(page, normalized, index)
-                    : renderRuleSummary(normalized, index, page._mediaCleanerRules)}
+                    : renderRuleSummary(page, normalized, index, page._mediaCleanerRules)}
             </div>`)
     })
 
@@ -615,8 +627,8 @@ function readAddConditionValue(button) {
     return select ? select.value : ''
 }
 
-function renderRuleSummary(rule, index, rules) {
-    const summary = readableRule(rule)
+function renderRuleSummary(page, rule, index, rules) {
+    const filters = summaryFilterLines(page, rule)
     const canMoveUp = findAdjacentRuleIndex(rules, index, -1) >= 0
     const canMoveDown = findAdjacentRuleIndex(rules, index, 1) >= 0
     return `
@@ -626,7 +638,15 @@ function renderRuleSummary(rule, index, rules) {
                     <h3 class="mediaCleanerRuleTitle">${escapeHtml(rule.Name)}</h3>
                     <span class="mediaCleanerStatus ${rule.Enabled === false ? 'mediaCleanerStatus-off' : 'mediaCleanerStatus-on'}">${rule.Enabled === false ? 'Disabled' : 'Enabled'}</span>
                 </div>
-                <p class="mediaCleanerRuleSentence">${escapeHtml(summary)}</p>
+                <div class="mediaCleanerRuleLogic">
+                    <section class="mediaCleanerRuleLogicBlock">
+                        <span class="mediaCleanerRuleLogicLabel">Trigger</span>
+                        <strong>${escapeHtml(triggerSentence(rule.Trigger, rule.Filters))}</strong>
+                        ${summaryUsersHtml(page, rule)}
+                    </section>
+                    ${filters.length > 0 ? `<div class="mediaCleanerRuleConnector">AND</div><section class="mediaCleanerRuleLogicBlock"><span class="mediaCleanerRuleLogicLabel">Filters</span>${filters.map(filter => `<div>${escapeHtml(filter)}</div>`).join('')}</section>` : ''}
+                    <div class="mediaCleanerRuleEffect">Then: ${escapeHtml(actionSentence(rule))}</div>
+                </div>
             </div>
             <div class="mediaCleanerRuleActions" aria-label="Rule actions">
                 ${iconButton('edit', 'edit', 'Edit')}
@@ -645,6 +665,41 @@ function renderRuleSummary(rule, index, rules) {
                 </div>
             </div>
         </div>`
+}
+
+function summaryUsersHtml(page, rule) {
+    if (rule.Trigger.Kind === 'AddedAge') return ''
+    const ids = rule.Filters.UserIds || []
+    if (rule.Filters.UsersMode !== 'Acknowledge' || ids.length === 0) {
+        return `<div class="mediaCleanerRuleScope">${escapeHtml(playbackUsersScope(rule.Filters) === 'AllUsers' ? 'Users: all users' : 'Users: all users except selected users')}</div>`
+    }
+
+    const connector = rule.Trigger.Kind === 'Played' && rule.Trigger.PlayedKeepKind !== 'AllUsers' ? 'OR' : 'AND'
+    const names = ids.map(id => userName(page, id))
+    return `<div class="mediaCleanerRuleUsers">${names.map((name, index) => `${index > 0 ? `<span class="mediaCleanerRuleUserConnector">${connector}</span>` : ''}<span class="mediaCleanerRuleUser">${escapeHtml(name)}</span>`).join('')}</div>`
+}
+
+function summaryFilterLines(page, rule) {
+    const filters = rule.Filters
+    const lines = []
+    const favorite = favoriteSentence(filters.FavoriteFilter, favoriteUsersScope(filters))
+    if (favorite) {
+        const selected = filters.FavoriteUsersMode === 'Acknowledge' && filters.FavoriteUserIds.length > 0
+            ? `: ${filters.FavoriteUserIds.map(id => userName(page, id)).join(['FavoriteByAllUsers', 'NotFavoriteByAnyUser'].includes(filters.FavoriteFilter) ? ' AND ' : ' OR ')}`
+            : ''
+        lines.push(`${favorite}${selected}. Episode favorites include the episode, season, or series; season favorites include the season or series.`)
+    }
+    if (filters.Locations.length > 0) lines.push(filters.LocationsMode === 'Include' ? 'Only selected locations' : 'Outside selected locations')
+    if (filters.EnableTagFilter) lines.push(filters.Tags.length > 0
+        ? `${filters.TagFilterMode === 'Inclusion' ? 'Require' : 'Exclude'} tags: ${filters.Tags.join(', ')}`
+        : `${filters.TagFilterMode === 'Inclusion' ? 'Require' : 'Exclude'} tags: none`)
+    if (isEpisodeOnly(rule) && episodeScopeClause(filters)) lines.push(episodeScopeClause(filters))
+    return lines
+}
+
+function userName(page, id) {
+    const user = (page._mediaCleanerUsers || []).find(candidate => candidate.Id === id)
+    return user ? user.Name : id
 }
 
 function renderRuleEditor(page, rule, index) {
@@ -931,6 +986,7 @@ function favoriteFilterHtml(filters, users, scope) {
             ? warningHtml('Select at least one user to exclude. An empty exclusion is equivalent to all users.')
             : ''
     return selectHtml('FavoriteFilter', 'Favorite requirement', filters.FavoriteFilter, ['FavoriteByAnyUser', 'FavoriteByAllUsers', 'NotFavoriteByAnyUser', 'NotFavoriteByAllUsers'])
+        + '<p class="fieldDescription">For episodes, favorite can come from the episode itself, its season, or its series. For seasons, favorite can come from the season or its series.</p>'
         + selectHtml('FavoriteUsersScope', 'Users included in favorite checks', scope, ['AllUsers', 'SelectedOnly', 'AllExceptSelected'])
         + userList
         + warning

@@ -55,6 +55,27 @@ public class MediaCleanupTaskTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_DryRunUsesCapturedPolicyOverrideAndRetainsUsers()
+    {
+        var task = new MediaCleanupTask(
+            Mock.Of<ILogger<MediaCleanupTask>>(),
+            Mock.Of<ILocalizationManager>(),
+            new ThrowingPolicyProvider(),
+            new TestCatalogAdapter(CreateItem()),
+            new CleanupPlanner(new FixedClock(), new OrdinalPathMatcher(), new NoExtraFileProbe()),
+            new RecordingMutationAdapter())
+        {
+            IsDryRun = true,
+            PolicyOverride = CreatePolicy(),
+        };
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        task.LastPlan!.Decisions.Should().ContainSingle();
+        task.LastUsers.Should().ContainSingle(x => x.Id == "user" && x.Username == "User");
+    }
+
+    [Fact]
     public void NotificationOverview_IncludesPathAndItemDecisionLog()
     {
         var item = CreateItem();
@@ -207,6 +228,13 @@ public class MediaCleanupTaskTests
         public CleanupPolicy GetPolicy() => policy;
 
         public bool RequiresMigrationReview { get; } = requiresMigrationReview;
+    }
+
+    private sealed class ThrowingPolicyProvider : ICleanupPolicyProvider
+    {
+        public CleanupPolicy GetPolicy() => throw new InvalidOperationException("The live policy must not be read.");
+
+        public bool RequiresMigrationReview => throw new InvalidOperationException("The live migration state must not be read.");
     }
 
     private sealed class TestCatalogAdapter(MediaItem item) : IMediaCatalogAdapter

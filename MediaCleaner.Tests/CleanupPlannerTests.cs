@@ -881,6 +881,74 @@ public class CleanupPlannerTests
     }
 
     [Fact]
+    public void Plan_Issue116_SeparatesCleanupAndProtectionRuleEvidence()
+    {
+        var cleanup = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 14) with
+        {
+            Id = "cleanup",
+            Name = "Movies played 14d ago",
+            Filters = Filters(MediaItemKind.Movie) with
+            {
+                UserIds = ["alice"],
+                UsersMode = UsersListMode.Acknowledge,
+            },
+        };
+        var protection = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.NotPlayed, 0) with
+        {
+            Id = "protection",
+            Name = "Movies not played and favorited",
+            Actions = new(CleanupRuleActionKind.Protect, false),
+            Filters = Filters(MediaItemKind.Movie) with
+            {
+                UserIds = ["bob"],
+                UsersMode = UsersListMode.Acknowledge,
+                FavoriteUserIds = ["bob"],
+                FavoriteUsersMode = UsersListMode.Acknowledge,
+                FavoriteFilter = RuleFavoriteFilterKind.FavoriteByAnyUser,
+            },
+        };
+        var arcane = Movie(
+            "arcane",
+            new PlaybackState("alice", null, false, false, false, "Alice"),
+            new PlaybackState("bob", null, false, false, false, "Bob"));
+        var blueEyelids = Movie(
+            "blue",
+            new PlaybackState("alice", null, false, false, false, "Alice"),
+            new PlaybackState("bob", null, false, false, true, "Bob", FavoriteSource: FavoriteSourceKind.Item));
+        var newWorld = Movie(
+            "new-world",
+            new PlaybackState("alice", Now.AddDays(-18), true, false, false, "Alice"),
+            new PlaybackState("bob", null, false, false, true, "Bob", FavoriteSource: FavoriteSourceKind.Item));
+
+        var plan = Planner().Plan(new CleanupRequest(
+            Policy(cleanup, protection),
+            [new MediaUser("alice", "Alice"), new MediaUser("bob", "Bob")],
+            [arcane, blueEyelids, newWorld],
+            true));
+
+        plan.Decisions.Should().BeEmpty("the only cleanup match is protected");
+        plan.AuditEntries.Should().Contain(x =>
+            x.ItemId == "arcane" &&
+            x.RuleId == "protection" &&
+            x.Stage == CleanupAuditStage.FavoriteFilter &&
+            x.Outcome == CleanupAuditOutcome.Rejected);
+        plan.AuditEntries.Should().Contain(x =>
+            x.ItemId == "blue" &&
+            x.RuleId == "protection" &&
+            x.Outcome == CleanupAuditOutcome.Protected);
+        plan.AuditEntries.Should().Contain(x =>
+            x.ItemId == "new-world" &&
+            x.RuleId == "cleanup" &&
+            x.Outcome == CleanupAuditOutcome.Suppressed);
+        plan.AuditEntries.Single(x =>
+                x.ItemId == "new-world" &&
+                x.RuleId == "protection" &&
+                x.Stage == CleanupAuditStage.Trigger)
+            .Evidence!.RelevantPlayback.Single(x => x.UserId == "bob")
+            .FavoriteSource.Should().Be(FavoriteSourceKind.Item);
+    }
+
+    [Fact]
     public void Plan_WritesRuleLevelAudit_WhenPlayedRuleHasNoMatchedUsers()
     {
         var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 10) with

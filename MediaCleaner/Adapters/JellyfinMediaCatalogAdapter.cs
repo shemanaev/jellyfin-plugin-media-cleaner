@@ -362,14 +362,18 @@ internal sealed class JellyfinMediaCatalogAdapter(
     private PlaybackState CreatePlaybackState(JellyfinUser user, BaseItem item, SnapshotContext snapshot)
     {
         var data = snapshot.GetUserData(user, item);
+        var favoriteSource = snapshot.NeedsFavoriteState
+            ? GetFavoriteSource(user, item, data?.IsFavorite ?? false, snapshot)
+            : FavoriteSourceKind.None;
         return new PlaybackState(
             UserId: GetUserId(user),
             LastPlayedDate: data?.LastPlayedDate,
             IsPlayed: data?.Played ?? false,
             IsWatching: data?.PlaybackPositionTicks != 0,
-            IsFavorite: snapshot.NeedsFavoriteState && IsFavorite(user, item, data?.IsFavorite ?? false, snapshot),
+            IsFavorite: favoriteSource != FavoriteSourceKind.None,
             UserName: user.Username,
-            HasUserData: data is not null);
+            HasUserData: data is not null,
+            FavoriteSource: favoriteSource);
     }
 
     private void LogNotPlayedCandidate(
@@ -410,15 +414,40 @@ internal sealed class JellyfinMediaCatalogAdapter(
         logger.LogTrace("\"{Name}\" ({Id}) added because not played by {Username}", item.Name, item.Id, user.Username);
     }
 
-    private static bool IsFavorite(JellyfinUser user, BaseItem item, bool itemIsFavorite, SnapshotContext snapshot) => item switch
+    private static FavoriteSourceKind GetFavoriteSource(
+        JellyfinUser user,
+        BaseItem item,
+        bool itemIsFavorite,
+        SnapshotContext snapshot)
     {
-        Episode episode => itemIsFavorite
-            || (snapshot.GetEpisodeSeason(episode) is { } season && (snapshot.GetUserData(user, season)?.IsFavorite ?? false))
-            || (snapshot.GetEpisodeSeries(episode) is { } series && (snapshot.GetUserData(user, series)?.IsFavorite ?? false)),
-        Season season => itemIsFavorite
-            || (snapshot.GetSeasonSeries(season) is { } series && (snapshot.GetUserData(user, series)?.IsFavorite ?? false)),
-        _ => itemIsFavorite,
-    };
+        if (itemIsFavorite)
+        {
+            return FavoriteSourceKind.Item;
+        }
+
+        if (item is Episode episode)
+        {
+            if (snapshot.GetEpisodeSeason(episode) is { } season
+                && (snapshot.GetUserData(user, season)?.IsFavorite ?? false))
+            {
+                return FavoriteSourceKind.Season;
+            }
+
+            if (snapshot.GetEpisodeSeries(episode) is { } series
+                && (snapshot.GetUserData(user, series)?.IsFavorite ?? false))
+            {
+                return FavoriteSourceKind.Series;
+            }
+        }
+        else if (item is Season season
+            && snapshot.GetSeasonSeries(season) is { } series
+            && (snapshot.GetUserData(user, series)?.IsFavorite ?? false))
+        {
+            return FavoriteSourceKind.Series;
+        }
+
+        return FavoriteSourceKind.None;
+    }
 
     private static IReadOnlyList<string> GetTags(BaseItem item, SnapshotContext snapshot)
     {

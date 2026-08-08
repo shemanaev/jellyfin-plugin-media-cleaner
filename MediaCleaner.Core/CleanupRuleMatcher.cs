@@ -86,7 +86,15 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
                 rule,
                 CleanupAuditStage.Trigger,
                 CleanupAuditOutcome.Matched,
-                $"matched {rule.Trigger.Kind} rule '{rule.Name}'");
+                $"matched {rule.Trigger.Kind} rule '{rule.Name}'",
+                evidence: CreateEvidence(
+                    candidate.Item,
+                    context,
+                    MergePlayback(
+                        candidate.Playback,
+                        rule.Filters.FavoriteFilter == RuleFavoriteFilterKind.Ignore
+                            ? []
+                            : GetPlaybackForUsers(candidate.Item, context.FavoriteUsers))));
 
             if (!IsAllowedByFavorites(candidate.Item, context.FavoriteUsers, rule.Filters.FavoriteFilter))
             {
@@ -96,7 +104,11 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
                     rule,
                     CleanupAuditStage.FavoriteFilter,
                     CleanupAuditOutcome.Rejected,
-                    $"rejected by favorite filter '{rule.Filters.FavoriteFilter}'");
+                    $"rejected by favorite filter '{rule.Filters.FavoriteFilter}'",
+                    evidence: CreateEvidence(
+                        candidate.Item,
+                        context,
+                        GetPlaybackForUsers(candidate.Item, context.FavoriteUsers)));
 
                 continue;
             }
@@ -363,21 +375,67 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
         }
     }
 
-    private static void AddPlayedBeforeAddedAudit(
+    private void AddPlayedBeforeAddedAudit(
         CleanupAuditCollector audit,
         MediaItem item,
         CleanupRule rule,
         PlaybackState playback,
         string action)
     {
-        var user = string.IsNullOrWhiteSpace(playback.UserName) ? playback.UserId : playback.UserName;
+        var playbackStartDate = rule.Trigger.CountAsNotPlayedAfter >= 0
+            ? now.AddDays(-rule.Trigger.CountAsNotPlayedAfter)
+            : (DateTime?)null;
         CleanupAudit.AddItem(
             audit,
             item,
             rule,
             CleanupAuditStage.Trigger,
             CleanupAuditOutcome.Skipped,
-            $"{action} for user '{user}' because Last Played ({playback.LastPlayedDate!.Value.ToLocalTime()}) is before Date Added ({item.DateCreated.ToLocalTime()}); this usually happens after a file upgrade or re-import");
+            $"{action} because Last Played is before Date Added; this usually happens after a file upgrade or re-import",
+            evidence: new CleanupAuditEvidence(
+                item.DateCreated,
+                now.AddDays(-rule.Trigger.Days),
+                playbackStartDate,
+                [playback]));
+    }
+
+    private static CleanupAuditEvidence CreateEvidence(
+        MediaItem item,
+        RuleEvaluationContext context,
+        IReadOnlyList<PlaybackState> playback) =>
+        new(
+            item.DateCreated,
+            context.ExpirationCutoffDate,
+            context.PlaybackStartDate,
+            playback);
+
+    private static IReadOnlyList<PlaybackState> GetPlaybackForUsers(
+        MediaItem item,
+        IReadOnlyList<MediaUser> users)
+    {
+        if (users.Count == 0)
+        {
+            return [];
+        }
+
+        var userIds = users.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return item.Playback.Where(x => userIds.Contains(x.UserId)).ToList();
+    }
+
+    private static IReadOnlyList<PlaybackState> MergePlayback(
+        IReadOnlyList<PlaybackState> first,
+        IReadOnlyList<PlaybackState> second)
+    {
+        if (second.Count == 0)
+        {
+            return first;
+        }
+
+        return first
+            .Concat(second)
+            .GroupBy(x => x.UserId, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.First())
+            .ToList();
     }
 
     private static bool IsAllowedByFavorites(MediaItem item, IReadOnlyList<MediaUser> users, RuleFavoriteFilterKind filter)

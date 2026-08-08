@@ -97,7 +97,8 @@ internal static class CleanupAudit
         CleanupAuditStage stage,
         CleanupAuditOutcome outcome,
         [InterpolatedStringHandlerArgument("audit")] ref AuditReasonInterpolatedStringHandler reason,
-        CleanupRuleActionKind? action = null)
+        CleanupRuleActionKind? action = null,
+        CleanupAuditEvidence? evidence = null)
     {
         if (!audit.Enabled)
         {
@@ -113,7 +114,8 @@ internal static class CleanupAudit
             action ?? rule?.Actions.Kind,
             stage,
             outcome,
-            reason.GetFormattedText()));
+            reason.GetFormattedText(),
+            evidence));
     }
 
     public static void AddCascadeBlocked(

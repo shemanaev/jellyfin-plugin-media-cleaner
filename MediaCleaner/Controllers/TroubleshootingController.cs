@@ -72,26 +72,34 @@ public class TroubleshootingController(
         var localization = scope.ServiceProvider.GetRequiredService<ILocalizationManager>();
         var fileSystem = scope.ServiceProvider.GetRequiredService<IFileSystem>();
         var progress = new Progress<double>();
+        var configurationSnapshot = Plugin.Instance!.Configuration;
+        var pluginConfig = GetPrettyXml(configurationSnapshot);
+        var policySnapshot = configurationSnapshot.ToCleanupPolicy();
 
         using var loggerFactory = LoggerFactory.Create(_ => { });
 
         var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem)
         {
-            IsDryRun = true
+            IsDryRun = true,
+            PolicyOverride = policySnapshot,
+            PolicyOverrideRequiresMigrationReview = configurationSnapshot.RequiresMigrationReview(),
         };
         await task.ExecuteAsync(progress, HttpContext.RequestAborted);
 
-        var pluginConfig = GetPrettyXml(Plugin.Instance!.Configuration);
         var plan = task.LastPlan ?? CleanupPlan.Empty;
         var reportId = Guid.NewGuid().ToString("N");
         var jellyfinVersion = applicationHost.ApplicationVersionString;
         var pluginVersion = Plugin.Instance.Version.ToString();
-        var itemGroups = BuildItemDecisionGroups(plan);
+        var userNames = task.LastUsers.ToDictionary(x => x.Id, x => x.Username, StringComparer.OrdinalIgnoreCase);
+        var itemGroups = BuildItemDecisionGroups(plan, policySnapshot);
         var report = new CachedTroubleshootingReport(
             reportId,
             jellyfinVersion,
             pluginVersion,
             pluginConfig,
+            policySnapshot,
+            task.LastUsers,
+            userNames,
             plan,
             itemGroups,
             DateTime.UtcNow);
@@ -100,7 +108,7 @@ public class TroubleshootingController(
 
         return new TroubleshootingReportResponse(
             reportId,
-            BuildFormattedHtmlPage(jellyfinVersion, pluginVersion, pluginConfig, plan, itemGroups, 0, DefaultItemPageSize),
+            BuildFormattedHtmlPage(jellyfinVersion, pluginVersion, pluginConfig, plan, itemGroups, userNames, 0, DefaultItemPageSize),
             string.Empty,
             itemGroups.Count,
             itemGroups.Count,
@@ -129,7 +137,7 @@ public class TroubleshootingController(
             limit,
             itemGroups.Count,
             report.ItemGroups.Count,
-            BuildItemDecisionReport(itemGroups, start, limit));
+            BuildItemDecisionReport(itemGroups, report.UserNames, start, limit));
     }
 
     [HttpGet("ReportIssueSource")]
@@ -150,6 +158,7 @@ public class TroubleshootingController(
                 report.PluginConfig,
                 report.Plan,
                 report.ItemGroups,
+                TroubleshootingDecisionFormatter.CreateAliases(report.Users),
                 includeItemDetails));
     }
 
@@ -261,6 +270,7 @@ public class TroubleshootingController(
             pluginConfig,
             plan,
             BuildItemDecisionGroups(plan),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             0,
             MaxDetailedReportItemGroups);
 
@@ -270,10 +280,11 @@ public class TroubleshootingController(
         string pluginConfig,
         CleanupPlan plan,
         IReadOnlyList<ItemDecisionGroup> itemGroups,
+        IReadOnlyDictionary<string, string> userNames,
         int itemStart,
         int itemLimit)
     {
-        var decisionReport = BuildDecisionReport(plan, itemGroups, itemStart, itemLimit);
+        var decisionReport = BuildDecisionReport(plan, itemGroups, userNames, itemStart, itemLimit);
         return $@"<div class=""mediaCleanerTroubleshootingReport"">
 <ul class=""mediaCleanerReportMeta"">
 <li><strong>Jellyfin version:</strong> {HttpUtility.HtmlEncode(jellyfinVersion)}</li>
@@ -296,6 +307,7 @@ public class TroubleshootingController(
     private static string BuildDecisionReport(
         CleanupPlan plan,
         IReadOnlyList<ItemDecisionGroup> itemGroups,
+        IReadOnlyDictionary<string, string> userNames,
         int itemStart,
         int itemLimit)
     {
@@ -311,27 +323,30 @@ public class TroubleshootingController(
         builder.AppendLine("</div>");
 
         builder.AppendLine("<section class=\"mediaCleanerDecisionSection\">");
-        builder.AppendLine("<h3>Outcome summary</h3>");
+        builder.AppendLine("<h3>Item result summary</h3>");
         builder.AppendLine("<div class=\"mediaCleanerOutcomeSummary\">");
-        foreach (var outcome in Enum.GetValues<CleanupAuditOutcome>())
+        foreach (var outcome in Enum.GetValues<ItemReportOutcome>())
         {
-            var count = plan.AuditEntries.Count(x => x.Outcome == outcome);
+            var count = itemGroups.Count(x => x.FinalOutcome == outcome);
             if (count == 0)
             {
                 continue;
             }
 
             builder.Append("<span class=\"mediaCleanerDecisionBadge ");
-            builder.Append(GetOutcomeClass(outcome));
+            builder.Append("mediaCleanerResultBadge-");
+            builder.Append(outcome.ToString().ToLowerInvariant());
             builder.Append("\">");
-            builder.Append(HttpUtility.HtmlEncode(outcome.ToString()));
+            builder.Append(HttpUtility.HtmlEncode(TroubleshootingDecisionFormatter.GetResultLabel(outcome)));
             builder.Append(": ");
             builder.Append(count.ToString(CultureInfo.InvariantCulture));
             builder.AppendLine("</span>");
         }
         builder.AppendLine("</div>");
         builder.AppendLine("</section>");
+        builder.AppendLine("<details class=\"mediaCleanerTechnicalDetails\"><summary>Technical stage legend</summary>");
         AppendOutcomeLegend(builder);
+        builder.AppendLine("</details>");
 
         var ruleEntries = plan.AuditEntries
             .Where(x => x.ItemId is null)
@@ -359,7 +374,7 @@ public class TroubleshootingController(
             builder.AppendLine("</section>");
         }
 
-        AppendItemDecisionReport(builder, itemGroups, itemStart, itemLimit);
+        AppendItemDecisionReport(builder, itemGroups, userNames, itemStart, itemLimit);
 
         if (plan.AuditEntries.Count == 0)
         {
@@ -370,16 +385,21 @@ public class TroubleshootingController(
         return builder.ToString();
     }
 
-    private static string BuildItemDecisionReport(IReadOnlyList<ItemDecisionGroup> itemGroups, int itemStart, int itemLimit)
+    private static string BuildItemDecisionReport(
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        IReadOnlyDictionary<string, string> userNames,
+        int itemStart,
+        int itemLimit)
     {
         var builder = new StringBuilder();
-        AppendItemDecisionReport(builder, itemGroups, itemStart, itemLimit);
+        AppendItemDecisionReport(builder, itemGroups, userNames, itemStart, itemLimit);
         return builder.ToString();
     }
 
     private static void AppendItemDecisionReport(
         StringBuilder builder,
         IReadOnlyList<ItemDecisionGroup> itemGroups,
+        IReadOnlyDictionary<string, string> userNames,
         int itemStart,
         int itemLimit)
     {
@@ -403,24 +423,7 @@ public class TroubleshootingController(
 
         foreach (var group in itemGroups.Skip(itemStart).Take(itemLimit))
         {
-            builder.AppendLine("<details class=\"mediaCleanerDecisionGroup\">");
-            builder.Append("<summary>");
-            builder.Append("<span class=\"mediaCleanerDecisionItemTitle\">");
-            builder.Append(HttpUtility.HtmlEncode($"{group.ItemKind}: {group.ItemName}"));
-            builder.Append("</span> ");
-            builder.Append("<span class=\"mediaCleanerDecisionItemId\">");
-            builder.Append(HttpUtility.HtmlEncode(group.ItemId));
-            builder.Append("</span> ");
-            AppendOutcomeBadge(builder, group.FinalOutcome);
-            builder.AppendLine("</summary>");
-            builder.AppendLine("<ol class=\"mediaCleanerDecisionList\">");
-            foreach (var entry in group.Entries)
-            {
-                AppendAuditEntry(builder, entry);
-            }
-
-            builder.AppendLine("</ol>");
-            builder.AppendLine("</details>");
+            TroubleshootingDecisionFormatter.AppendItemHtml(builder, group, userNames);
         }
 
         builder.AppendLine("</section>");
@@ -433,6 +436,7 @@ public class TroubleshootingController(
             pluginConfig,
             plan,
             BuildItemDecisionGroups(plan),
+            TroubleshootingDecisionFormatter.CreateAliases(CollectEvidenceUsers(plan)),
             includeItemDetails: true);
 
     private static string BuildIssueMarkdownCore(
@@ -441,6 +445,7 @@ public class TroubleshootingController(
         string pluginConfig,
         CleanupPlan plan,
         IReadOnlyList<ItemDecisionGroup> itemGroups,
+        IReadOnlyDictionary<string, string> aliases,
         bool includeItemDetails)
     {
         var builder = new StringBuilder();
@@ -471,7 +476,7 @@ public class TroubleshootingController(
         AppendIssueRuleDecisions(builder, plan);
         if (includeItemDetails)
         {
-            AppendIssueItemDecisions(builder, itemGroups, MaxDetailedReportItemGroups);
+            AppendIssueItemDecisions(builder, itemGroups, aliases, MaxDetailedReportItemGroups);
         }
         else if (itemGroups.Count > 0)
         {
@@ -539,7 +544,10 @@ public class TroubleshootingController(
         await writer.WriteLineAsync("</details>");
 
         await WriteIssueRuleDecisionsAsync(writer, report.Plan);
-        await WriteIssueItemDecisionsAsync(writer, report.ItemGroups);
+        await WriteIssueItemDecisionsAsync(
+            writer,
+            report.ItemGroups,
+            TroubleshootingDecisionFormatter.CreateAliases(report.Users));
 
         if (report.Plan.AuditEntries.Count == 0)
         {
@@ -574,7 +582,10 @@ public class TroubleshootingController(
         }
     }
 
-    private static async Task WriteIssueItemDecisionsAsync(TextWriter writer, IReadOnlyList<ItemDecisionGroup> itemGroups)
+    private static async Task WriteIssueItemDecisionsAsync(
+        TextWriter writer,
+        IReadOnlyList<ItemDecisionGroup> itemGroups,
+        IReadOnlyDictionary<string, string> aliases)
     {
         if (itemGroups.Count == 0)
         {
@@ -585,16 +596,9 @@ public class TroubleshootingController(
         await writer.WriteLineAsync("### Item-level decisions");
         foreach (var group in itemGroups)
         {
-            await writer.WriteLineAsync();
-            await writer.WriteLineAsync("<details>");
-            await writer.WriteLineAsync($"<summary>{EscapeMarkdownText($"{group.ItemKind}: {group.ItemName} ({group.ItemId}) - {group.FinalOutcome}")}</summary>");
-            await writer.WriteLineAsync();
-            foreach (var entry in group.Entries)
-            {
-                await writer.WriteLineAsync($"- {CleanupAuditFormatter.FormatPlainTextEntry(entry, escapeText: EscapeMarkdownText)}");
-            }
-
-            await writer.WriteLineAsync("</details>");
+            var builder = new StringBuilder();
+            TroubleshootingDecisionFormatter.AppendItemMarkdown(builder, group, aliases);
+            await writer.WriteAsync(builder.ToString());
         }
     }
 
@@ -627,6 +631,7 @@ public class TroubleshootingController(
     private static void AppendIssueItemDecisions(
         StringBuilder builder,
         IReadOnlyList<ItemDecisionGroup> itemGroups,
+        IReadOnlyDictionary<string, string> aliases,
         int maxItemGroups)
     {
         if (itemGroups.Count == 0)
@@ -644,16 +649,7 @@ public class TroubleshootingController(
 
         foreach (var group in itemGroups.Take(maxItemGroups))
         {
-            builder.AppendLine();
-            builder.AppendLine("<details>");
-            builder.AppendLine($"<summary>{EscapeMarkdownText($"{group.ItemKind}: {group.ItemName} ({group.ItemId}) - {group.FinalOutcome}")}</summary>");
-            builder.AppendLine();
-            foreach (var entry in group.Entries)
-            {
-                AppendIssueAuditEntry(builder, entry);
-            }
-
-            builder.AppendLine("</details>");
+            TroubleshootingDecisionFormatter.AppendItemMarkdown(builder, group, aliases);
         }
     }
 
@@ -662,23 +658,16 @@ public class TroubleshootingController(
         builder.AppendLine($"- {CleanupAuditFormatter.FormatPlainTextEntry(entry, escapeText: EscapeMarkdownText)}");
     }
 
-    private static IReadOnlyList<ItemDecisionGroup> BuildItemDecisionGroups(CleanupPlan plan) =>
+    private static IReadOnlyList<ItemDecisionGroup> BuildItemDecisionGroups(
+        CleanupPlan plan,
+        CleanupPolicy? policy = null) =>
+        TroubleshootingDecisionFormatter.BuildItemGroups(plan, policy);
+
+    private static IReadOnlyList<MediaUser> CollectEvidenceUsers(CleanupPlan plan) =>
         plan.AuditEntries
-            .Where(x => x.ItemId is not null)
-            .GroupBy(x => x.ItemId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            .Select(group =>
-            {
-                var entries = group.ToList();
-                var first = entries[0];
-                return new ItemDecisionGroup(
-                    first.ItemId ?? string.Empty,
-                    first.ItemName ?? string.Empty,
-                    first.ItemKind,
-                    CleanupAuditFormatter.GetFinalOutcome(entries),
-                    entries);
-            })
-            .OrderBy(x => x.ItemKind?.ToString())
-            .ThenBy(x => x.ItemName)
+            .SelectMany(x => x.Evidence?.RelevantPlayback ?? [])
+            .GroupBy(x => x.UserId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new MediaUser(group.Key, group.First().UserName ?? group.Key))
             .ToList();
 
     private static IReadOnlyList<ItemDecisionGroup> FilterItemDecisionGroups(
@@ -830,15 +819,35 @@ internal sealed record CachedTroubleshootingReport(
     string JellyfinVersion,
     string PluginVersion,
     string PluginConfig,
+    CleanupPolicy Policy,
+    IReadOnlyList<MediaUser> Users,
+    IReadOnlyDictionary<string, string> UserNames,
     CleanupPlan Plan,
     IReadOnlyList<ItemDecisionGroup> ItemGroups,
     DateTime CreatedUtc);
+
+internal enum ItemReportOutcome
+{
+    NoAction,
+    Planned,
+    Suppressed,
+    Blocked,
+}
+
+internal sealed record RuleDecisionGroup(
+    string RuleId,
+    string RuleName,
+    CleanupRuleActionKind? Action,
+    bool Matched,
+    CleanupRule? Rule,
+    IReadOnlyList<CleanupAuditEntry> Entries);
 
 internal sealed record ItemDecisionGroup(
     string ItemId,
     string ItemName,
     MediaItemKind? ItemKind,
-    CleanupAuditOutcome FinalOutcome,
+    ItemReportOutcome FinalOutcome,
+    IReadOnlyList<RuleDecisionGroup> RuleGroups,
     IReadOnlyList<CleanupAuditEntry> Entries);
 
 public sealed record MediaCleanerStatusResponse(

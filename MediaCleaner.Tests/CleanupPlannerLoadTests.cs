@@ -119,6 +119,30 @@ public class CleanupPlannerLoadTests
             $"normal planning allocated {normalBytes:N0} bytes while dry-run allocated {dryRunBytes:N0} bytes");
     }
 
+    [Fact(Timeout = 10_000)]
+    public async Task Plan_LoadShapedDryRun_AttachesEvidenceOnlyToExistingCandidates()
+    {
+        var users = new[]
+        {
+            new MediaUser("u1", "one"),
+            new MediaUser("u2", "two"),
+            new MediaUser("u3", "three"),
+        };
+        var items = BuildLibrary(users).ToList();
+        var rule = Rule(MediaItemKind.Episode, CleanupRuleTriggerKind.Played, 10) with
+        {
+            Filters = Filters(MediaItemKind.Episode) with { DeleteEpisodes = SeriesDeleteKind.Episode },
+        };
+
+        var plan = await Task.Run(() => Planner().Plan(new CleanupRequest(new CleanupPolicy([rule], false), users, items, true)));
+        var evidenceEntries = plan.AuditEntries.Where(x => x.Evidence is not null).ToList();
+
+        evidenceEntries.Count.Should().BeLessThanOrEqualTo(EpisodeCount);
+        evidenceEntries.Should().OnlyContain(x =>
+            x.Stage == CleanupAuditStage.Trigger || x.Stage == CleanupAuditStage.FavoriteFilter);
+        evidenceEntries.Should().OnlyContain(x => x.Evidence!.RelevantPlayback.Count <= users.Length);
+    }
+
     [Fact]
     public void Matcher_NormalRunEvaluatesTriggerOnlyAfterCheapFiltersPass()
     {
