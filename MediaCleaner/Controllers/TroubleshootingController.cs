@@ -62,8 +62,18 @@ public class TroubleshootingController(
 
     [HttpGet("Report")]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<TroubleshootingReportResponse> GetReport()
+    public async Task<ActionResult<TroubleshootingReportResponse>> GetReport([FromQuery] string? reportId = null)
     {
+        if (!string.IsNullOrWhiteSpace(reportId))
+        {
+            if (!TryGetCachedReport(reportId, out var cachedReport))
+            {
+                return NotFound(new { error = "Troubleshooting report has expired. Refresh the report and try again." });
+            }
+
+            return BuildReportResponse(cachedReport);
+        }
+
         using var scope = scopeFactory.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<IUserManager>();
         var libraryManager = scope.ServiceProvider.GetRequiredService<ILibraryManager>();
@@ -87,13 +97,13 @@ public class TroubleshootingController(
         await task.ExecuteAsync(progress, HttpContext.RequestAborted);
 
         var plan = task.LastPlan ?? CleanupPlan.Empty;
-        var reportId = Guid.NewGuid().ToString("N");
+        var newReportId = Guid.NewGuid().ToString("N");
         var jellyfinVersion = applicationHost.ApplicationVersionString;
         var pluginVersion = Plugin.Instance.Version.ToString();
         var userNames = task.LastUsers.ToDictionary(x => x.Id, x => x.Username, StringComparer.OrdinalIgnoreCase);
         var itemGroups = BuildItemDecisionGroups(plan, policySnapshot);
         var report = new CachedTroubleshootingReport(
-            reportId,
+            newReportId,
             jellyfinVersion,
             pluginVersion,
             pluginConfig,
@@ -106,14 +116,25 @@ public class TroubleshootingController(
 
         SetCachedReport(report);
 
-        return new TroubleshootingReportResponse(
-            reportId,
-            BuildFormattedHtmlPage(jellyfinVersion, pluginVersion, pluginConfig, plan, itemGroups, userNames, 0, DefaultItemPageSize),
-            string.Empty,
-            itemGroups.Count,
-            itemGroups.Count,
-            DefaultItemPageSize);
+        return BuildReportResponse(report);
     }
+
+    private static TroubleshootingReportResponse BuildReportResponse(CachedTroubleshootingReport report) =>
+        new(
+            report.ReportId,
+            BuildFormattedHtmlPage(
+                report.JellyfinVersion,
+                report.PluginVersion,
+                report.PluginConfig,
+                report.Plan,
+                report.ItemGroups,
+                report.UserNames,
+                0,
+                DefaultItemPageSize),
+            string.Empty,
+            report.ItemGroups.Count,
+            report.ItemGroups.Count,
+            DefaultItemPageSize);
 
     [HttpGet("ReportItems")]
     [Produces(MediaTypeNames.Application.Json)]

@@ -249,6 +249,11 @@ internal static class TroubleshootingDecisionFormatter
         builder.AppendLine("<div class=\"mediaCleanerRuleEvidence\"><strong>Evidence at dry-run time</strong><ul>");
         AppendDateHtml(builder, "Date added", evidence.DateCreatedUtc);
         AppendDateHtml(builder, "Expiration cutoff", evidence.ExpirationCutoffUtc);
+        if (group.Rule is { } evaluatedRule)
+        {
+            AppendDateHtml(builder, "Evaluated at", EvaluatedAt(evidence, evaluatedRule));
+        }
+
         if (evidence.PlaybackHistoryStartUtc is { } start)
         {
             AppendDateHtml(builder, "Playback history starts", start);
@@ -266,7 +271,16 @@ internal static class TroubleshootingDecisionFormatter
             var name = ResolveUser(playback.UserId, playback.UserName, userNames);
             builder.Append("<li><strong>");
             builder.Append(Html(name));
-            builder.Append(":</strong> ");
+            builder.Append("</strong>");
+            var roles = DescribeEvidenceRoles(group.Rule, playback.UserId);
+            if (!string.IsNullOrEmpty(roles))
+            {
+                builder.Append(" <span class=\"mediaCleanerEvidenceRoles\">(");
+                builder.Append(Html(roles));
+                builder.Append(")</span>");
+            }
+
+            builder.Append(": ");
             builder.Append(Html(DescribePlayback(playback)));
             if (playback.LastPlayedDate is { } lastPlayed)
             {
@@ -280,13 +294,17 @@ internal static class TroubleshootingDecisionFormatter
                 }
             }
 
-            if (playback.IsFavorite)
+            if (IsFavoriteFilterUser(group.Rule, playback.UserId) && playback.IsFavorite)
             {
                 builder.Append(playback.FavoriteSource == FavoriteSourceKind.None ? "; favorite (source unavailable)" : "; favorite via ");
                 if (playback.FavoriteSource != FavoriteSourceKind.None)
                 {
                     builder.Append(Html(playback.FavoriteSource.ToString().ToLowerInvariant()));
                 }
+            }
+            else if (IsFavoriteFilterUser(group.Rule, playback.UserId))
+            {
+                builder.Append("; not favorite");
             }
 
             builder.AppendLine("</li>");
@@ -366,6 +384,11 @@ internal static class TroubleshootingDecisionFormatter
 
         builder.AppendLine($"- Date added: {Utc(evidence.DateCreatedUtc)}");
         builder.AppendLine($"- Expiration cutoff: {Utc(evidence.ExpirationCutoffUtc)}");
+        if (group.Rule is { } evaluatedRule)
+        {
+            builder.AppendLine($"- Evaluated at: {Utc(EvaluatedAt(evidence, evaluatedRule))}");
+        }
+
         if (evidence.PlaybackHistoryStartUtc is { } start)
         {
             builder.AppendLine($"- Playback history starts: {Utc(start)}");
@@ -380,7 +403,9 @@ internal static class TroubleshootingDecisionFormatter
         foreach (var playback in evidence.RelevantPlayback)
         {
             var name = aliases.TryGetValue(playback.UserId, out var alias) ? alias : "User";
-            var line = $"- {name}: {DescribePlayback(playback)}";
+            var roles = DescribeEvidenceRoles(group.Rule, playback.UserId);
+            var roleSuffix = string.IsNullOrEmpty(roles) ? string.Empty : $" ({roles})";
+            var line = $"- {name}{roleSuffix}: {DescribePlayback(playback)}";
             if (playback.LastPlayedDate is { } lastPlayed)
             {
                 line += $"; Last played {Utc(lastPlayed)}";
@@ -390,11 +415,15 @@ internal static class TroubleshootingDecisionFormatter
                 }
             }
 
-            if (playback.IsFavorite)
+            if (IsFavoriteFilterUser(group.Rule, playback.UserId) && playback.IsFavorite)
             {
                 line += playback.FavoriteSource == FavoriteSourceKind.None
                     ? "; favorite (source unavailable)"
                     : $"; favorite via {playback.FavoriteSource.ToString().ToLowerInvariant()}";
+            }
+            else if (IsFavoriteFilterUser(group.Rule, playback.UserId))
+            {
+                line += "; not favorite";
             }
 
             builder.AppendLine(Markdown(line));
@@ -456,16 +485,59 @@ internal static class TroubleshootingDecisionFormatter
             return mode == UsersListMode.Acknowledge ? "no selected users" : "all users";
         }
 
-        var names = ids.Select(id => userNames.TryGetValue(id, out var name) ? name : id);
+        var names = ids.Select(id => ResolveConfiguredUser(id, userNames));
         var joined = string.Join(mode == UsersListMode.Acknowledge ? connector : ", ", names);
         return mode == UsersListMode.Acknowledge ? joined : $"all users except {joined}";
+    }
+
+    private static string ResolveConfiguredUser(
+        string userId,
+        IReadOnlyDictionary<string, string> userNames)
+    {
+        if (TryResolveUserName(userId, userNames, out var name))
+        {
+            return name;
+        }
+
+        return $"unknown or deleted user ({userId.Trim()})";
     }
 
     private static string ResolveUser(
         string userId,
         string? fallback,
-        IReadOnlyDictionary<string, string> userNames) =>
-        userNames.TryGetValue(userId, out var name) ? name : fallback ?? userId;
+        IReadOnlyDictionary<string, string> userNames)
+    {
+        if (TryResolveUserName(userId, userNames, out var name))
+        {
+            return name;
+        }
+
+        return fallback ?? ResolveConfiguredUser(userId, userNames);
+    }
+
+    private static bool TryResolveUserName(
+        string userId,
+        IReadOnlyDictionary<string, string> userNames,
+        out string name)
+    {
+        var normalizedId = userId.Trim();
+        if (userNames.TryGetValue(normalizedId, out name!))
+        {
+            return true;
+        }
+
+        foreach (var candidate in userNames)
+        {
+            if (UserIdsEqual(normalizedId, candidate.Key))
+            {
+                name = candidate.Value;
+                return true;
+            }
+        }
+
+        name = string.Empty;
+        return false;
+    }
 
     private static string DescribePlayback(PlaybackState playback)
     {
@@ -480,6 +552,51 @@ internal static class TroubleshootingDecisionFormatter
         }
 
         return playback.IsPlayed ? "played" : "not played";
+    }
+
+    private static string DescribeEvidenceRoles(CleanupRule? rule, string userId)
+    {
+        if (rule is null)
+        {
+            return string.Empty;
+        }
+
+        var roles = new List<string>(2);
+        if (rule.Trigger.Kind != CleanupRuleTriggerKind.AddedAge
+            && IsUserInScope(userId, rule.Filters.UserIds, rule.Filters.UsersMode))
+        {
+            roles.Add("playback trigger");
+        }
+
+        if (IsFavoriteFilterUser(rule, userId))
+        {
+            roles.Add("favorite filter");
+        }
+
+        return string.Join(", ", roles);
+    }
+
+    private static bool IsFavoriteFilterUser(CleanupRule? rule, string userId) =>
+        rule is { Filters.FavoriteFilter: not RuleFavoriteFilterKind.Ignore }
+        && IsUserInScope(userId, rule.Filters.FavoriteUserIds, rule.Filters.FavoriteUsersMode);
+
+    private static bool IsUserInScope(
+        string userId,
+        IReadOnlyList<string> selectedUserIds,
+        UsersListMode mode)
+    {
+        var selected = selectedUserIds.Any(selectedUserId => UserIdsEqual(userId, selectedUserId));
+        return mode == UsersListMode.Acknowledge ? selected : !selected;
+    }
+
+    private static bool UserIdsEqual(string left, string right)
+    {
+        var trimmedLeft = left.Trim();
+        var trimmedRight = right.Trim();
+        return string.Equals(trimmedLeft, trimmedRight, StringComparison.OrdinalIgnoreCase)
+            || (Guid.TryParse(trimmedLeft, out var leftGuid)
+                && Guid.TryParse(trimmedRight, out var rightGuid)
+                && leftGuid == rightGuid);
     }
 
     private static string GetActionLabel(CleanupRuleActionKind? action) => action switch
@@ -507,16 +624,19 @@ internal static class TroubleshootingDecisionFormatter
         CleanupRule rule,
         DateTime threshold)
     {
-        var evaluatedAt = evidence.ExpirationCutoffUtc.AddDays(rule.Trigger.Days);
+        var evaluatedAt = EvaluatedAt(evidence, rule);
         var distance = evaluatedAt - threshold;
         var absolute = distance.Duration();
         var text = absolute.TotalDays >= 1
-            ? $"{absolute.TotalDays:F1} day(s)"
+            ? $"{absolute.TotalDays.ToString("F1", CultureInfo.InvariantCulture)} day(s)"
             : absolute.TotalHours >= 1
-                ? $"{absolute.TotalHours:F1} hour(s)"
-                : $"{absolute.TotalMinutes:F0} minute(s)";
+                ? $"{absolute.TotalHours.ToString("F1", CultureInfo.InvariantCulture)} hour(s)"
+                : $"{absolute.TotalMinutes.ToString("F0", CultureInfo.InvariantCulture)} minute(s)";
         return distance >= TimeSpan.Zero ? $"{text} past" : $"{text} remaining";
     }
+
+    private static DateTime EvaluatedAt(CleanupAuditEvidence evidence, CleanupRule rule) =>
+        evidence.ExpirationCutoffUtc.AddDays(rule.Trigger.Days);
 
     private static string Html(string value) => HttpUtility.HtmlEncode(value);
 

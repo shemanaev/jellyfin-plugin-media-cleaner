@@ -698,8 +698,13 @@ function summaryFilterLines(page, rule) {
 }
 
 function userName(page, id) {
-    const user = (page._mediaCleanerUsers || []).find(candidate => candidate.Id === id)
-    return user ? user.Name : id
+    const user = (page._mediaCleanerUsers || []).find(candidate => userIdsEqual(candidate.Id, id))
+    return user ? user.Name : `Unknown or deleted user (${String(id).trim()})`
+}
+
+function userIdsEqual(left, right) {
+    const normalize = value => String(value || '').trim().replace(/-/g, '').toLowerCase()
+    return normalize(left) === normalize(right)
 }
 
 function renderRuleEditor(page, rule, index) {
@@ -1544,8 +1549,8 @@ function userListHtml(field, users, selectedIds, label) {
         return textareaHtml(field, label, selectedIds)
     }
 
-    const selected = selectedIds.map(id => id.toLowerCase())
-    return listHtml(field, label, users.map(user => ({ value: user.Id, label: user.Name })), selected)
+    const selected = selectedIds.map(id => String(id).trim().replace(/-/g, '').toLowerCase())
+    return listHtml(field, label, users.map(user => ({ value: user.Id, label: user.Name })), selected, userIdsEqual)
 }
 
 function locationListHtml(locations, selectedLocations) {
@@ -1557,12 +1562,12 @@ function locationListHtml(locations, selectedLocations) {
     return listHtml('Locations', 'Locations', locations.map(location => ({ value: location, label: location })), selected)
 }
 
-function listHtml(field, label, items, selectedLowerValues) {
+function listHtml(field, label, items, selectedLowerValues, matchesSelected = (value, selected) => String(value).toLowerCase() === selected) {
     return `
         <div class="mediaCleanerListBlock">
             <h2 class="checkboxListLabel mediaCleanerListLabel">${label}</h2>
             <div class="paperList checkboxList checkboxList-paperList mediaCleanerCheckList" data-field="${field}">
-                ${items.map(item => listItemHtml(item, selectedLowerValues.includes(String(item.value).toLowerCase()))).join('')}
+                ${items.map(item => listItemHtml(item, selectedLowerValues.some(selected => matchesSelected(item.value, selected)))).join('')}
             </div>
         </div>`
 }

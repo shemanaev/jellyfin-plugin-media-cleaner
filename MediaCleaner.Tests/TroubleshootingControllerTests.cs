@@ -3,7 +3,11 @@ using System.Text;
 using FluentAssertions;
 using MediaCleaner.Controllers;
 using MediaCleaner.Core;
+using MediaBrowser.Common;
 using MediaBrowser.Model.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Moq;
 
 namespace MediaCleaner.Tests;
 
@@ -51,6 +55,42 @@ public class TroubleshootingControllerTests
 
         cache.TryGet("first", created.AddMinutes(15), out _).Should().BeTrue();
         cache.TryGet("first", created.AddMinutes(15).AddTicks(1), out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetReport_WithCachedReportId_ReturnsSnapshotWithoutCreatingDryRunScope()
+    {
+        var reportId = Guid.NewGuid().ToString("N");
+        var report = CreateCachedReport(reportId, DateTime.UtcNow);
+        typeof(TroubleshootingController)
+            .GetMethod("SetCachedReport", BindingFlags.NonPublic | BindingFlags.Static)!
+            .Invoke(null, [report]);
+        var scopeFactory = new Mock<IServiceScopeFactory>(MockBehavior.Strict);
+        var applicationHost = new Mock<IApplicationHost>(MockBehavior.Strict);
+        var controller = new TroubleshootingController(scopeFactory.Object, applicationHost.Object);
+
+        var result = await controller.GetReport(reportId);
+
+        result.Result.Should().BeNull();
+        result.Value.Should().NotBeNull();
+        result.Value!.ReportId.Should().Be(reportId);
+        scopeFactory.VerifyNoOtherCalls();
+        applicationHost.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task GetReport_WithUnknownReportId_ReturnsNotFoundWithoutCreatingDryRunScope()
+    {
+        var scopeFactory = new Mock<IServiceScopeFactory>(MockBehavior.Strict);
+        var applicationHost = new Mock<IApplicationHost>(MockBehavior.Strict);
+        var controller = new TroubleshootingController(scopeFactory.Object, applicationHost.Object);
+
+        var result = await controller.GetReport(Guid.NewGuid().ToString("N"));
+
+        result.Value.Should().BeNull();
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
+        scopeFactory.VerifyNoOtherCalls();
+        applicationHost.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -211,7 +251,7 @@ public class TroubleshootingControllerTests
                 [MediaItemKind.Movie],
                 ["alice"],
                 UsersListMode.Acknowledge,
-                ["bob"],
+                ["bob", "carol"],
                 UsersListMode.Acknowledge,
                 RuleFavoriteFilterKind.FavoriteByAnyUser,
                 [],
@@ -228,7 +268,8 @@ public class TroubleshootingControllerTests
             null,
             [
                 new PlaybackState("alice", new DateTime(2026, 07, 20, 12, 0, 0, DateTimeKind.Utc), true, false, false, "Alice"),
-                new PlaybackState("bob", null, false, false, true, "Bob", FavoriteSource: FavoriteSourceKind.Season),
+                new PlaybackState("bob", null, false, false, false, "Bob"),
+                new PlaybackState("carol", null, false, false, true, "Carol", FavoriteSource: FavoriteSourceKind.Season),
             ]);
         var entry = new CleanupAuditEntry(
             "movie",
@@ -250,23 +291,90 @@ public class TroubleshootingControllerTests
         TroubleshootingDecisionFormatter.AppendItemHtml(
             html,
             group,
-            new Dictionary<string, string> { ["alice"] = "Alice", ["bob"] = "Bob" });
+            new Dictionary<string, string> { ["alice"] = "Alice", ["bob"] = "Bob", ["carol"] = "Carol" });
         html.ToString().Should().Contain("Movies played 14d ago");
         html.ToString().Should().Contain("Filters (AND)");
         html.ToString().Should().Contain("episodes inherit favorite from season or series");
         html.ToString().Should().Contain("data-view-rule-id=\"cleanup\"");
+        html.ToString().Should().Contain("Evaluated at");
+        html.ToString().Should().Contain("Alice</strong> <span class=\"mediaCleanerEvidenceRoles\">(playback trigger)</span>: played; Last played");
+        html.ToString().Should().Contain("Bob</strong> <span class=\"mediaCleanerEvidenceRoles\">(favorite filter)</span>: not played; not favorite");
+        html.ToString().Should().Contain("Carol</strong> <span class=\"mediaCleanerEvidenceRoles\">(favorite filter)</span>: not played; favorite via season");
         html.ToString().Should().Contain("favorite via season");
 
         var markdown = new StringBuilder();
         TroubleshootingDecisionFormatter.AppendItemMarkdown(
             markdown,
             group,
-            new Dictionary<string, string> { ["alice"] = "User 1", ["bob"] = "User 2" });
+            new Dictionary<string, string> { ["alice"] = "User 1", ["bob"] = "User 2", ["carol"] = "User 3" });
         markdown.ToString().Should().Contain("User 1");
         markdown.ToString().Should().Contain("User 2");
+        markdown.ToString().Should().Contain("User 3");
         markdown.ToString().Should().NotContain("Alice");
         markdown.ToString().Should().NotContain("Bob");
+        markdown.ToString().Should().NotContain("Carol");
+        markdown.ToString().Should().Contain("Evaluated at: 2026-08-08T12:00:00.0000000Z");
+        markdown.ToString().Should().Contain("User 1 (playback trigger): played");
+        markdown.ToString().Should().Contain("User 1 (playback trigger): played; Last played 2026-07-20T12:00:00.0000000Z; threshold 5.0 day(s) past");
+        markdown.ToString().Should().Contain("User 2 (favorite filter): not played; not favorite");
+        markdown.ToString().Should().Contain("User 3 (favorite filter): not played; favorite via season");
         markdown.ToString().Should().Contain("past");
+    }
+
+    [Fact]
+    public void TroubleshootingDecisionFormatter_ResolvesEquivalentGuidFormatsAndLabelsMissingUsers()
+    {
+        var knownUserId = Guid.Parse("0bfdd89f-115e-41f7-9cb5-8ddad96189f0");
+        var missingUserId = Guid.Parse("1e8e2828-70ac-4646-a98f-395844794afa");
+        var rule = new CleanupRule(
+            "cleanup",
+            "Cleanup",
+            true,
+            new CleanupRuleTrigger(CleanupRuleTriggerKind.Played, 0),
+            new CleanupRuleFilters(
+                [MediaItemKind.Episode],
+                [$" {knownUserId:N} "],
+                UsersListMode.Acknowledge,
+                [missingUserId.ToString("N")],
+                UsersListMode.Acknowledge,
+                RuleFavoriteFilterKind.NotFavoriteByAnyUser,
+                [],
+                LocationsListMode.Exclude,
+                false,
+                TagMode.Exclusion,
+                [],
+                SeriesDeleteKind.Episode,
+                SeriesKeepKind.None),
+            new CleanupRuleActions(CleanupRuleActionKind.Delete, false));
+        var evidence = new CleanupAuditEvidence(
+            new DateTime(2026, 09, 1, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 09, 12, 12, 0, 0, DateTimeKind.Utc),
+            null,
+            [new PlaybackState(knownUserId.ToString("D"), new DateTime(2026, 09, 1, 12, 0, 0, DateTimeKind.Utc), true, false, false)]);
+        var entry = new CleanupAuditEntry(
+            "episode",
+            "Episode",
+            MediaItemKind.Episode,
+            rule.Id,
+            rule.Name,
+            CleanupRuleActionKind.Delete,
+            CleanupAuditStage.Trigger,
+            CleanupAuditOutcome.Matched,
+            "trigger matched",
+            evidence);
+        var group = TroubleshootingDecisionFormatter.BuildItemGroups(
+            new CleanupPlan([], [], [entry]),
+            new CleanupPolicy([rule], false)).Single();
+
+        var html = new StringBuilder();
+        TroubleshootingDecisionFormatter.AppendItemHtml(
+            html,
+            group,
+            new Dictionary<string, string> { [knownUserId.ToString("D").ToUpperInvariant()] = "Alice" });
+
+        html.ToString().Should().Contain("played by at least one user in Alice at least 0 day(s) ago");
+        html.ToString().Should().Contain($"unknown or deleted user ({missingUserId:N})");
+        html.ToString().Should().Contain("Alice</strong> <span class=\"mediaCleanerEvidenceRoles\">(playback trigger)</span>");
     }
 
     private static CleanupAuditEntry Entry(

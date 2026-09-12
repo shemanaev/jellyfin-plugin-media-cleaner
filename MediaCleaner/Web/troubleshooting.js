@@ -1,5 +1,6 @@
 export default function (view, params) {
     const commonsUrl = ApiClient.getUrl('web/ConfigurationPage', { name: 'MediaCleaner_commons_js' })
+    view._mediaCleanerRequestedReportId = params && params.reportId ? String(params.reportId) : ''
 
     view.addEventListener('viewshow', function (e) {
         import(commonsUrl).then(onViewShow.bind(this))
@@ -48,12 +49,14 @@ function onViewShow(commons) {
         page.querySelector(logViewerSelector).addEventListener('click', troubleshootingReportClick)
     }
 
-    getReport(page)
+    const requestedReportId = page._mediaCleanerRequestedReportId || reportIdFromCurrentUrl()
+    page._mediaCleanerRequestedReportId = ''
+    getReport(page, requestedReportId)
 }
 
-function getReport(page) {
+function getReport(page, requestedReportId = '') {
     const request = {
-        url: ApiClient.getUrl('MediaCleaner/Report'),
+        url: ApiClient.getUrl('MediaCleaner/Report', requestedReportId ? { reportId: requestedReportId } : {}),
     }
 
     Dashboard.showLoadingMsg()
@@ -65,6 +68,7 @@ function getReport(page) {
         issueMarkdownLoaded = Boolean(issueMarkdown)
         issueMarkdownLoading = null
         reportId = report.reportId || report.ReportId || ''
+        updateReportUrl(reportId)
         itemGroupCount = Number(report.itemGroupCount || report.ItemGroupCount || 0)
         totalItemGroupCount = Number(report.totalItemGroupCount || report.TotalItemGroupCount || itemGroupCount)
         itemPageSize = Number(report.itemPageSize || report.ItemPageSize || 100)
@@ -86,7 +90,9 @@ function getReport(page) {
     }).catch(function (error) {
         console.log(error)
         Dashboard.hideLoadingMsg()
-        Dashboard.alert('Could not generate the troubleshooting report')
+        Dashboard.alert(requestedReportId
+            ? 'This troubleshooting report has expired. Use Refresh report to generate a new snapshot.'
+            : 'Could not generate the troubleshooting report')
     })
 }
 
@@ -146,8 +152,34 @@ function troubleshootingReportClick(event) {
     if (!button) return
     event.preventDefault()
     const ruleId = button.dataset.viewRuleId
-    window.sessionStorage.setItem('mediaCleanerRequestedRuleId', ruleId)
-    Dashboard.navigate(`/configurationpage?name=MediaCleaner&ruleId=${encodeURIComponent(ruleId)}`, false)
+    window.open(configurationPageUrl('MediaCleaner', { ruleId: ruleId }), '_blank', 'noopener')
+}
+
+function configurationPageUrl(name, params = {}) {
+    const url = new URL(window.location.href)
+    const query = new URLSearchParams({ name: name, ...params })
+    url.hash = `/configurationpage?${query.toString()}`
+    return url.toString()
+}
+
+function reportIdFromCurrentUrl() {
+    const hash = window.location.hash.replace(/^#/, '')
+    const queryIndex = hash.indexOf('?')
+    const query = queryIndex >= 0 ? hash.substring(queryIndex + 1) : window.location.search.substring(1)
+    return new URLSearchParams(query).get('reportId') || ''
+}
+
+function updateReportUrl(currentReportId) {
+    if (!currentReportId) return
+
+    const url = new URL(window.location.href)
+    const hash = url.hash.replace(/^#/, '')
+    const queryIndex = hash.indexOf('?')
+    const route = queryIndex >= 0 ? hash.substring(0, queryIndex) : hash
+    const query = new URLSearchParams(queryIndex >= 0 ? hash.substring(queryIndex + 1) : '')
+    query.set('reportId', currentReportId)
+    url.hash = `${route}?${query.toString()}`
+    window.history.replaceState(window.history.state, '', url.toString())
 }
 
 function getItemSectionHtml(result) {
