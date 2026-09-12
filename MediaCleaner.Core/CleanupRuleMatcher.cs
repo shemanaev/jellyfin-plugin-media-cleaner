@@ -232,10 +232,37 @@ internal sealed class CleanupRuleMatcher(DateTime now, IPathMatcher pathMatcher,
         }
 
         StableSortPlaybackDescending(playback);
-        return playback.Count > 0 && IsPlayedExpired(playback, context.Users.Count, context.Rule.Trigger, context.ExpirationCutoffDate)
-            ? new CandidateItem(item, playback)
-            : null;
+        if (playback.Count == 0)
+        {
+            return null;
+        }
+
+        if (!IsPlayedExpired(playback, context.Users.Count, context.Rule.Trigger, context.ExpirationCutoffDate))
+        {
+            if (audit is not null)
+            {
+                CleanupAudit.IncrementRuleAggregate(
+                    audit,
+                    context.Rule,
+                    item,
+                    CleanupAuditStage.Trigger,
+                    CleanupAuditOutcome.Rejected,
+                    GetPlayedTriggerRejectionReason(context.Rule.Trigger));
+            }
+
+            return null;
+        }
+
+        return new CandidateItem(item, playback);
     }
+
+    private static string GetPlayedTriggerRejectionReason(CleanupRuleTrigger trigger) => trigger.PlayedKeepKind switch
+    {
+        PlayedKeepKind.AnyUser => $"did not have played status at least {trigger.Days} day(s) old for any selected user",
+        PlayedKeepKind.AnyUserRolling => $"did not have a most-recent played status at least {trigger.Days} day(s) old, or had active playback",
+        PlayedKeepKind.AllUsers => $"did not have played status at least {trigger.Days} day(s) old for every selected user",
+        _ => throw new NotSupportedException($"Unsupported played keep kind: {trigger.PlayedKeepKind}"),
+    };
 
     private IEnumerable<CandidateItem> CollectNotPlayed(
         IEnumerable<MediaItem> items,

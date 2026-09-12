@@ -80,6 +80,7 @@ internal static class TroubleshootingDecisionFormatter
         builder.Append("<p class=\"mediaCleanerDecisionResult\"><strong>Result:</strong> ");
         builder.Append(Html(GetResultDescription(group)));
         builder.AppendLine("</p>");
+        AppendLastStageHtml(builder, group);
 
         foreach (var ruleGroup in group.RuleGroups)
         {
@@ -111,6 +112,7 @@ internal static class TroubleshootingDecisionFormatter
         builder.AppendLine($"<summary>{Markdown($"{group.ItemKind}: {group.ItemName} ({group.ItemId}) - {GetResultLabel(group.FinalOutcome)}")}</summary>");
         builder.AppendLine();
         builder.AppendLine($"**Result:** {Markdown(GetResultDescription(group))}");
+        builder.AppendLine($"**Last stage:** {Markdown(GetLastStageSummary(group))}");
 
         foreach (var ruleGroup in group.RuleGroups)
         {
@@ -171,6 +173,19 @@ internal static class TroubleshootingDecisionFormatter
             "No cleanup rule matched. A protection rule matched and would suppress a future cleanup match.",
         _ => "No cleanup rule matched. No deletion is proposed.",
     };
+
+    private static void AppendLastStageHtml(StringBuilder builder, ItemDecisionGroup group)
+    {
+        builder.Append("<p class=\"mediaCleanerDecisionLastStage\"><strong>Last stage:</strong> ");
+        builder.Append(Html(GetLastStageSummary(group)));
+        builder.AppendLine("</p>");
+    }
+
+    private static string GetLastStageSummary(ItemDecisionGroup group)
+    {
+        var entry = group.Entries[^1];
+        return $"{entry.Stage} -> {entry.Outcome}: {entry.Reason}";
+    }
 
     private static void AppendRuleHtml(
         StringBuilder builder,

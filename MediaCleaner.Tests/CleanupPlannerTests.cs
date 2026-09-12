@@ -127,6 +127,34 @@ public class CleanupPlannerTests
     }
 
     [Fact]
+    public void Plan_AggregatesPlayedTriggerRejections_WithoutPerItemAudit()
+    {
+        var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.Played, 10);
+        var first = Movie("m1", Playback("u1", Now.AddDays(-1), isPlayed: true));
+        var second = Movie("m2", Playback("u1", Now.AddDays(-2), isPlayed: true));
+        var third = Movie("m3", Playback("u1", Now.AddDays(-3), isPlayed: true));
+        var fourth = Movie("m4", Playback("u1", Now.AddDays(-4), isPlayed: true));
+        var request = new CleanupRequest(Policy(rule), [User("u1")], [first, second, third, fourth], true);
+
+        var plan = Planner().Plan(request);
+
+        plan.Decisions.Should().BeEmpty();
+        plan.AuditEntries.Should().ContainSingle().Which.Should().Match<CleanupAuditEntry>(entry =>
+            entry.ItemId == null
+            && entry.RuleId == rule.Id
+            && entry.Stage == CleanupAuditStage.Trigger
+            && entry.Outcome == CleanupAuditOutcome.Rejected
+            && entry.Reason.StartsWith("4 items did not have played status at least 10 day(s) old for any selected user")
+            && entry.Reason.Contains("m1")
+            && entry.Reason.Contains("m2")
+            && entry.Reason.Contains("m3")
+            && !entry.Reason.Contains("m4"));
+        plan.AuditEntries.Should().NotContain(entry => entry.ItemId != null);
+
+        Planner().Plan(request with { IsDryRun = false }).AuditEntries.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Plan_BlocksNotPlayedMatch_WhenPlaybackExistsBeforeAddedDate()
     {
         var rule = Rule(MediaItemKind.Movie, CleanupRuleTriggerKind.NotPlayed, 10);

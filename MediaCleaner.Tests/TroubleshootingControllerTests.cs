@@ -187,6 +187,7 @@ public class TroubleshootingControllerTests
         html.Should().Contain("mediaCleanerItemDecisionGroup");
         html.Should().Contain("mediaCleanerResultBadge-suppressed");
         html.Should().Contain("A delete rule matched this item, but protection overrode that delete decision.");
+        html.Should().Contain("<p class=\"mediaCleanerDecisionLastStage\"><strong>Last stage:</strong> Protection -&gt; Suppressed: delete suppressed</p>");
         html.Should().Contain("Deletion was stopped by a safety blocker, such as an unresolved series exception");
         html.Should().Contain("The Show | S01E02 | Pilot");
         html.Should().Contain("played rule");
@@ -207,6 +208,7 @@ public class TroubleshootingControllerTests
         markdown.Should().Contain("### Rule-level decisions");
         markdown.Should().Contain("### Item-level decisions");
         markdown.Should().Contain("Episode: The Show | S01E02 | Pilot (m1) - Suppressed");
+        markdown.Should().Contain("**Last stage:** Protection -&gt; Suppressed: delete suppressed");
         markdown.Should().Contain("User 1: played");
         markdown.Should().Contain("2026-07-14T12:00:00.0000000Z");
         markdown.Should().NotContain("Alice");
