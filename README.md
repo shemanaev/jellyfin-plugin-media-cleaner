@@ -108,6 +108,8 @@ dotnet build MediaCleaner.sln -p:JellyfinProfile=10.10.7
 dotnet build MediaCleaner.sln -p:JellyfinProfile=10.11.0
 dotnet build MediaCleaner.sln -p:JellyfinProfile=10.11.3
 dotnet build MediaCleaner.sln -p:JellyfinProfile=10.11.11
+dotnet build MediaCleaner.sln -p:JellyfinProfile=12.0
+dotnet build MediaCleaner.sln -p:JellyfinProfile=12.1
 ```
 
 Use the packaging helper to generate ABI build artifacts and `build.yaml` files under `artifacts/<build-profile>`:

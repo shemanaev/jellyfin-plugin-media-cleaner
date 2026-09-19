@@ -39,6 +39,19 @@
         "JELLYFIN_USER_IN_DATABASE_ENTITIES",
         "JELLYFIN_USER_MANAGER_GET_USERS_METHOD"
       ]
+    },
+    {
+      "profile": "12.0",
+      "packageVersion": "12.0.0",
+      "sqliteVersion": "10.0.11",
+      "targetAbi": "12.0.0.0",
+      "targetFramework": "net10.0",
+      "versionPatchOffset": "120000",
+      "constants": [
+        "JELLYFIN_12",
+        "JELLYFIN_USER_IN_DATABASE_ENTITIES",
+        "JELLYFIN_USER_MANAGER_GET_USERS_METHOD"
+      ]
     }
   ],
   "serverProfiles": [
@@ -89,6 +102,14 @@
     {
       "profile": "10.11.11",
       "buildProfile": "10.11.9"
+    },
+    {
+      "profile": "12.0",
+      "buildProfile": "12.0"
+    },
+    {
+      "profile": "12.1",
+      "buildProfile": "12.0"
     }
   ]
 }

@@ -46,6 +46,7 @@ jobs:
           dotnet-version: |-
             8.0.x
             9.0.x
+            10.0.x
       -
         name: Run Unit Tests
         run: dotnet test MediaCleaner.Tests/MediaCleaner.Tests.csproj -c Release
@@ -69,6 +70,7 @@ jobs:
           dotnet-version: |-
             8.0.x
             9.0.x
+            10.0.x
       -
         name: Prepare Jellyfin Metadata (${{ matrix.jellyfin-profile }})
         shell: pwsh

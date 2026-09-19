@@ -53,6 +53,14 @@
     <JellyfinBuildProfile>10.11.9</JellyfinBuildProfile>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '12.0'">
+    <JellyfinBuildProfile>12.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '' And '$(JellyfinProfile)' == '12.1'">
+    <JellyfinBuildProfile>12.0</JellyfinBuildProfile>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '10.10.7'">
     <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">10.10.7</JellyfinPackageVersion>
     <JellyfinSqliteVersion>8.0.11</JellyfinSqliteVersion>
@@ -81,5 +89,15 @@
     <JellyfinVersionPatchOffset>101109</JellyfinVersionPatchOffset>
     <PluginVersion Condition="'$(PluginVersion)' == ''">$(PluginBaseVersion).101109</PluginVersion>
     <JellyfinCompatibilityConstants>JELLYFIN_10_11;JELLYFIN_USER_IN_DATABASE_ENTITIES;JELLYFIN_USER_MANAGER_GET_USERS_METHOD</JellyfinCompatibilityConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '12.0'">
+    <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">12.0.0</JellyfinPackageVersion>
+    <JellyfinSqliteVersion>10.0.11</JellyfinSqliteVersion>
+    <JellyfinTargetAbi Condition="'$(JellyfinTargetAbi)' == ''">12.0.0.0</JellyfinTargetAbi>
+    <JellyfinTargetFramework>net10.0</JellyfinTargetFramework>
+    <JellyfinVersionPatchOffset>120000</JellyfinVersionPatchOffset>
+    <PluginVersion Condition="'$(PluginVersion)' == ''">$(PluginBaseVersion).120000</PluginVersion>
+    <JellyfinCompatibilityConstants>JELLYFIN_12;JELLYFIN_USER_IN_DATABASE_ENTITIES;JELLYFIN_USER_MANAGER_GET_USERS_METHOD</JellyfinCompatibilityConstants>
   </PropertyGroup>
 </Project>

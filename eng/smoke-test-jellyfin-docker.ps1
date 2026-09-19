@@ -20,7 +20,7 @@ $ProjectPath = Join-Path $RepoRoot "MediaCleaner/MediaCleaner.csproj"
 
 if ($null -eq $Profile -or $Profile.Count -eq 0) {
     $Profile = @(& $ProfilesScriptPath -Format ServerProfiles)
-    if ($LASTEXITCODE -ne 0 -or $Profile.Count -eq 0) {
+    if ($Profile.Count -eq 0) {
         throw "$ProfilesScriptPath failed to return Jellyfin profiles"
     }
 }
@@ -189,6 +189,15 @@ function Test-PluginLogs {
         return $false
     }
 
+    if ($logs -notmatch "Loaded plugin: Media Cleaner") {
+        Write-Host "Media Cleaner was not reported as loaded on Jellyfin $CurrentProfile."
+        $logs -split "`n" |
+            Select-String -Pattern "MediaCleaner|Media Cleaner|Plugin" |
+            Select-Object -First 120 |
+            ForEach-Object { Write-Host $_.Line }
+        return $false
+    }
+
     return $true
 }
 
@@ -196,9 +205,6 @@ Invoke-External -FilePath $DockerPath -Arguments @("version")
 
 if (-not $SkipBuild) {
     & $BuildScript -Profile $Profile -Configuration $Configuration
-    if ($LASTEXITCODE -ne 0) {
-        throw "$BuildScript failed with exit code $LASTEXITCODE"
-    }
 }
 
 $failedProfiles = New-Object System.Collections.Generic.List[string]
@@ -212,7 +218,6 @@ foreach ($currentProfile in $Profile) {
     $profileArtifactRoot = Join-Path $ArtifactsRoot $currentBuildProfile
     $profileSmokeRoot = Join-Path $SmokeRoot $currentProfile
     $configRoot = Join-Path $profileSmokeRoot "config"
-    $cacheRoot = Join-Path $profileSmokeRoot "cache"
     $pluginRoot = Join-Path $configRoot "plugins/Media Cleaner_$pluginVersion"
 
     Write-Host "==> Smoke testing Jellyfin $currentProfile with $image using build profile $currentBuildProfile"
@@ -225,7 +230,7 @@ foreach ($currentProfile in $Profile) {
 
     Remove-ContainerIfExists -Name $containerName
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $profileSmokeRoot
-    New-Item -ItemType Directory -Force -Path $pluginRoot, $cacheRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path $pluginRoot | Out-Null
 
     foreach ($artifact in $pluginArtifacts) {
         Copy-Item -Force -Path (Join-Path $profileArtifactRoot $artifact) -Destination $pluginRoot
@@ -235,16 +240,17 @@ foreach ($currentProfile in $Profile) {
 
     Invoke-External -FilePath $DockerPath -Arguments @("pull", $image)
     Invoke-External -FilePath $DockerPath -Arguments @(
-        "run",
-        "-d",
+        "create",
         "--name",
         $containerName,
-        "-v",
-        "$($configRoot):/config",
-        "-v",
-        "$($cacheRoot):/cache",
         $image
     )
+    Invoke-External -FilePath $DockerPath -Arguments @(
+        "cp",
+        "$configRoot/.",
+        "$containerName`:/config"
+    )
+    Invoke-External -FilePath $DockerPath -Arguments @("start", $containerName)
 
     $started = Wait-JellyfinStartup -ContainerName $containerName -Timeout $TimeoutSeconds
     $logsAreClean = Test-PluginLogs -ContainerName $containerName -CurrentProfile $currentProfile

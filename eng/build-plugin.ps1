@@ -15,7 +15,7 @@ $ArtifactsRoot = Join-Path $RepoRoot "artifacts"
 
 if ($null -eq $Profile -or $Profile.Count -eq 0) {
     $Profile = @(& $ProfilesScriptPath -Format BuildProfiles)
-    if ($LASTEXITCODE -ne 0 -or $Profile.Count -eq 0) {
+    if ($Profile.Count -eq 0) {
         throw "$ProfilesScriptPath failed to return Jellyfin profiles"
     }
 }
@@ -84,7 +84,4 @@ foreach ($currentProfile in $Profile) {
     )
 
     & $BuildYamlScriptPath -Profile $currentProfile -OutputPath (Join-Path $outputPath "build.yaml")
-    if ($LASTEXITCODE -ne 0) {
-        throw "$BuildYamlScriptPath failed with exit code $LASTEXITCODE"
-    }
 }
