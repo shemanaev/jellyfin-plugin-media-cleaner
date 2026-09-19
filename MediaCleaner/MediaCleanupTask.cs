@@ -10,18 +10,21 @@ using MediaBrowser.Model.Tasks;
 using MediaCleaner.Adapters;
 using MediaCleaner.Compatibility;
 using MediaCleaner.Core;
+using MediaCleaner.LeavingSoon;
 using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner;
 
 public class MediaCleanupTask : IScheduledTask
 {
+    private static readonly SemaphoreSlim RunLock = new(1, 1);
     private readonly ILogger<MediaCleanupTask> _logger;
     private readonly ILocalizationManager _localization;
     private readonly ICleanupPolicyProvider _policyProvider;
     private readonly IMediaCatalogAdapter _catalogAdapter;
     private readonly CleanupPlanner _planner;
     private readonly IMediaMutationAdapter _mutationAdapter;
+    private readonly LeavingSoonCoordinator? _leavingSoonCoordinator;
 
     public bool IsDryRun { get; init; }
 
@@ -53,7 +56,8 @@ public class MediaCleanupTask : IScheduledTask
         IUserDataManager userDataManager,
         IActivityManager activityManager,
         ILocalizationManager localization,
-        IFileSystem fileSystem)
+        IFileSystem fileSystem,
+        LeavingSoonCoordinator leavingSoonCoordinator)
         : this(
             loggerFactory.CreateLogger<MediaCleanupTask>(),
             localization,
@@ -64,7 +68,8 @@ public class MediaCleanupTask : IScheduledTask
                 libraryManager,
                 userDataManager),
             new CleanupPlanner(new SystemClock(), new JellyfinPathMatcher(fileSystem), new JellyfinExtraFileProbe()),
-            new JellyfinMutationAdapter(loggerFactory.CreateLogger<JellyfinMutationAdapter>(), libraryManager, activityManager))
+            new JellyfinMutationAdapter(loggerFactory.CreateLogger<JellyfinMutationAdapter>(), libraryManager, activityManager, leavingSoonCoordinator),
+            leavingSoonCoordinator)
     {
     }
 
@@ -74,7 +79,8 @@ public class MediaCleanupTask : IScheduledTask
         ICleanupPolicyProvider policyProvider,
         IMediaCatalogAdapter catalogAdapter,
         CleanupPlanner planner,
-        IMediaMutationAdapter mutationAdapter)
+        IMediaMutationAdapter mutationAdapter,
+        LeavingSoonCoordinator? leavingSoonCoordinator = null)
     {
         _logger = logger;
         _localization = localization;
@@ -82,9 +88,23 @@ public class MediaCleanupTask : IScheduledTask
         _catalogAdapter = catalogAdapter;
         _planner = planner;
         _mutationAdapter = mutationAdapter;
+        _leavingSoonCoordinator = leavingSoonCoordinator;
     }
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
+    {
+        await RunLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await ExecuteCoreAsync(progress, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            RunLock.Release();
+        }
+    }
+
+    private async Task ExecuteCoreAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         var policy = PolicyOverride ?? _policyProvider.GetPolicy();
         _logger.LogDebug("Loaded {RuleCount} cleanup rules", policy.Rules.Count);
@@ -93,8 +113,16 @@ public class MediaCleanupTask : IScheduledTask
         LastUsers = IsDryRun ? catalog.Users : [];
         progress.Report(25);
 
-        var request = new CleanupRequest(policy, catalog.Users, catalog.Items, IsDryRun);
-        var plan = _planner.Plan(request);
+        LeavingSoonPreparation? preparation = null;
+        if (_leavingSoonCoordinator is not null)
+        {
+            preparation = IsDryRun
+                ? await _leavingSoonCoordinator.EvaluateReadOnlyAsync(policy, catalog, Plugin.Instance!.Configuration.LeavingSoon, cancellationToken).ConfigureAwait(false)
+                : await _leavingSoonCoordinator.PrepareAsync(policy, catalog, Plugin.Instance!.Configuration.LeavingSoon, cancellationToken).ConfigureAwait(false);
+        }
+
+        var request = new CleanupRequest(policy, catalog.Users, catalog.Items, IsDryRun, preparation?.ProtectedItemIds, preparation?.ProtectionReasons);
+        var plan = _planner.Plan(request) with { SafetyRevision = preparation?.StateRevision };
         LastPlan = IsDryRun ? plan : null;
         progress.Report(75);
 

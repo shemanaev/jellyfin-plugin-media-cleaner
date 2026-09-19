@@ -11,6 +11,10 @@ export function getTabs() {
             name: 'Advanced'
         },
         {
+            href: getConfigurationPageUrl('MediaCleaner_LeavingSoonReview'),
+            name: 'Leaving Soon keeps'
+        },
+        {
             href: getConfigurationPageUrl('MediaCleaner_Troubleshooting'),
             name: 'Troubleshooting'
         },
@@ -38,7 +42,8 @@ export function setTabs(unused, selectedIndex, itemsFn) {
 
 export const TabGeneral = 0
 export const TabAdvanced = 1
-export const TabTroubleshooting = 2
+export const TabLeavingSoonReview = 2
+export const TabTroubleshooting = 3
 
 const getConfigurationPageUrl = (name) => 'configurationpage?name=' + encodeURIComponent(name)
 

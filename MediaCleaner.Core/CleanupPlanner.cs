@@ -21,14 +21,17 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
         var deleteMatches = request.IsDryRun ? new List<RuleMatch>() : null;
         var protectMatches = request.IsDryRun ? new List<RuleMatch>() : null;
         var decisionAccumulator = request.IsDryRun ? null : new DeleteDecisionAccumulator();
-        var protectedIds = catalog.ItemsById.Values
+        var watchingIds = catalog.ItemsById.Values
             .Where(item => item.Playback.Any(playback => playback.IsWatching))
             .Select(item => item.Id)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var externalProtectedIds = (request.ExternalProtectedItemIds ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var protectedIds = new HashSet<string>(watchingIds, StringComparer.OrdinalIgnoreCase);
+        protectedIds.UnionWith(externalProtectedIds);
 
         if (request.IsDryRun)
         {
-            foreach (var item in catalog.ItemsById.Values.Where(item => protectedIds.Contains(item.Id)))
+            foreach (var item in catalog.ItemsById.Values.Where(item => watchingIds.Contains(item.Id)))
             {
                 CleanupAudit.AddItem(
                     audit,
@@ -37,6 +40,21 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
                     CleanupAuditStage.Protection,
                     CleanupAuditOutcome.Protected,
                     $"protected because the item is currently being watched");
+            }
+
+            foreach (var item in catalog.ItemsById.Values.Where(item => externalProtectedIds.Contains(item.Id)))
+            {
+                var reasons = request.ExternalProtectionReasons?.GetValueOrDefault(item.Id) ?? ["protected by an external safety exclusion"];
+                foreach (var reason in reasons)
+                {
+                    CleanupAudit.AddItem(
+                        audit,
+                        item,
+                        null,
+                        CleanupAuditStage.ExternalProtection,
+                        CleanupAuditOutcome.Protected,
+                        $"{reason}");
+                }
             }
         }
 
@@ -88,7 +106,14 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
         }
 
         var decisions = (request.IsDryRun
-                ? BuildDeleteDecisions(deleteMatches!, protectedIds, audit)
+                ? BuildDeleteDecisions(
+                    deleteMatches!,
+                    protectedIds,
+                    watchingIds,
+                    externalProtectedIds,
+                    request.ExternalProtectionReasons,
+                    protectMatches!,
+                    audit)
                 : decisionAccumulator!.BuildDecisions(protectedIds))
             .OrderBy(x => CleanupRuleKinds.Priority(x.Kind))
             .ThenBy(x => x.Kind == ExpiredKind.Played ? FirstPlaybackLastPlayedDate(x.Playback) : x.Item.DateCreated)
@@ -136,6 +161,10 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
     private static IEnumerable<CleanupDecision> BuildDeleteDecisions(
         IEnumerable<RuleMatch> deleteMatches,
         ISet<string> protectedIds,
+        ISet<string> watchingIds,
+        ISet<string> externalProtectedIds,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? externalProtectionReasons,
+        IReadOnlyCollection<RuleMatch> protectMatches,
         CleanupAuditCollector audit)
     {
         foreach (var group in deleteMatches.GroupBy(x => x.Item.Id, StringComparer.OrdinalIgnoreCase))
@@ -143,6 +172,12 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
             var first = group.First();
             if (protectedIds.Contains(first.Item.Id))
             {
+                var suppressionReason = BuildSuppressionReason(
+                    first.Item.Id,
+                    watchingIds,
+                    externalProtectedIds,
+                    externalProtectionReasons,
+                    protectMatches);
                 foreach (var match in group)
                 {
                     CleanupAudit.AddItem(
@@ -151,7 +186,7 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
                         match.Rule,
                         CleanupAuditStage.Protection,
                         CleanupAuditOutcome.Suppressed,
-                        $"delete suppressed because item is protected");
+                        $"{suppressionReason}");
                 }
 
                 continue;
@@ -178,13 +213,51 @@ public sealed class CleanupPlanner(IClock clock, IPathMatcher pathMatcher, IExtr
                 .ThenBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.Name)
                 .ToList();
+            var matchedRuleIds = group
+                .Select(x => x.Rule)
+                .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.First())
+                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.Id)
+                .ToList();
             var markUnplayedUsers = group
                 .Where(x => x.Kind == ExpiredKind.Played && x.Rule.Actions.MarkAsUnplayed)
                 .SelectMany(x => x.Playback.Select(y => y.UserId))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            yield return CleanupDecisionFactory.Create(selectedItem, selectedKind, playback, markUnplayedUsers, matchedRules);
+            yield return CleanupDecisionFactory.Create(selectedItem, selectedKind, playback, markUnplayedUsers, matchedRules, matchedRuleIds);
         }
+    }
+
+    private static string BuildSuppressionReason(
+        string itemId,
+        ISet<string> watchingIds,
+        ISet<string> externalProtectedIds,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? externalProtectionReasons,
+        IReadOnlyCollection<RuleMatch> protectMatches)
+    {
+        var reasons = new List<string>();
+        if (watchingIds.Contains(itemId))
+        {
+            reasons.Add("item is currently being watched");
+        }
+
+        if (externalProtectedIds.Contains(itemId))
+        {
+            reasons.AddRange(
+                externalProtectionReasons?.GetValueOrDefault(itemId)
+                ?? ["protected by an external safety exclusion"]);
+        }
+
+        reasons.AddRange(protectMatches
+            .Where(x => string.Equals(x.Item.Id, itemId, StringComparison.OrdinalIgnoreCase))
+            .Select(x => $"matched protection rule '{x.Rule.Name}'")
+            .Distinct(StringComparer.OrdinalIgnoreCase));
+
+        return reasons.Count == 0
+            ? "delete suppressed because item is protected"
+            : $"delete suppressed because {string.Join("; ", reasons)}";
     }
 }

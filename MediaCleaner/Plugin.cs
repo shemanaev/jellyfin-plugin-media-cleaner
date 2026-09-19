@@ -5,22 +5,51 @@ using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
+using MediaCleaner.LeavingSoon;
+using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner
 {
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
+        internal const string CommonsPageName = "MediaCleaner_commons_js";
+        private readonly LeavingSoonWebClientInstaller _webClientInstaller;
+
         public override string Name => "Media Cleaner";
 
         public override Guid Id => Guid.Parse("607fee77-97eb-41fe-bf22-26844d99ffb0");
 
-        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
+        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer, ILogger<Plugin> logger)
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
+            _webClientInstaller = new LeavingSoonWebClientInstaller(applicationPaths, logger);
+            _webClientInstaller.Install();
         }
 
         public static Plugin? Instance { get; private set; }
+
+        internal WebClientInjectionStatus WebClientInjectionStatus => _webClientInstaller.Status;
+
+        public override void UpdateConfiguration(BasePluginConfiguration configuration)
+        {
+            var updated = (PluginConfiguration)configuration;
+            var current = Configuration.LeavingSoon ?? new LeavingSoonConfiguration();
+            updated.LeavingSoon ??= new LeavingSoonConfiguration();
+            updated.LeavingSoon.NoticeGeneration = current.Enabled == updated.LeavingSoon.Enabled
+                ? NormalizeNoticeGeneration(current.NoticeGeneration)
+                : Guid.NewGuid().ToString("N");
+            base.UpdateConfiguration(updated);
+        }
+
+        private static string NormalizeNoticeGeneration(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? "initial" : value;
+
+        public override void OnUninstalling()
+        {
+            _webClientInstaller.Remove();
+            base.OnUninstalling();
+        }
 
         public IEnumerable<PluginPageInfo> GetPages()
         {
@@ -38,7 +67,7 @@ namespace MediaCleaner
                 },
                 new PluginPageInfo
                 {
-                    Name = "MediaCleaner_commons_js",
+                    Name = CommonsPageName,
                     EmbeddedResourcePath = $"{GetType().Namespace}.Web.commons.js"
                 },
                 new PluginPageInfo
@@ -61,6 +90,21 @@ namespace MediaCleaner
                 {
                     Name = "MediaCleaner_Troubleshooting_js",
                     EmbeddedResourcePath = $"{GetType().Namespace}.Web.troubleshooting.js"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_LeavingSoonItemMenu_js",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.leavingSoonItemMenu.js"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_LeavingSoonReview",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.leavingSoonReview.html"
+                },
+                new PluginPageInfo
+                {
+                    Name = "MediaCleaner_LeavingSoonReview_js",
+                    EmbeddedResourcePath = $"{GetType().Namespace}.Web.leavingSoonReview.js"
                 }
             };
         }

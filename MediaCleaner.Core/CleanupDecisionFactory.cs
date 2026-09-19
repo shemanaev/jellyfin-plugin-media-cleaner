@@ -12,7 +12,8 @@ internal static class CleanupDecisionFactory
         ExpiredKind kind,
         IReadOnlyList<PlaybackState> playback,
         IReadOnlyList<string> markUnplayedUsers,
-        IReadOnlyList<string> matchedRules)
+        IReadOnlyList<string> matchedRules,
+        IReadOnlyList<string>? matchedRuleIds = null)
     {
         var notification = CreateBaseNotification(item, kind, playback);
         var reason = kind switch
@@ -23,7 +24,7 @@ internal static class CleanupDecisionFactory
             _ => throw new NotSupportedException($"Unsupported expired kind: {kind}"),
         };
 
-        return new CleanupDecision(item, kind, playback, reason, notification, markUnplayedUsers, matchedRules);
+        return new CleanupDecision(item, kind, playback, reason, notification, markUnplayedUsers, matchedRules, matchedRuleIds);
     }
 
     private static string DisplayUser(PlaybackState playback) => playback.UserName ?? playback.UserId;

@@ -452,7 +452,39 @@ public class CleanupPlannerTests
     }
 
     [Fact]
-    public void Plan_KeepsAllEpisodesTiedForLatestWatched()
+    public void Plan_KeepsHighestNumberedEpisodeWhenLatestWatchedDatesAreTied()
+    {
+        var rule = Rule(MediaItemKind.Episode, CleanupRuleTriggerKind.AddedAge, 10) with
+        {
+            Filters = Filters(MediaItemKind.Episode) with
+            {
+                DeleteEpisodes = SeriesDeleteKind.Episode,
+                KeepSeriesKind = SeriesKeepKind.LatestWatched,
+            },
+        };
+        var tiedDate = Now.AddDays(-20);
+        var first = Episode("e1", "s1", "show1", Playback("u1", tiedDate, true));
+        var second = Episode("e2", "s1", "show1", Playback("u2", tiedDate, true));
+        var series = Series("show1", ["e1", "e2"]) with
+        {
+            LatestWatchedEpisodes =
+            [
+                new("e1", "u1", tiedDate, 1, 1),
+                new("e2", "u2", tiedDate, 1, 2),
+            ],
+        };
+
+        var plan = Planner().Plan(new CleanupRequest(Policy(rule), [], [first, second, series], true));
+
+        plan.Decisions.Should().ContainSingle(x => x.Item.Id == "e1");
+        plan.AuditEntries.Should().Contain(x =>
+            x.ItemId == "e2"
+            && x.Stage == CleanupAuditStage.SeriesPolicy
+            && x.Outcome == CleanupAuditOutcome.Rejected);
+    }
+
+    [Fact]
+    public void Plan_KeepsAllTiedLatestWatchedEpisodesWhenNumbersAreUnavailable()
     {
         var rule = Rule(MediaItemKind.Episode, CleanupRuleTriggerKind.AddedAge, 10) with
         {

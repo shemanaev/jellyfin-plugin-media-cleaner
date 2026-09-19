@@ -17,6 +17,16 @@ export default function (view, params) {
         updateSaveStatus(page)
     })
 
+    view.querySelectorAll('[id^="MediaCleanerLeavingSoon"]').forEach(input => {
+        const onChange = function () {
+            const page = this.closest('#MediaCleanerAdvancedPage')
+            readSettings(page)
+            updateSaveStatus(page)
+        }
+        input.addEventListener('change', onChange)
+        input.addEventListener('input', onChange)
+    })
+
     view.querySelector('#MediaCleanerPreviewTagRename').addEventListener('click', function () {
         previewTagRename(this.closest('#MediaCleanerAdvancedPage'))
     })
@@ -39,6 +49,7 @@ function onViewShow(commons) {
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
         page._mediaCleanerAllowDeleteIfPlayedBeforeAdded = config.AllowDeleteIfPlayedBeforeAdded === true
+        page._mediaCleanerLeavingSoon = normalizeLeavingSoon(config.LeavingSoon)
         renderSettings(page)
         page._savedSettingsSnapshot = settingsSnapshot(page)
         updateSaveStatus(page)
@@ -54,30 +65,68 @@ function onFormSubmit(commons) {
     readSettings(page)
 
     ApiClient.getPluginConfiguration(commons.pluginId).then(config => {
+        const refreshLeavingSoon = JSON.stringify(normalizeLeavingSoon(config.LeavingSoon)) !== JSON.stringify(page._mediaCleanerLeavingSoon)
         config.AllowDeleteIfPlayedBeforeAdded = page._mediaCleanerAllowDeleteIfPlayedBeforeAdded === true
+        config.LeavingSoon = page._mediaCleanerLeavingSoon
 
         ApiClient.updatePluginConfiguration(commons.pluginId, config).then(result => {
             page._savedSettingsSnapshot = settingsSnapshot(page)
             updateSaveStatus(page)
-            Dashboard.processPluginConfigurationUpdateResult(result)
+
+            const refresh = refreshLeavingSoon ? ApiClient.fetch({
+                type: 'POST',
+                url: ApiClient.getUrl('MediaCleaner/LeavingSoon/Admin/Refresh'),
+            }) : Promise.resolve()
+
+            refresh.then(response => {
+                if (response && response.ok === false) throw new Error(`Leaving Soon refresh failed with status ${response.status}`)
+                Dashboard.processPluginConfigurationUpdateResult(result)
+            }).catch(error => {
+                console.error('Media Cleaner settings were saved, but Leaving Soon refresh failed.', error)
+                Dashboard.hideLoadingMsg()
+                Dashboard.alert('Settings were saved, but Leaving Soon could not be refreshed. Run Media Cleaner Leaving Soon refresh manually.')
+            })
         })
     })
 }
 
 function renderSettings(page) {
     const input = page.querySelector('[data-field="AllowDeleteIfPlayedBeforeAdded"]')
-    if (!input) return
-    input.checked = page._mediaCleanerAllowDeleteIfPlayedBeforeAdded === true
+    if (input) input.checked = page._mediaCleanerAllowDeleteIfPlayedBeforeAdded === true
+    const leavingSoon = page._mediaCleanerLeavingSoon || normalizeLeavingSoon()
+    page.querySelector('#MediaCleanerLeavingSoonEnabled').checked = leavingSoon.Enabled
+    page.querySelector('#MediaCleanerLeavingSoonNoticeDays').value = leavingSoon.NoticeDays
+    page.querySelector('#MediaCleanerLeavingSoonCollectionName').value = leavingSoon.CollectionName
 }
 
 function readSettings(page) {
     page._mediaCleanerAllowDeleteIfPlayedBeforeAdded = readChecked(page, 'AllowDeleteIfPlayedBeforeAdded')
+    page._mediaCleanerLeavingSoon = {
+        Enabled: page.querySelector('#MediaCleanerLeavingSoonEnabled').checked === true,
+        NoticeDays: noticeDays(page.querySelector('#MediaCleanerLeavingSoonNoticeDays').value),
+        CollectionName: page.querySelector('#MediaCleanerLeavingSoonCollectionName').value.trim() || 'Leaving Soon',
+    }
 }
 
 function settingsSnapshot(page) {
     return JSON.stringify({
         AllowDeleteIfPlayedBeforeAdded: page._mediaCleanerAllowDeleteIfPlayedBeforeAdded === true,
+        LeavingSoon: page._mediaCleanerLeavingSoon || normalizeLeavingSoon(),
     })
+}
+
+function normalizeLeavingSoon(value) {
+    value = value || {}
+    return {
+        Enabled: value.Enabled === true,
+        NoticeDays: noticeDays(value.NoticeDays),
+        CollectionName: String(value.CollectionName || '').trim() || 'Leaving Soon',
+    }
+}
+
+function noticeDays(value) {
+    const number = Number(value)
+    return Number.isFinite(number) ? Math.max(0, number) : 7
 }
 
 function updateSaveStatus(page) {

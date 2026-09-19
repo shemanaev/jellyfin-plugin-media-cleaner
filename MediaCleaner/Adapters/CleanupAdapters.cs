@@ -6,7 +6,7 @@ using MediaCleaner.Core;
 
 namespace MediaCleaner.Adapters;
 
-internal sealed record CleanupCatalog(
+public sealed record CleanupCatalog(
     IReadOnlyList<MediaUser> Users,
     IReadOnlyList<MediaItem> Items,
     IReadOnlyDictionary<string, BaseItem> ItemsById,

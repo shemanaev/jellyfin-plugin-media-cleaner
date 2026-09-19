@@ -121,6 +121,21 @@ $description = Get-MsBuildProperty -Name "PluginDescription"
 $category = Get-MsBuildProperty -Name "PluginCategory"
 $owner = Get-MsBuildProperty -Name "PluginOwner"
 $artifacts = Get-MsBuildProperty -Name "PluginArtifacts"
+$artifactItems = @(
+    $artifacts -split ';' |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+)
+$forbiddenSqliteArtifacts = @(
+    $artifactItems |
+        Where-Object {
+            $_ -match '(^|[\\/])(e_sqlite3|Microsoft\.Data\.Sqlite|SQLitePCLRaw\.[^\\/]+)\.dll$' -or
+            $_ -match '(^|[\\/])runtimes[\\/].*sqlite'
+        }
+)
+if ($forbiddenSqliteArtifacts.Count -gt 0) {
+    throw "SQLite is supplied by Jellyfin and must not be packaged as a plugin artifact: $($forbiddenSqliteArtifacts -join ', ')"
+}
 $changelog = Get-Changelog
 $resolvedOutputPath = if ([System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath
@@ -145,7 +160,7 @@ $(ConvertTo-YamlBlock $description)
 category: $(ConvertTo-YamlQuoted $category)
 owner: $(ConvertTo-YamlQuoted $owner)
 artifacts:
-$(($artifacts -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { "- $(ConvertTo-YamlQuoted $_.Trim())" }) -join "`n")
+$(($artifactItems | ForEach-Object { "- $(ConvertTo-YamlQuoted $_)" }) -join "`n")
 changelog: >
 $(ConvertTo-YamlBlock $changelog)
 "@

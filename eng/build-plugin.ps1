@@ -60,7 +60,19 @@ function Invoke-DotNet {
 foreach ($currentProfile in $Profile) {
     $outputPath = Join-Path $ArtifactsRoot $currentProfile
 
-    New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
+    $resolvedArtifactsRoot = [System.IO.Path]::GetFullPath($ArtifactsRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    $resolvedOutputPath = [System.IO.Path]::GetFullPath($outputPath)
+    if (-not $resolvedOutputPath.StartsWith($resolvedArtifactsRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clean artifact path outside '$resolvedArtifactsRoot': '$resolvedOutputPath'"
+    }
+
+    if (Test-Path -LiteralPath $resolvedOutputPath) {
+        Remove-Item -LiteralPath $resolvedOutputPath -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Force -Path $resolvedOutputPath | Out-Null
 
     Invoke-DotNet -Arguments @(
         "build",

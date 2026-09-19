@@ -73,12 +73,18 @@ internal sealed class DeleteDecisionAccumulator
                 .ThenBy(rule => rule.Id, StringComparer.OrdinalIgnoreCase)
                 .Select(rule => rule.Name)
                 .ToList();
+            var matchedRuleIds = entry.Rules.Values
+                .OrderBy(rule => rule.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(rule => rule.Id, StringComparer.OrdinalIgnoreCase)
+                .Select(rule => rule.Id)
+                .ToList();
             yield return CleanupDecisionFactory.Create(
                 entry.Item,
                 entry.Kind,
                 playback,
                 entry.MarkUnplayedUserOrder,
-                matchedRules);
+                matchedRules,
+                matchedRuleIds);
         }
     }
 

@@ -4,6 +4,7 @@
     {
       "profile": "10.10.7",
       "packageVersion": "10.10.7",
+      "sqliteVersion": "8.0.11",
       "targetAbi": "10.10.7.0",
       "targetFramework": "net8.0",
       "versionPatchOffset": "101007",
@@ -16,6 +17,7 @@
     {
       "profile": "10.11.0",
       "packageVersion": "10.11.0",
+      "sqliteVersion": "9.0.10",
       "targetAbi": "10.11.0.0",
       "targetFramework": "net9.0",
       "versionPatchOffset": "101100",
@@ -28,6 +30,7 @@
     {
       "profile": "10.11.9",
       "packageVersion": "10.11.9",
+      "sqliteVersion": "9.0.11",
       "targetAbi": "10.11.9.0",
       "targetFramework": "net9.0",
       "versionPatchOffset": "101109",

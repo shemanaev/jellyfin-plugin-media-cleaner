@@ -100,6 +100,7 @@ public enum CleanupAuditStage
     SeriesPolicy,
     Protection,
     DeletionCascade,
+    ExternalProtection,
 }
 
 public enum CleanupAuditOutcome
@@ -153,7 +154,8 @@ public sealed record CleanupRuleFilters(
 
 public sealed record CleanupRuleActions(
     CleanupRuleActionKind Kind,
-    bool MarkAsUnplayed);
+    bool MarkAsUnplayed,
+    int? NoticeDaysOverride = null);
 
 public sealed record CleanupRule(
     string Id,
@@ -188,7 +190,9 @@ public sealed record CleanupAuditEvidence(
 public readonly record struct SeriesPlaybackAnchor(
     string EpisodeId,
     string UserId,
-    DateTime LastPlayedDate);
+    DateTime LastPlayedDate,
+    int? SeasonNumber = null,
+    int? EpisodeNumber = null);
 
 public sealed record MediaItem(
     string Id,
@@ -222,7 +226,9 @@ public sealed record CleanupRequest(
     CleanupPolicy Policy,
     IReadOnlyList<MediaUser> Users,
     IReadOnlyList<MediaItem> Items,
-    bool IsDryRun);
+    bool IsDryRun,
+    IReadOnlyCollection<string>? ExternalProtectedItemIds = null,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? ExternalProtectionReasons = null);
 
 public sealed record CleanupDecision(
     MediaItem Item,
@@ -231,7 +237,8 @@ public sealed record CleanupDecision(
     string Reason,
     ActivityNotification Notification,
     IReadOnlyList<string> MarkUnplayedUserIds,
-    IReadOnlyList<string> MatchedRules);
+    IReadOnlyList<string> MatchedRules,
+    IReadOnlyList<string>? MatchedRuleIds = null);
 
 public readonly record struct CleanupAuditEntry(
     string? ItemId,
@@ -252,7 +259,8 @@ public sealed record ActivityNotification(string Title, string ShortOverview, st
 public sealed record CleanupPlan(
     IReadOnlyList<CleanupDecision> Decisions,
     IReadOnlyList<DeletionOperation> Deletions,
-    IReadOnlyList<CleanupAuditEntry> AuditEntries)
+    IReadOnlyList<CleanupAuditEntry> AuditEntries,
+    long? SafetyRevision = null)
 {
     public static CleanupPlan Empty { get; } = new([], [], []);
 }

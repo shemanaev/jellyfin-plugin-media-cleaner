@@ -44,6 +44,7 @@ foreach ($profile in @($profilesConfig.serverProfiles)) {
 foreach ($profile in @($profilesConfig.buildProfiles)) {
     $profileName = ConvertTo-XmlAttribute ([string]$profile.profile)
     $packageVersion = ConvertTo-XmlAttribute ([string]$profile.packageVersion)
+    $sqliteVersion = ConvertTo-XmlAttribute ([string]$profile.sqliteVersion)
     $targetAbi = ConvertTo-XmlAttribute ([string]$profile.targetAbi)
     $targetFramework = ConvertTo-XmlAttribute ([string]$profile.targetFramework)
     $versionPatchOffset = ConvertTo-XmlAttribute ([string]$profile.versionPatchOffset)
@@ -52,6 +53,7 @@ foreach ($profile in @($profilesConfig.buildProfiles)) {
     $lines.Add("")
     $lines.Add("  <PropertyGroup Condition=`"'`$(JellyfinBuildProfile)' == '$profileName'`">")
     $lines.Add("    <JellyfinPackageVersion Condition=`"'`$(JellyfinPackageVersion)' == ''`">$packageVersion</JellyfinPackageVersion>")
+    $lines.Add("    <JellyfinSqliteVersion>$sqliteVersion</JellyfinSqliteVersion>")
     $lines.Add("    <JellyfinTargetAbi Condition=`"'`$(JellyfinTargetAbi)' == ''`">$targetAbi</JellyfinTargetAbi>")
     $lines.Add("    <JellyfinTargetFramework>$targetFramework</JellyfinTargetFramework>")
     $lines.Add("    <JellyfinVersionPatchOffset>$versionPatchOffset</JellyfinVersionPatchOffset>")

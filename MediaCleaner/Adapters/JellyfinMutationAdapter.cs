@@ -8,6 +8,7 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Activity;
 using MediaCleaner.Compatibility;
 using MediaCleaner.Core;
+using MediaCleaner.LeavingSoon;
 using CoreExpiredKind = MediaCleaner.Core.ExpiredKind;
 using Microsoft.Extensions.Logging;
 
@@ -16,7 +17,8 @@ namespace MediaCleaner.Adapters;
 internal sealed class JellyfinMutationAdapter(
     ILogger<JellyfinMutationAdapter> logger,
     ILibraryManager libraryManager,
-    IActivityManager activityManager) : IMediaMutationAdapter
+    IActivityManager activityManager,
+    LeavingSoonCoordinator? leavingSoonCoordinator = null) : IMediaMutationAdapter
 {
     public async Task ExecuteAsync(CleanupPlan plan, CleanupCatalog catalog, CancellationToken cancellationToken)
     {
@@ -25,12 +27,8 @@ internal sealed class JellyfinMutationAdapter(
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var successfullyDeletedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Jellyfin persists user data from MarkUnplayed, so it must run while the item still exists.
-        foreach (var decision in GetDecisionsForItemIds(plan.Decisions, plannedDeletionIds))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            MarkUnplayed(decision, catalog);
-        }
+        var decisionsByItemId = GetDecisionsForItemIds(plan.Decisions, plannedDeletionIds)
+            .ToDictionary(decision => decision.Item.Id, StringComparer.OrdinalIgnoreCase);
 
         foreach (var operation in plan.Deletions)
         {
@@ -41,14 +39,39 @@ internal sealed class JellyfinMutationAdapter(
                 continue;
             }
 
-            try
+            var deleted = false;
+            void Delete()
             {
-                JellyfinCompatibility.DeleteItem(libraryManager, item, new DeleteOptions { DeleteFileLocation = true });
-                successfullyDeletedIds.Add(operation.ItemId);
+                // Jellyfin persists user data from MarkUnplayed, so it must run immediately
+                // before deletion while the same safety revision is guarded.
+                if (decisionsByItemId.TryGetValue(operation.ItemId, out var decision))
+                {
+                    MarkUnplayed(decision, catalog);
+                }
+
+                try
+                {
+                    JellyfinCompatibility.DeleteItem(libraryManager, item, new DeleteOptions { DeleteFileLocation = true });
+                    deleted = true;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error deleting item: {Name}", operation.Name);
+                }
             }
-            catch (Exception ex)
+
+            if (plan.SafetyRevision is { } revision && leavingSoonCoordinator is not null)
             {
-                logger.LogError(ex, "Error deleting item: {Name}", operation.Name);
+                leavingSoonCoordinator.ExecuteDeletionIfRevisionCurrent(revision, Delete);
+            }
+            else
+            {
+                Delete();
+            }
+
+            if (deleted)
+            {
+                successfullyDeletedIds.Add(operation.ItemId);
             }
         }
 
@@ -57,6 +80,11 @@ internal sealed class JellyfinMutationAdapter(
             LogSuccessfulDeletion(decision);
             var notificationDecision = WithNotificationOverview(decision);
             await CreateNotification(notificationDecision, cancellationToken);
+        }
+
+        if (successfullyDeletedIds.Count > 0 && leavingSoonCoordinator is not null)
+        {
+            leavingSoonCoordinator.MarkDeleted(successfullyDeletedIds);
         }
     }
 

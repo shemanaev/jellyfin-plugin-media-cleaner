@@ -33,6 +33,16 @@ Played cleanup can require playback by at least one user, the most recent play b
 
 Tag filters only affect rule matching. Changing a tag in a rule does not rename tags already stored on Jellyfin items; use **Advanced** for library tag maintenance.
 
+### Leaving Soon
+
+Leaving Soon is optional. When enabled, Media Cleaner adds cleanup candidates to a Jellyfin collection before deleting them. Deletion waits for the configured notice period, which can be overridden by individual cleanup rules. If several rules match, the longest notice period is used. An item that no longer matches any cleanup rule is removed from the collection.
+
+Users can select **Keep until watched** from an item's menu in Jellyfin Web. The item remains protected until that user marks it as played or removes the protection. Starting or partially watching it is not enough. For a season or series, Media Cleaner protects its currently visible, unplayed episodes; episodes added later are not included automatically.
+
+Favorites and tags continue to follow the configured cleanup and protection rules. Administrators can review and remove active personal protections on the **Leaving Soon keeps** tab. Disabling Leaving Soon removes the warnings but keeps existing personal protections.
+
+The collection is available through Jellyfin's normal **Collections** view. **Keep until watched** is added only to the Jellyfin Web installation hosted by the server; separate web clients can still open the collection but do not receive the extra menu action.
+
 ### Advanced
 
 The **Advanced** tab contains tools and safety switches that should not be hidden inside ordinary rules:
@@ -46,9 +56,11 @@ The **Troubleshooting** tab runs a dry-run cleanup report and opens it in a form
 
 ### When deletion happens
 
-Saving Media Cleaner settings does not delete anything immediately. Actual deletion happens only when Jellyfin runs the **Media Cleaner cleanup** scheduled task, or when an admin starts that scheduled task manually.
+Saving Media Cleaner settings does not delete anything. Deletion happens only when Jellyfin runs the **Media Cleaner cleanup** scheduled task, either automatically or manually.
 
-Its default trigger is once per day, but the exact run time, custom triggers, manual runs and disabled state are controlled by Jellyfin's **Scheduled Tasks** page, not by Media Cleaner's rule editor.
+Saving Leaving Soon settings refreshes its collection but does not delete media. The **Media Cleaner Leaving Soon refresh** task also updates the collection every six hours by default.
+
+The cleanup task runs once per day by default. Its schedule, manual runs and enabled state are controlled from Jellyfin's **Scheduled Tasks** page.
 
 On each task run, Media Cleaner loads the current rules, scans the Jellyfin library, builds a cleanup plan, applies protection rules and cascade safety checks, then executes the planned delete operations. Media currently being watched is always protected, including from season and series cascades. If no cleanup rule matches, no item is deleted.
 

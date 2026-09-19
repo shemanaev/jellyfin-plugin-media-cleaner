@@ -114,6 +114,15 @@ namespace MediaCleaner.Configuration
     {
         public CleanupRuleActionKind Kind { get; set; } = CleanupRuleActionKind.Delete;
         public bool MarkAsUnplayed { get; set; } = false;
+        public int? NoticeDaysOverride { get; set; }
+    }
+
+    public class LeavingSoonConfiguration
+    {
+        public bool Enabled { get; set; } = false;
+        public int NoticeDays { get; set; } = 7;
+        public string CollectionName { get; set; } = "Leaving Soon";
+        public string NoticeGeneration { get; set; } = "initial";
     }
 
     public class CleanupRuleConfiguration
@@ -130,6 +139,7 @@ namespace MediaCleaner.Configuration
     {
         public int ConfigVersion { get; set; } = 1;
         public List<CleanupRuleConfiguration> Rules { get; set; } = new List<CleanupRuleConfiguration>();
+        public LeavingSoonConfiguration LeavingSoon { get; set; } = new LeavingSoonConfiguration();
 
         public int KeepMoviesFor { get; set; } = -1;
         public int KeepMoviesNotPlayedFor { get; set; } = -1;

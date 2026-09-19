@@ -108,6 +108,28 @@
                     </div>
                 </section>
 
+                <section class="paperList mediaCleanerAdvancedSection" aria-label="Leaving Soon">
+                    <div class="mediaCleanerAdvancedHeader">
+                        <h3>Leaving Soon</h3>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="MediaCleanerLeavingSoonEnabled" />
+                            <span>Enable</span>
+                        </label>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="MediaCleanerLeavingSoonNoticeDays">Notice days</label>
+                        <input is="emby-input" id="MediaCleanerLeavingSoonNoticeDays" type="number" min="0" step="1" />
+                        <div class="fieldDescription">0 skips the notice period. Active deadlines are never shortened.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="MediaCleanerLeavingSoonCollectionName">Collection name</label>
+                        <input is="emby-input" id="MediaCleanerLeavingSoonCollectionName" type="text" maxlength="120" />
+                    </div>
+                    <p class="fieldDescription">Protections and notice history are not included in configuration backups.</p>
+                </section>
+
                 <section class="paperList mediaCleanerAdvancedSection" aria-label="Library tag maintenance">
                     <div class="mediaCleanerAdvancedHeader">
                         <h3>Library tag maintenance</h3>

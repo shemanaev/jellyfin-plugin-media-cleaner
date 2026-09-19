@@ -197,9 +197,11 @@ public class JellyfinMediaCatalogAdapterLoadTests
         var episodeSnapshot = catalog.Items.Single(x => x.Kind == MediaItemKind.Episode);
         episodeSnapshot.FirstEpisodeId.Should().BeNull();
         episodeSnapshot.LastEpisodeId.Should().BeNull();
-        catalog.Items.Single(x => x.Kind == MediaItemKind.Series)
-            .LatestWatchedEpisodes.Should().ContainSingle()
-            .Which.EpisodeId.Should().Be(library.Episodes[0].Id.ToString("N"));
+        var anchor = catalog.Items.Single(x => x.Kind == MediaItemKind.Series)
+            .LatestWatchedEpisodes.Should().ContainSingle().Subject;
+        anchor.EpisodeId.Should().Be(library.Episodes[0].Id.ToString("N"));
+        anchor.SeasonNumber.Should().Be(1);
+        anchor.EpisodeNumber.Should().Be(1);
     }
 
     [Fact]

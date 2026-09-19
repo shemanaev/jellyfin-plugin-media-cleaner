@@ -40,7 +40,7 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
         var catalogItem = byId.TryGetValue(item.Id, out var foundItem) ? foundItem : item;
         if (item.Kind == MediaItemKind.Series && TryGetProtectedDescendant(catalogItem, byId, protectedIds, out var protectedChild))
         {
-            CleanupAudit.AddCascadeBlocked(audit, item, $"delete blocked because series contains protected item '{protectedChild.Name}'");
+            CleanupAudit.AddCascadeBlocked(audit, item, $"delete blocked because series contains protected item '{protectedChild}'");
 
             yield break;
         }
@@ -49,7 +49,7 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
         {
             if (TryGetProtectedDescendant(catalogItem, byId, protectedIds, out protectedChild))
             {
-                CleanupAudit.AddCascadeBlocked(audit, item, $"delete blocked because season contains protected item '{protectedChild.Name}'");
+                CleanupAudit.AddCascadeBlocked(audit, item, $"delete blocked because season contains protected item '{protectedChild}'");
 
                 yield break;
             }
@@ -77,7 +77,7 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
             {
                 if (TryGetProtectedDescendant(season, byId, protectedIds, out var protectedSeasonChild))
                 {
-                    CleanupAudit.AddCascadeBlocked(audit, season, $"delete blocked because season contains protected item '{protectedSeasonChild.Name}'");
+                    CleanupAudit.AddCascadeBlocked(audit, season, $"delete blocked because season contains protected item '{protectedSeasonChild}'");
                 }
                 else
                 {
@@ -100,7 +100,7 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
                 }
                 else if (TryGetProtectedDescendant(series, byId, protectedIds, out var protectedSeriesChild))
                 {
-                    CleanupAudit.AddCascadeBlocked(audit, series, $"delete blocked because series contains protected item '{protectedSeriesChild.Name}'");
+                    CleanupAudit.AddCascadeBlocked(audit, series, $"delete blocked because series contains protected item '{protectedSeriesChild}'");
                 }
                 else
                 {
@@ -117,17 +117,18 @@ internal sealed class DeletionCascadePlanner(IExtraFileProbe extraFileProbe)
         MediaItem item,
         IReadOnlyDictionary<string, MediaItem> byId,
         ISet<string> protectedIds,
-        out MediaItem protectedChild)
+        out string protectedChild)
     {
         foreach (var childId in GetDescendantIds(item, byId))
         {
-            if (protectedIds.Contains(childId) && byId.TryGetValue(childId, out protectedChild!))
+            if (protectedIds.Contains(childId))
             {
+                protectedChild = byId.TryGetValue(childId, out var child) ? child.Name : childId;
                 return true;
             }
         }
 
-        protectedChild = null!;
+        protectedChild = string.Empty;
         return false;
     }
 

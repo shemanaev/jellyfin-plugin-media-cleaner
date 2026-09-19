@@ -55,6 +55,7 @@
 
   <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '10.10.7'">
     <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">10.10.7</JellyfinPackageVersion>
+    <JellyfinSqliteVersion>8.0.11</JellyfinSqliteVersion>
     <JellyfinTargetAbi Condition="'$(JellyfinTargetAbi)' == ''">10.10.7.0</JellyfinTargetAbi>
     <JellyfinTargetFramework>net8.0</JellyfinTargetFramework>
     <JellyfinVersionPatchOffset>101007</JellyfinVersionPatchOffset>
@@ -64,6 +65,7 @@
 
   <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '10.11.0'">
     <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">10.11.0</JellyfinPackageVersion>
+    <JellyfinSqliteVersion>9.0.10</JellyfinSqliteVersion>
     <JellyfinTargetAbi Condition="'$(JellyfinTargetAbi)' == ''">10.11.0.0</JellyfinTargetAbi>
     <JellyfinTargetFramework>net9.0</JellyfinTargetFramework>
     <JellyfinVersionPatchOffset>101100</JellyfinVersionPatchOffset>
@@ -73,6 +75,7 @@
 
   <PropertyGroup Condition="'$(JellyfinBuildProfile)' == '10.11.9'">
     <JellyfinPackageVersion Condition="'$(JellyfinPackageVersion)' == ''">10.11.9</JellyfinPackageVersion>
+    <JellyfinSqliteVersion>9.0.11</JellyfinSqliteVersion>
     <JellyfinTargetAbi Condition="'$(JellyfinTargetAbi)' == ''">10.11.9.0</JellyfinTargetAbi>
     <JellyfinTargetFramework>net9.0</JellyfinTargetFramework>
     <JellyfinVersionPatchOffset>101109</JellyfinVersionPatchOffset>

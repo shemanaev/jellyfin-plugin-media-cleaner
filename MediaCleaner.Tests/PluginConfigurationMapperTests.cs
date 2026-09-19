@@ -16,6 +16,27 @@ namespace MediaCleaner.Tests;
 public class PluginConfigurationMapperTests
 {
     [Fact]
+    public void ToCleanupPolicy_PreservesPerRuleNoticeOverride()
+    {
+        var config = new PluginConfiguration
+        {
+            ConfigVersion = 2,
+            Rules =
+            [
+                new CleanupRuleConfiguration
+                {
+                    Id = "notice",
+                    Trigger = new CleanupRuleTriggerConfiguration { Days = 30 },
+                    Filters = new CleanupRuleFiltersConfiguration { MediaKinds = [ConfigRuleMediaKind.Movie] },
+                    Actions = new CleanupRuleActionsConfiguration { NoticeDaysOverride = 12 },
+                },
+            ],
+        };
+
+        config.ToCleanupPolicy().Rules.Single().Actions.NoticeDaysOverride.Should().Be(12);
+    }
+
+    [Fact]
     public void ToCleanupPolicy_MigratesLegacyConfigurationToEquivalentRules()
     {
         var config = new PluginConfiguration

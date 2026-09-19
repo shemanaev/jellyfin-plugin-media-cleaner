@@ -1,0 +1,62 @@
+<div id="MediaCleanerLeavingSoonReviewPage" data-role="page" class="page type-interior pluginConfigurationPage withTabs" data-controller="__plugin/MediaCleaner_LeavingSoonReview_js">
+    <style>
+        #MediaCleanerLeavingSoonReviewPage .mcReviewSection{margin-top:1.5em;max-width:54em;padding-bottom:4em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewToolbar{align-items:end;display:grid;gap:.65em;grid-template-columns:minmax(0,1fr) auto;margin-bottom:1.25em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewToolbar .inputContainer{margin:0}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewRefresh{align-self:end;height:2.75em;margin:0;padding:.4em;width:2.75em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewRefresh .material-icons{font-size:1.25em;margin-left: 0.25em;}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewError{border-left:.25em solid #c62828;margin-bottom:1.25em;padding:.8em 1em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewList{display:grid;gap:1em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewCard{border:1px solid rgba(128,128,128,.2);border-radius:.4em;box-sizing:border-box;display:grid;grid-template-columns:7.5em minmax(0,1fr);margin:0;max-width:none;min-height:11.25em;overflow:hidden;width:100%}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPoster{background:rgba(128,128,128,.12);min-height:11.25em;overflow:hidden;position:relative}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPoster img{height:100%;inset:0;object-fit:cover;position:absolute;width:100%}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPosterFallback{align-items:center;display:flex;height:100%;justify-content:center;min-height:11.25em;opacity:.3}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPosterFallback .material-icons{font-size:3em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewCardContent{display:flex;flex-direction:column;min-width:0;padding:1.1em 1.25em .9em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewCardTitle{font-size:1.2em;line-height:1.25;margin:0;overflow-wrap:anywhere}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewCardTitle a{color:inherit;text-decoration:none}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewCardTitle a:hover{text-decoration:underline}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPeople{display:grid;margin-top:.7em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPerson{align-items:center;border-top:1px solid rgba(128,128,128,.18);display:grid;gap:.8em;grid-template-columns:auto minmax(0,1fr) auto;padding:.75em 0}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPersonIcon{font-size:1.5em;opacity:.62}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPersonTitle{font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPersonMeta{font-size:.88em;line-height:1.35;margin-top:.18em;opacity:.67;overflow-wrap:anywhere}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewRemove,#MediaCleanerLeavingSoonReviewPage .mcReviewRemoveAll{align-items:center;display:inline-flex;gap:.4em;white-space:nowrap}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewRemove .material-icons,#MediaCleanerLeavingSoonReviewPage .mcReviewRemoveAll .material-icons{font-size:1.2em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewCardActions{border-top:1px solid rgba(128,128,128,.18);display:flex;justify-content:flex-end;margin-top:auto;padding-top:.7em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewEmpty{border:1px dashed rgba(128,128,128,.35);border-radius:.4em;padding:2.5em 1.5em;text-align:center;opacity:.72}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPager{align-items:center;display:flex;gap:1em;justify-content:center;margin-top:1.5em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPager[hidden]{display:none}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPager button{align-items:center;display:inline-flex;justify-content:center;min-width:2.75em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPager .material-icons{font-size:1.3em}
+        #MediaCleanerLeavingSoonReviewPage .mcReviewPageLabel{font-variant-numeric:tabular-nums;min-width:7em;text-align:center}
+        @media (max-width:40em){
+            #MediaCleanerLeavingSoonReviewPage .mcReviewCard{grid-template-columns:5.5em minmax(0,1fr)}
+            #MediaCleanerLeavingSoonReviewPage .mcReviewPoster,#MediaCleanerLeavingSoonReviewPage .mcReviewPosterFallback{min-height:8.25em}
+            #MediaCleanerLeavingSoonReviewPage .mcReviewCardContent{padding:1em}
+            #MediaCleanerLeavingSoonReviewPage .mcReviewPerson{grid-template-columns:auto minmax(0,1fr)}
+            #MediaCleanerLeavingSoonReviewPage .mcReviewRemove{grid-column:2;justify-self:start}
+        }
+    </style>
+    <div data-role="content">
+        <div class="content-primary">
+            <div id="navigationTabs" data-role="controlgroup" data-type="horizontal" class="localnav"></div>
+            <div class="verticalSection mcReviewSection">
+                <div class="mcReviewToolbar">
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="MediaCleanerProtectionSearch">Search item or user</label>
+                        <input is="emby-input" class="emby-input" id="MediaCleanerProtectionSearch" type="search" autocomplete="off" />
+                    </div>
+                    <button is="emby-button" type="button" class="raised emby-button mcReviewRefresh" id="MediaCleanerProtectionRefresh" title="Refresh" aria-label="Refresh"><span class="material-icons refresh" aria-hidden="true"></span></button>
+                </div>
+                <div id="MediaCleanerProtectionError" class="fieldDescription mcReviewError" hidden></div>
+                <div id="MediaCleanerProtectionList" class="mcReviewList" aria-live="polite"></div>
+                <nav class="mcReviewPager" aria-label="Protection pages">
+                    <button is="emby-button" type="button" id="MediaCleanerProtectionPrevious" class="raised emby-button" title="Previous page" aria-label="Previous page"><span class="material-icons chevron_left" aria-hidden="true"></span></button>
+                    <span id="MediaCleanerProtectionPageLabel" class="mcReviewPageLabel">0–0 of 0</span>
+                    <button is="emby-button" type="button" id="MediaCleanerProtectionNext" class="raised emby-button" title="Next page" aria-label="Next page"><span class="material-icons chevron_right" aria-hidden="true"></span></button>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>

@@ -835,7 +835,7 @@ internal sealed class JellyfinMediaCatalogAdapter(
             foreach (var user in LatestWatchedUsers)
             {
                 DateTime? latestDate = null;
-                var latestEpisodeIds = new List<string>();
+                var latestEpisodes = new List<Episode>();
                 foreach (var episode in episodes)
                 {
                     var playedDate = GetUserData(user, episode)?.LastPlayedDate;
@@ -847,16 +847,24 @@ internal sealed class JellyfinMediaCatalogAdapter(
                     if (!latestDate.HasValue || playedDate > latestDate)
                     {
                         latestDate = playedDate;
-                        latestEpisodeIds.Clear();
+                        latestEpisodes.Clear();
                     }
 
-                    latestEpisodeIds.Add(GetItemId(episode));
+                    if (episode is Episode typedEpisode)
+                    {
+                        latestEpisodes.Add(typedEpisode);
+                    }
                 }
 
                 if (latestDate.HasValue)
                 {
-                    anchors.AddRange(latestEpisodeIds.Select(episodeId =>
-                        new SeriesPlaybackAnchor(episodeId, GetUserId(user), latestDate.Value)));
+                    anchors.AddRange(latestEpisodes.Select(episode =>
+                        new SeriesPlaybackAnchor(
+                            GetItemId(episode),
+                            GetUserId(user),
+                            latestDate.Value,
+                            episode.ParentIndexNumber,
+                            episode.IndexNumber)));
                 }
             }
 

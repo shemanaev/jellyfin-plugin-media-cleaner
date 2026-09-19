@@ -108,7 +108,6 @@ function onViewShow(commons) {
     page._mediaCleanerStatus = null
     page._mediaCleanerMigrationReviewRequired = false
     page._savedRulesSnapshot = rulesSnapshot([])
-
     Promise.all([
         ApiClient.getPluginConfiguration(commons.pluginId),
         ApiClient.getUsers().catch(() => []),
@@ -250,6 +249,8 @@ function renderOverview(page) {
     if (!status) {
         setOverviewValue(page, '#MediaCleanerNextRun', 'Could not load scheduled task status.', true)
         setOverviewValue(page, '#MediaCleanerTaskState', 'Unknown', true)
+        setOverviewValue(page, '#MediaCleanerLeavingSoonState', 'Unknown', true)
+        setOverviewValue(page, '#MediaCleanerWebClientInjectionState', 'Unknown', true)
         setScheduledTasksLinkVisible(page, false)
         return
     }
@@ -258,6 +259,31 @@ function renderOverview(page) {
     const scheduledTaskAvailable = scheduledTaskAvailableValue !== false
     const scheduledTaskState = readResponseValue(status, 'ScheduledTaskState', 'scheduledTaskState')
     const nextRunUtc = readResponseValue(status, 'NextRunUtc', 'nextRunUtc')
+    const leavingSoonError = readResponseValue(status, 'LeavingSoonStateError', 'leavingSoonStateError')
+    const refreshError = readResponseValue(status, 'LeavingSoonRefreshError', 'leavingSoonRefreshError')
+    const lastRefresh = readResponseValue(status, 'LastLeavingSoonRefreshUtc', 'lastLeavingSoonRefreshUtc')
+    setOverviewValue(
+        page,
+        '#MediaCleanerLeavingSoonState',
+        leavingSoonError
+            ? `State unavailable: ${leavingSoonError}`
+            : refreshError
+                ? `Refresh failed: ${refreshError}`
+                : lastRefresh ? new Date(lastRefresh).toLocaleString() : 'Never',
+        Boolean(leavingSoonError || refreshError))
+    const injectionState = readResponseValue(status, 'WebClientInjectionState', 'webClientInjectionState')
+    const injectionPath = readResponseValue(status, 'WebClientInjectionPath', 'webClientInjectionPath')
+    const injectionChanged = readResponseValue(status, 'WebClientInjectionChanged', 'webClientInjectionChanged') === true
+    const injectionError = readResponseValue(status, 'WebClientInjectionError', 'webClientInjectionError')
+    const injectionInstalled = injectionState === 'Installed'
+    const injectionText = injectionInstalled
+        ? injectionChanged ? 'Installed — reload open tabs' : 'Installed'
+        : injectionState === 'MissingWebIndex'
+            ? `Unavailable — index.html was not found at ${injectionPath || 'the configured web path'}`
+            : injectionState === 'Failed'
+                ? `Install failed: ${injectionError || 'the web directory could not be updated'}${injectionPath ? ` (${injectionPath})` : ''}`
+                : 'Not checked'
+    setOverviewValue(page, '#MediaCleanerWebClientInjectionState', injectionText, !injectionInstalled)
     setScheduledTasksLinkVisible(page, scheduledTaskAvailableValue === false || !isValidDateValue(nextRunUtc))
 
     const taskState = !scheduledTaskAvailable
@@ -445,7 +471,8 @@ function rulesSnapshot(rules) {
 function updateSaveStatus(page) {
     const status = page.querySelector('#MediaCleanerSaveStatus')
     if (!status) return
-    status.classList.toggle('hide', rulesSnapshot(page._mediaCleanerRules) === page._savedRulesSnapshot)
+    const rulesUnchanged = rulesSnapshot(page._mediaCleanerRules) === page._savedRulesSnapshot
+    status.classList.toggle('hide', rulesUnchanged)
 }
 
 function updateMigrationReview(page) {
@@ -576,6 +603,10 @@ function readRuleEditor(page, card) {
     readPlaybackSettings(card, baseRule, page)
     baseRule.Actions.Kind = readField(card, 'ActionKind', baseRule.Actions.Kind || 'Delete')
     baseRule.Actions.MarkAsUnplayed = isDeleteRule(baseRule) && baseRule.Trigger.Kind === 'Played' && readChecked(card, 'MarkAsUnplayed')
+    const noticeOverride = readText(card, 'NoticeDaysOverride').trim()
+    baseRule.Actions.NoticeDaysOverride = isDeleteRule(baseRule) && noticeOverride !== ''
+        ? Math.max(0, numberValue(noticeOverride, 0))
+        : null
 
     for (const condition of conditionRegistry) {
         if (activeIds.includes(condition.id) && conditionAvailable(condition, baseRule)) {
@@ -930,7 +961,8 @@ function renderDeletionBehavior(rule) {
     const markUnplayed = rule.Trigger.Kind === 'Played'
         ? `<div class="checkboxContainer"><label><input is="emby-checkbox" type="checkbox" data-field="MarkAsUnplayed" ${rule.Actions.MarkAsUnplayed ? 'checked="checked"' : ''} /><span>Mark as unplayed when deleting</span></label></div>`
         : ''
-    const controls = episodeControls + markUnplayed
+    const noticeOverride = `<div class="inputContainer"><label class="inputLabel inputLabelUnfocused">Notice days override</label><input is="emby-input" type="number" min="0" step="1" data-field="NoticeDaysOverride" value="${rule.Actions.NoticeDaysOverride == null ? '' : rule.Actions.NoticeDaysOverride}" placeholder="Use global default" /><div class="fieldDescription">Leave blank to use the Leaving Soon default. 0 intentionally bypasses advance notice for this rule.</div></div>`
+    const controls = episodeControls + markUnplayed + noticeOverride
     return `<input type="hidden" data-field="ActionKind" value="Delete" />${controls || '<p class="mediaCleanerEmptyState">Matching media will be deleted.</p>'}`
 }
 
@@ -1395,7 +1427,7 @@ function legacyRule(config, name, mediaKind, triggerKind, days, playedKeepKind, 
             DeleteEpisodes: deleteEpisodes || 'Episode',
             KeepSeriesKind: keepSeriesKind || 'None',
         },
-        Actions: { Kind: 'Delete', MarkAsUnplayed: config.MarkAsUnplayed === true },
+        Actions: { Kind: 'Delete', MarkAsUnplayed: config.MarkAsUnplayed === true, NoticeDaysOverride: null },
     })
 }
 
@@ -1405,7 +1437,7 @@ function defaultRule(actionKind = 'Delete') {
         Enabled: true,
         Trigger: { Kind: 'Played', Days: 30, PlayedKeepKind: 'AnyUser', CountAsNotPlayedAfter: -1 },
         Filters: { MediaKinds: ['Movie'] },
-        Actions: { Kind: actionKind, MarkAsUnplayed: false },
+        Actions: { Kind: actionKind, MarkAsUnplayed: false, NoticeDaysOverride: null },
     })
 }
 
@@ -1423,6 +1455,7 @@ function normalizeRule(rule) {
         normalized.Filters.DeleteEpisodes = 'Episode'
         normalized.Filters.KeepSeriesKind = 'None'
         normalized.Actions.MarkAsUnplayed = false
+        normalized.Actions.NoticeDaysOverride = null
     }
 
     if (!isEpisodeOnly(normalized)) {
@@ -1475,6 +1508,9 @@ function normalizeActions(actions) {
     return {
         Kind: kind,
         MarkAsUnplayed: kind === 'Delete' && actions.MarkAsUnplayed === true,
+        NoticeDaysOverride: kind === 'Delete' && actions.NoticeDaysOverride != null
+            ? Math.max(0, numberValue(actions.NoticeDaysOverride, 0))
+            : null,
     }
 }
 

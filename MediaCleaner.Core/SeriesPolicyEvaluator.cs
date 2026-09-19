@@ -199,8 +199,21 @@ internal static class SeriesPolicyEvaluator
                 continue;
             }
 
-            var latestEpisodeIds = includedAnchors
+            var latestAnchors = includedAnchors
                 .Where(x => x.LastPlayedDate == latestPlayedDate)
+                .ToList();
+            if (latestAnchors.All(x => x.SeasonNumber.HasValue && x.EpisodeNumber.HasValue))
+            {
+                var latestSeasonNumber = latestAnchors.Max(x => x.SeasonNumber!.Value);
+                var latestEpisodeNumber = latestAnchors
+                    .Where(x => x.SeasonNumber == latestSeasonNumber)
+                    .Max(x => x.EpisodeNumber!.Value);
+                latestAnchors = latestAnchors
+                    .Where(x => x.SeasonNumber == latestSeasonNumber && x.EpisodeNumber == latestEpisodeNumber)
+                    .ToList();
+            }
+
+            var latestEpisodeIds = latestAnchors
                 .Select(x => x.EpisodeId)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var keptCandidate = false;

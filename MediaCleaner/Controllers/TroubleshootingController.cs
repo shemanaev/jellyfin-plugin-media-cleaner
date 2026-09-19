@@ -17,6 +17,7 @@ using MediaBrowser.Model.Globalization;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Tasks;
 using MediaCleaner.Core;
+using MediaCleaner.LeavingSoon;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,12 +53,40 @@ public class TroubleshootingController(
             x.Enabled
             && x.Trigger.Days >= 0
             && x.Actions.Kind == CleanupRuleActionKind.Delete);
+        int? warningCount = null;
+        int? protectionCount = null;
+        DateTime? lastLeavingSoonRefreshUtc = null;
+        string? leavingSoonRefreshError = null;
+        string? leavingSoonStateError = null;
+        try
+        {
+            var snapshot = scope.ServiceProvider.GetService<LeavingSoonCoordinator>()?.ReadState();
+            warningCount = snapshot?.Warnings.Count;
+            protectionCount = snapshot?.Protections.Count;
+            lastLeavingSoonRefreshUtc = snapshot?.LastSuccessfulRefreshUtc;
+            leavingSoonRefreshError = snapshot?.LastRefreshError;
+        }
+        catch (Exception ex)
+        {
+            leavingSoonStateError = ex.Message;
+        }
+        var webClientInjection = Plugin.Instance.WebClientInjectionStatus;
 
         return new MediaCleanerStatusResponse(
             activeCleanupRuleCount,
             scheduledTask is not null,
             scheduledTask?.State.ToString(),
-            GetNextRunUtc(scheduledTask));
+            GetNextRunUtc(scheduledTask),
+            Plugin.Instance.Configuration.LeavingSoon.Enabled,
+            warningCount,
+            protectionCount,
+            lastLeavingSoonRefreshUtc,
+            leavingSoonRefreshError,
+            leavingSoonStateError,
+            webClientInjection.State.ToString(),
+            webClientInjection.IndexPath,
+            webClientInjection.Changed,
+            webClientInjection.Error);
     }
 
     [HttpGet("Report")]
@@ -81,6 +110,7 @@ public class TroubleshootingController(
         var activityManager = scope.ServiceProvider.GetRequiredService<IActivityManager>();
         var localization = scope.ServiceProvider.GetRequiredService<ILocalizationManager>();
         var fileSystem = scope.ServiceProvider.GetRequiredService<IFileSystem>();
+        var leavingSoonCoordinator = scope.ServiceProvider.GetRequiredService<LeavingSoonCoordinator>();
         var progress = new Progress<double>();
         var configurationSnapshot = Plugin.Instance!.Configuration;
         var pluginConfig = GetPrettyXml(configurationSnapshot);
@@ -88,7 +118,15 @@ public class TroubleshootingController(
 
         using var loggerFactory = LoggerFactory.Create(_ => { });
 
-        var task = new MediaCleanupTask(userManager, loggerFactory, libraryManager, userDataManager, activityManager, localization, fileSystem)
+        var task = new MediaCleanupTask(
+            userManager,
+            loggerFactory,
+            libraryManager,
+            userDataManager,
+            activityManager,
+            localization,
+            fileSystem,
+            leavingSoonCoordinator)
         {
             IsDryRun = true,
             PolicyOverride = policySnapshot,
@@ -875,4 +913,14 @@ public sealed record MediaCleanerStatusResponse(
     int ActiveCleanupRuleCount,
     bool ScheduledTaskAvailable,
     string? ScheduledTaskState,
-    DateTime? NextRunUtc);
+    DateTime? NextRunUtc,
+    bool LeavingSoonEnabled,
+    int? LeavingSoonWarningCount,
+    int? ProtectionCount,
+    DateTime? LastLeavingSoonRefreshUtc,
+    string? LeavingSoonRefreshError,
+    string? LeavingSoonStateError,
+    string WebClientInjectionState,
+    string WebClientInjectionPath,
+    bool WebClientInjectionChanged,
+    string? WebClientInjectionError);

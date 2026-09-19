@@ -261,7 +261,10 @@ internal static class PluginConfigurationMapper
             Tags: new List<string>(value.Filters.Tags),
             DeleteEpisodes: Map(value.Filters.DeleteEpisodes),
             KeepSeriesKind: Map(value.Filters.KeepSeriesKind)),
-        Actions: new CoreCleanupRuleActions(Map(value.Actions.Kind), value.Actions.MarkAsUnplayed));
+        Actions: new CoreCleanupRuleActions(
+            Map(value.Actions.Kind),
+            value.Actions.MarkAsUnplayed,
+            value.Actions.NoticeDaysOverride));
 
     private static CoreCleanupRuleTriggerKind Map(ConfigCleanupRuleTriggerKind value) => value switch
     {

@@ -21,7 +21,12 @@
     <PackageReference Include="Jellyfin.Model">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="System.Text.Json" />
+    <!-- Jellyfin ships and initializes the matching SQLite provider. Referencing Core only
+         supplies compile-time types; SQLite assemblies and native libraries must not be
+         copied into the plugin directory, which Jellyfin scans recursively for assemblies. -->
+    <PackageReference Include="Microsoft.Data.Sqlite.Core">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +35,9 @@
     <None Remove="Web\commons.js" />
     <None Remove="Web\general.html" />
     <None Remove="Web\general.js" />
+    <None Remove="Web\leavingSoonItemMenu.js" />
+    <None Remove="Web\leavingSoonReview.html" />
+    <None Remove="Web\leavingSoonReview.js" />
     <None Remove="Web\troubleshooting.html" />
     <None Remove="Web\troubleshooting.js" />
   </ItemGroup>
@@ -40,11 +48,17 @@
     <EmbeddedResource Include="Web\commons.js" />
     <EmbeddedResource Include="Web\general.html" />
     <EmbeddedResource Include="Web\general.js" />
+    <EmbeddedResource Include="Web\leavingSoonItemMenu.js" />
+    <EmbeddedResource Include="Web\leavingSoonReview.html" />
+    <EmbeddedResource Include="Web\leavingSoonReview.js" />
     <EmbeddedResource Include="Web\troubleshooting.html" />
     <EmbeddedResource Include="Web\troubleshooting.js" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="$(ConfigurationName) == Debug">
+    <Error Condition="Exists('$(TargetDir)Microsoft.Data.Sqlite.dll') Or Exists('$(TargetDir)SQLitePCLRaw.core.dll') Or Exists('$(TargetDir)e_sqlite3.dll')"
+           Text="SQLite runtime files must be supplied by Jellyfin and must not be copied into the Media Cleaner plugin directory." />
+    <RemoveDir Directories="$(TargetDir)data\plugins\MediaCleaner" />
     <Exec Command="xcopy /I /Y $(TargetDir) &quot;$(TargetDir)/data/plugins/MediaCleaner/&quot;" />
   </Target>
 
