@@ -58,6 +58,11 @@ public sealed class LeavingSoonReviewPageTests
 
         page.Should().Contain("id=\"MediaCleanerWebClientInjectionState\"");
         script.Should().Contain("WebClientInjectionState");
+        script.Should().Contain("WebClientInjectionMethod");
+        script.Should().Contain("File Transformation");
+        script.Should().Contain("JavaScript Injector");
+        script.Should().Contain("startup filter");
+        script.Should().Contain("index.html fallback");
         script.Should().Contain("Install failed:");
         script.Should().Contain("index.html was not found");
     }

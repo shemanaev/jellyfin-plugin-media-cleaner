@@ -3,6 +3,9 @@ using System.IO;
 using FluentAssertions;
 using MediaBrowser.Common.Configuration;
 using MediaCleaner.LeavingSoon;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -63,6 +66,51 @@ public sealed class LeavingSoonWebClientInstallerTests
     }
 
     [Fact]
+    public void FileTransformationCallbackInjectsTheOwnedScriptBlock()
+    {
+        var transformed = LeavingSoonFileTransformation.Transform(new LeavingSoonFileTransformationPayload
+        {
+            Contents = "<html><body></body></html>",
+        });
+
+        transformed.Should().Contain(LeavingSoonWebClientInstaller.ScriptStart);
+        transformed.Should().Contain(LeavingSoonWebClientInstaller.ScriptTag);
+    }
+
+    [Fact]
+    public async Task StartupFilterInjectsServedIndexWithoutChangingTheFile()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "media-cleaner-installer-tests", Guid.NewGuid().ToString("N"));
+        var paths = new Mock<IApplicationPaths>();
+        paths.SetupGet(x => x.WebPath).Returns(directory);
+        var installer = new LeavingSoonWebClientInstaller(paths.Object, NullLogger.Instance);
+        var filter = new LeavingSoonWebClientStartupFilter(installer, NullLogger<LeavingSoonWebClientStartupFilter>.Instance);
+        installer.Install();
+
+        var app = new ApplicationBuilder(new ServiceCollection().BuildServiceProvider());
+        filter.Configure(next => next.Run(async context =>
+        {
+            context.Response.ContentType = "text/html; charset=utf-8";
+            await context.Response.WriteAsync("<html><body>Jellyfin</body></html>");
+        }))(app);
+        var pipeline = app.Build();
+        var responseBody = new MemoryStream();
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/web/index.html";
+        context.Request.Headers.IfNoneMatch = "old-etag";
+        context.Response.Body = responseBody;
+
+        await pipeline(context);
+
+        installer.Status.Method.Should().Be(WebClientInjectionMethod.StartupFilter);
+        context.Request.Headers.IfNoneMatch.ToString().Should().Be("old-etag");
+        System.Text.Encoding.UTF8.GetString(responseBody.ToArray())
+            .Should().Contain(LeavingSoonWebClientInstaller.ScriptTag);
+        File.Exists(Path.Combine(directory, "index.html")).Should().BeFalse();
+    }
+
+    [Fact]
     public void InstallerReportsInstalledStatusAndWhetherIndexChanged()
     {
         var directory = Path.Combine(Path.GetTempPath(), "media-cleaner-installer-tests", Guid.NewGuid().ToString("N"));
@@ -77,6 +125,7 @@ public sealed class LeavingSoonWebClientInstallerTests
             installer.Install();
 
             installer.Status.State.Should().Be(WebClientInjectionState.Installed);
+            installer.Status.Method.Should().Be(WebClientInjectionMethod.FileReplacement);
             installer.Status.Changed.Should().BeTrue();
             installer.Status.IndexPath.Should().Be(Path.Combine(directory, "index.html"));
             installer.Install();
@@ -100,6 +149,7 @@ public sealed class LeavingSoonWebClientInstallerTests
         installer.Install();
 
         installer.Status.State.Should().Be(WebClientInjectionState.MissingWebIndex);
+        installer.Status.Method.Should().Be(WebClientInjectionMethod.None);
         installer.Status.Error.Should().NotBeNullOrWhiteSpace();
     }
 }

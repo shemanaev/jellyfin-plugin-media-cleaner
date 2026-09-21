@@ -84,6 +84,7 @@ public class TroubleshootingController(
             leavingSoonRefreshError,
             leavingSoonStateError,
             webClientInjection.State.ToString(),
+            webClientInjection.Method.ToString(),
             webClientInjection.IndexPath,
             webClientInjection.Changed,
             webClientInjection.Error);
@@ -921,6 +922,7 @@ public sealed record MediaCleanerStatusResponse(
     string? LeavingSoonRefreshError,
     string? LeavingSoonStateError,
     string WebClientInjectionState,
+    string WebClientInjectionMethod,
     string WebClientInjectionPath,
     bool WebClientInjectionChanged,
     string? WebClientInjectionError);

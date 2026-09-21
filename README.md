@@ -41,7 +41,7 @@ Users can select **Keep until watched** from an item's menu in Jellyfin Web. The
 
 Favorites and tags continue to follow the configured cleanup and protection rules. Administrators can review and remove active personal protections on the **Leaving Soon keeps** tab. Disabling Leaving Soon removes the warnings but keeps existing personal protections.
 
-The collection is available through Jellyfin's normal **Collections** view. **Keep until watched** is added only to the Jellyfin Web installation hosted by the server; separate web clients can still open the collection but do not receive the extra menu action.
+The collection is available through Jellyfin's normal **Collections** view. **Keep until watched** is added only to the Jellyfin Web installation hosted by the server; separate web clients can still open the collection but do not receive the extra menu action. Media Cleaner injects that action through [JavaScript Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) when available, then [File Transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), otherwise through its built-in startup filter, and modifies `index.html` on disk only as a final fallback.
 
 ### Advanced
 

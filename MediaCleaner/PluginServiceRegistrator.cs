@@ -5,6 +5,7 @@ using MediaBrowser.Controller.Plugins;
 using MediaCleaner.Adapters;
 using MediaCleaner.Core;
 using MediaCleaner.LeavingSoon;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MediaCleaner;
@@ -13,6 +14,9 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
+        serviceCollection.AddSingleton<LeavingSoonWebClientInstaller>();
+        serviceCollection.AddSingleton<IStartupFilter, LeavingSoonWebClientStartupFilter>();
+        serviceCollection.AddHostedService<LeavingSoonWebClientInjectionService>();
         serviceCollection.AddSingleton<ILeavingSoonStateStore>(services =>
         {
             var paths = services.GetRequiredService<IApplicationPaths>();

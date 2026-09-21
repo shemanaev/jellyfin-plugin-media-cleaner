@@ -6,30 +6,33 @@ using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 using MediaCleaner.LeavingSoon;
-using Microsoft.Extensions.Logging;
 
 namespace MediaCleaner
 {
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         internal const string CommonsPageName = "MediaCleaner_commons_js";
-        private readonly LeavingSoonWebClientInstaller _webClientInstaller;
+        private readonly string _webIndexPath;
 
         public override string Name => "Media Cleaner";
 
         public override Guid Id => Guid.Parse("607fee77-97eb-41fe-bf22-26844d99ffb0");
 
-        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer, ILogger<Plugin> logger)
+        public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
-            _webClientInstaller = new LeavingSoonWebClientInstaller(applicationPaths, logger);
-            _webClientInstaller.Install();
+            _webIndexPath = System.IO.Path.Combine(applicationPaths.WebPath, "index.html");
         }
 
         public static Plugin? Instance { get; private set; }
 
-        internal WebClientInjectionStatus WebClientInjectionStatus => _webClientInstaller.Status;
+        internal WebClientInjectionStatus WebClientInjectionStatus =>
+            LeavingSoonWebClientInstaller.Current?.Status ?? new WebClientInjectionStatus(
+                WebClientInjectionState.NotChecked,
+                WebClientInjectionMethod.None,
+                _webIndexPath,
+                false);
 
         public override void UpdateConfiguration(BasePluginConfiguration configuration)
         {
@@ -47,7 +50,7 @@ namespace MediaCleaner
 
         public override void OnUninstalling()
         {
-            _webClientInstaller.Remove();
+            LeavingSoonWebClientInstaller.Current?.Remove();
             base.OnUninstalling();
         }
 

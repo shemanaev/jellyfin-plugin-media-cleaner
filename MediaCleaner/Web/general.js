@@ -272,12 +272,19 @@ function renderOverview(page) {
                 : lastRefresh ? new Date(lastRefresh).toLocaleString() : 'Never',
         Boolean(leavingSoonError || refreshError))
     const injectionState = readResponseValue(status, 'WebClientInjectionState', 'webClientInjectionState')
+    const injectionMethod = readResponseValue(status, 'WebClientInjectionMethod', 'webClientInjectionMethod')
     const injectionPath = readResponseValue(status, 'WebClientInjectionPath', 'webClientInjectionPath')
     const injectionChanged = readResponseValue(status, 'WebClientInjectionChanged', 'webClientInjectionChanged') === true
     const injectionError = readResponseValue(status, 'WebClientInjectionError', 'webClientInjectionError')
     const injectionInstalled = injectionState === 'Installed'
+    const injectionMethodText = ({
+        FileTransformation: 'File Transformation',
+        JavaScriptInjector: 'JavaScript Injector',
+        StartupFilter: 'startup filter',
+        FileReplacement: 'index.html fallback'
+    })[injectionMethod] || 'unknown method'
     const injectionText = injectionInstalled
-        ? injectionChanged ? 'Installed — reload open tabs' : 'Installed'
+        ? injectionMethodText
         : injectionState === 'MissingWebIndex'
             ? `Unavailable — index.html was not found at ${injectionPath || 'the configured web path'}`
             : injectionState === 'Failed'
