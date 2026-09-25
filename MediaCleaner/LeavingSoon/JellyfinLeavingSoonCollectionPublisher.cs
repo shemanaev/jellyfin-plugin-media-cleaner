@@ -51,12 +51,7 @@ internal sealed class JellyfinLeavingSoonCollectionPublisher(
             .Select(id => Guid.TryParse(id, out var parsed) && catalog.ItemsById.ContainsKey(id) ? parsed : Guid.Empty)
             .Where(id => id != Guid.Empty)
             .ToHashSet();
-        var current = collection.GetItems(new InternalItemsQuery
-        {
-            CollapseBoxSetItems = false,
-            Recursive = true,
-            Parent = collection,
-        }).Items.Select(x => x.Id).ToHashSet();
+        var current = GetMemberIds(collection);
 
         // Add first: a transient failure must retain previously published warnings.
         var additions = desired.Except(current).ToList();
@@ -73,12 +68,7 @@ internal sealed class JellyfinLeavingSoonCollectionPublisher(
 
         var verifiedCollection = libraryManager.GetItemById(collection.Id) as BoxSet
             ?? throw new InvalidOperationException("Owned Leaving Soon collection disappeared during synchronization.");
-        var verified = verifiedCollection.GetItems(new InternalItemsQuery
-        {
-            CollapseBoxSetItems = false,
-            Recursive = true,
-            Parent = verifiedCollection,
-        }).Items.Select(x => x.Id).ToHashSet();
+        var verified = GetMemberIds(verifiedCollection);
         if (!verified.SetEquals(desired))
         {
             throw new InvalidOperationException("Leaving Soon collection membership verification failed.");
@@ -86,6 +76,11 @@ internal sealed class JellyfinLeavingSoonCollectionPublisher(
 
         return collection.Id;
     }
+
+    // Direct members only. A recursive query also returns the episodes of linked
+    // seasons on Jellyfin 12, which breaks the diff and the verification below.
+    private static HashSet<Guid> GetMemberIds(BoxSet collection) =>
+        collection.GetLinkedChildren().Select(x => x.Id).ToHashSet();
 
     private BoxSet? FindOwnedCollection(Guid? collectionId)
     {
