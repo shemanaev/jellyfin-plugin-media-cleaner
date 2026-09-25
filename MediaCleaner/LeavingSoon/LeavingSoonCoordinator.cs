@@ -338,7 +338,10 @@ public sealed class LeavingSoonCoordinator(
         var warningPolicy = BuildWarningPolicy(policy, configuration.NoticeDays, generation, snapshot);
         var warningPlan = planner.Plan(new CleanupRequest(warningPolicy, catalog.Users, catalog.Items, false));
         var rulesById = policy.Rules.ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
-        return warningPlan.Decisions.Select(decision => new LeavingSoonCandidate(
+        // Announce only what the cascade would delete. A complete-season decision stays in
+        // Decisions even when a protected episode blocks it.
+        var deletableIds = warningPlan.Deletions.Select(x => x.ItemId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return warningPlan.Decisions.Where(decision => deletableIds.Contains(decision.Item.Id)).Select(decision => new LeavingSoonCandidate(
             decision.Item.Id,
             decision.Item.Kind,
             decision.Item.FullName,
