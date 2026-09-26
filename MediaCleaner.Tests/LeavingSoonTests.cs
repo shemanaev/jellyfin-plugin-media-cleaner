@@ -57,6 +57,43 @@ public sealed class LeavingSoonTests : IDisposable
     }
 
     [Fact]
+    public async Task CompleteSeasonWithProtectedEpisodeIsNotPublished()
+    {
+        var fixture = CreateFixture();
+        var created = fixture.Clock.UtcNow.AddDays(-27);
+        var episode = CreateItem(EpisodeId, MediaItemKind.Episode, created) with { SeasonId = SeasonId, SeriesId = SeriesId, Tags = ["mediacleaner_keep"] };
+        var season = CreateItem(SeasonId, MediaItemKind.Season, created) with { SeriesId = SeriesId, EpisodeIds = [EpisodeId] };
+        var series = CreateItem(SeriesId, MediaItemKind.Series, created) with { SeasonIds = [SeasonId], EpisodeIds = [EpisodeId] };
+        var movie = CreateItem(ItemId, MediaItemKind.Movie, created);
+        var catalog = new CleanupCatalog([], [episode, season, series, movie], new Dictionary<string, BaseItem>(), new Dictionary<string, JellyfinUser>());
+        var delete = CreatePolicy(30).Rules.Single();
+        var completeSeasons = delete with
+        {
+            Id = "season-rule",
+            Filters = delete.Filters with { MediaKinds = [MediaItemKind.Episode], DeleteEpisodes = SeriesDeleteKind.Season },
+        };
+        var keep = delete with
+        {
+            Id = "keep-rule",
+            Trigger = new CleanupRuleTrigger(CleanupRuleTriggerKind.AddedAge, 0),
+            Filters = delete.Filters with
+            {
+                MediaKinds = [MediaItemKind.Movie, MediaItemKind.Episode],
+                EnableTagFilter = true,
+                TagFilterMode = TagMode.Inclusion,
+                Tags = ["mediacleaner_keep"],
+            },
+            Actions = new CleanupRuleActions(MediaCleaner.Core.CleanupRuleActionKind.Protect, false),
+        };
+
+        await fixture.Coordinator.PrepareAsync(new CleanupPolicy([delete with { Filters = delete.Filters with { MediaKinds = [MediaItemKind.Movie] } }, completeSeasons, keep], false), catalog, Enabled(), CancellationToken.None);
+
+        fixture.Publisher.ItemIds.Should().Contain(ItemId);
+        fixture.Publisher.ItemIds.Should().NotContain(SeasonId,
+            "the deletion cascade blocks a season that contains a protected episode, so it must not be announced");
+    }
+
+    [Fact]
     public async Task EffectiveNoticeUsesMaximumAcrossMatchingDeleteRulesIncludingZeroOverride()
     {
         var fixture = CreateFixture();
