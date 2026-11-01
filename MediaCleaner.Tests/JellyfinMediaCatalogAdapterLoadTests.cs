@@ -204,6 +204,43 @@ public class JellyfinMediaCatalogAdapterLoadTests
         anchor.EpisodeNumber.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Create_LatestWatchedKeepsPreviousEpisodeUntilNextIsPlayed(bool nextIsPlayed)
+    {
+        var user = CreateUser(0);
+        var libraryManager = new Mock<ILibraryManager>();
+        var library = TestLibrary.Create(libraryManager.Object, programCount: 1, episodeCount: 2);
+        var userData = new CountingUserDataManager([user], library.AllItems);
+        var nextData = PlayedData(Now.AddDays(-2));
+        nextData.Played = nextIsPlayed;
+        nextData.PlaybackPositionTicks = nextIsPlayed ? 0 : TimeSpan.FromMinutes(16).Ticks;
+        userData.Set(user, library.Episodes[1], nextData);
+        SetupUsers(libraryManager, [user]);
+        SetupLibrary(libraryManager, library,
+            new Dictionary<(BaseItemKind Kind, string UserId, ItemSortBy SortBy), int>());
+        var adapter = new JellyfinMediaCatalogAdapter(
+            NullLogger<JellyfinMediaCatalogAdapter>.Instance,
+            CreateUserManager([user]), libraryManager.Object, userData.Manager,
+            new CountingTvHierarchyProvider(library));
+        var policy = new CleanupPolicy(
+            [EpisodeRule("latest-watched", CleanupRuleTriggerKind.Played, 1, SeriesKeepKind.LatestWatched)],
+            AllowDeleteIfPlayedBeforeAdded: false);
+
+        var catalog = adapter.Create(policy, CancellationToken.None);
+        var clock = new Mock<IClock>();
+        clock.SetupGet(x => x.UtcNow).Returns(Now);
+        var planner = new CleanupPlanner(clock.Object, new OrdinalPathMatcher(), new NoExtraFileProbe());
+        var plan = planner.Plan(new CleanupRequest(policy, catalog.Users, catalog.Items, false));
+
+        plan.Decisions.Should().HaveCount(nextIsPlayed ? 1 : 0,
+            "a partial watch must not release the previously completed episode for deletion");
+        var anchor = catalog.Items.Single(x => x.Kind == MediaItemKind.Series)
+            .LatestWatchedEpisodes.Should().ContainSingle().Subject;
+        anchor.EpisodeId.Should().Be(library.Episodes[nextIsPlayed ? 1 : 0].Id.ToString("N"));
+    }
+
     [Fact]
     public void Create_OverlappingPlayedRules_KeepUnionOfRuleCandidateWindows()
     {

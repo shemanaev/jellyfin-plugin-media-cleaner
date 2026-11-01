@@ -838,7 +838,9 @@ internal sealed class JellyfinMediaCatalogAdapter(
                 var latestEpisodes = new List<Episode>();
                 foreach (var episode in episodes)
                 {
-                    var playedDate = GetUserData(user, episode)?.LastPlayedDate;
+                    var data = GetUserData(user, episode);
+                    // Starting an episode also updates LastPlayedDate; only completed watches replace the anchor.
+                    var playedDate = data?.Played == true ? data.LastPlayedDate : null;
                     if (!playedDate.HasValue || (latestDate.HasValue && playedDate < latestDate))
                     {
                         continue;
